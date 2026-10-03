@@ -1,8 +1,8 @@
 # ScoutAI
 
-ScoutAI is a browser-based sports performance and scouting app designed to turn raw match or training footage into structured, professional-grade player insights. It lets you upload a video, select the sport, identify one or more athletes, and generate a scoring report powered by Google Gemini multimodal AI.
+ScoutAI is a browser-based sports performance and scouting app designed to turn raw match or training footage into structured, professional-grade player insights. It lets you upload a video, select[...]
 
-This project is intentionally lightweight: it runs entirely in the browser as a static front-end app with HTML, CSS, and vanilla JavaScript. There is no separate backend service, database, or build pipeline required for normal use.
+This project is intentionally lightweight: it runs entirely in the browser as a static front-end app with HTML, CSS, and vanilla JavaScript. There is no separate backend service, database, or build[...]
 
 ## Overview
 
@@ -60,6 +60,15 @@ ScoutAI currently includes tailored metrics and evaluation logic for:
 - Gemini Files API for video upload handling
 - Chart.js via jsDelivr
 - Google Fonts
+
+## Getting started
+
+### Clone the repository
+
+```bash
+git clone https://github.com/yussef2009/scout.1.git
+cd scout.1
+```
 
 ## Local setup
 
