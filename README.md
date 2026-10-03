@@ -1,111 +1,120 @@
 # ScoutAI
 
-ScoutAI is a browser-based, AI-powered sports performance analysis application. Upload sports footage, select the sport, identify one or more athletes, and generate a detailed scouting report using Google Gemini vision AI.
+ScoutAI is a browser-based sports performance and scouting app designed to turn raw match or training footage into structured, professional-grade player insights. It lets you upload a video, select the sport, identify one or more athletes, and generate a scoring report powered by Google Gemini multimodal AI.
 
-The project is intentionally lightweight: it is a static front-end application built with HTML, CSS, and vanilla JavaScript. There is no application server, database, build system, or framework required.
+This project is intentionally lightweight: it runs entirely in the browser as a static front-end app with HTML, CSS, and vanilla JavaScript. There is no separate backend service, database, or build pipeline required for normal use.
 
-> **Project status:** This repository contains a complete front-end application with Dynamic Model Resolution. AI analysis requires a valid Google Gemini API key and an internet connection.
+## Overview
 
-## Features
+ScoutAI is built for coaches, scouts, athletes, and analysts who want a fast way to:
 
-- Modern responsive dark-themed interface branded as ScoutAI.
-- **Dynamic Model Resolution Engine**: Built-in priority fallback list across stable models (`gemini-2.5-flash` → `gemini-2.0-flash` → `gemini-1.5-flash` → `gemini-2.5-flash-lite` → `gemini-1.5-pro`). If the primary or requested model is unavailable (404), rate-limited (429), or overloaded (503), the engine automatically switches to a working alternative without interrupting the user.
-- Interactive model settings modal with live fallback testing and active model badge.
-- Drag-and-drop or button-based video upload.
-- Local video preview before analysis.
-- Sport-specific analysis criteria across 10 major sports.
-- AI-powered player detection from video keyframes or uploaded video files.
-- Support for analyzing a single player or multiple selected players.
-- Individual player cards containing:
-  - Player label or jersey number
-  - Team or side
-  - Position or role
-  - Visual description
-  - Standout trait
-  - Team color and emoji
-- AI-generated scouting reports containing:
-  - Overall score from 0–100
-  - Overall grade from S to D
-  - Player summary and one-line assessment
-  - Descriptive tags
-  - Sport-specific performance metrics
-  - Metric notes and visual score bars
-  - Performance radar chart
-  - Metric breakdown bar chart
-  - Strengths
-  - Areas for improvement
-  - Actionable training recommendations
-  - Full scouting narrative
-  - Professional player comparisons
-  - Potential rating, position, and age category
-- Multi-player report tabs for reviewing reports one athlete at a time.
-- Downloadable plain-text scouting reports.
-- Resilient JSON extraction and self-healing parser for truncated or markdown-wrapped model responses.
-- Progress indicators for upload, processing, player selection, metric generation, and report creation.
-- Retry and fallback flows when player detection is unsuccessful.
-- API key modal with password visibility toggle and model selector.
-- API key persistence through browser `localStorage`.
-- Responsive layouts for desktop, tablet, and mobile screens.
+- review player performance from video footage
+- compare athletes across key metrics
+- receive role-specific tactical analysis
+- generate strengths, weaknesses, and training recommendations
+- track a player's progression over multiple analyses
+
+## Key features
+
+- dark, modern, responsive UI for sports analysis workflows
+- drag-and-drop or file-picker video uploads
+- local video preview before analysis
+- sport-specific evaluation logic across multiple disciplines
+- AI-powered player detection and multi-player selection
+- role-based analysis and position suitability scoring
+- performance metrics, charting, and summary cards
+- strengths, weaknesses, and actionable recommendations
+- dynamic model fallback logic for Gemini reliability
+- browser-based API key setup with local persistence
+- downloadable report export for sharing or review
 
 ## Supported sports
 
-ScoutAI currently provides tailored metrics for the following sports:
+ScoutAI currently includes tailored metrics and evaluation logic for:
 
-| Sport | Example analysis areas | Example roles |
-| --- | --- | --- |
-| Football / Soccer | Pace, dribbling, shooting, passing, defending, stamina, vision, positioning | Attacker, midfielder, defender |
-| Basketball | Shooting, ball handling, passing, defense, athleticism, basketball IQ, rebounding, speed | Guard, forward, center |
-| Tennis | Serve, forehand, backhand, volley, footwork, mental strength, consistency, power | Baseline player, net player |
-| Swimming | Technique, stroke rate, turn efficiency, breathing, endurance, start, kick, arm pull | Freestyle, backstroke, and other events |
-| Athletics | Speed, acceleration, technique, endurance, reaction time, form, stride length, efficiency | Sprinter, long-distance runner, jumper |
-| Volleyball | Serving, spiking, blocking, setting, digging, positioning, teamwork, jump | Setter, libero, spiker |
-| Boxing | Jab, cross, hook, defense, footwork, chin, power, stamina | Orthodox, southpaw |
-| Gymnastics | Flexibility, balance, strength, coordination, artistry, landings, difficulty, execution | Artistic, rhythmic |
-| Cycling | Power output, cadence, climbing, sprinting, aerodynamics, endurance, cornering, recovery | Climber, sprinter, all-rounder |
-| Baseball | Batting average, power, contact, speed, fielding, arm strength, pitch velocity, control | Pitcher, batter, fielder |
+- Football / Soccer
+- Basketball
+- Tennis
+- Swimming
+- Athletics
+- Volleyball
+- Boxing
+- Gymnastics
+- Cycling
+- Baseball
 
-The sport configuration, metric names, radar labels, emojis, and role descriptions are defined in `app.js` in the `SPORT_CONFIG` object.
+## How it works
 
-## Dynamic Model Resolution
+1. Select the sport and analysis context.
+2. Upload a video clip or match footage.
+3. Choose the athlete or athletes to evaluate.
+4. Let Gemini analyze the footage and generate a scouting dossier.
+5. Review the overall rating, tactical profile, performance chart, strengths, weaknesses, and recommendations.
 
-The application implements an intelligent **Dynamic Model Resolution** architecture to guarantee maximum reliability and continuous uptime:
-
-1. **Priority List of Stable Models**:
-   - `gemini-2.5-flash`: Primary high-intelligence fast multimodal model.
-   - `gemini-2.0-flash`: Proven multimodal workhorse.
-   - `gemini-1.5-flash`: Universally supported reliable fallback with wide global quota.
-   - `gemini-2.5-flash-lite`: Ultra-fast lightweight fallback.
-   - `gemini-2.0-flash-lite`: Fast lightweight fallback.
-   - `gemini-1.5-pro`: Deep reasoning Pro fallback.
-
-2. **Automatic Failure Detection & Seamless Fallback**:
-   - If the requested or primary model returns `404 Not Found` (such as experimental, obsolete, or non-existent identifiers like `gemini-3.8-flash`), the engine detects the unavailability and automatically promotes the next working alternative from the priority list.
-   - If a model encounters capacity/quota limits (`429 Too Many Requests` or `503 Service Unavailable`), the engine switches to alternative stable models instead of leaving the user stalled.
-   - Successful fallback updates the active working model in `localStorage` and the UI badge so subsequent requests execute immediately against the working alternative.
-
-3. **Live Testing & Verification**:
-   - The settings modal includes a **Test Dynamic Resolution** button. Users can test any primary model (including testing invalid models like `gemini-3.8-flash`) to verify live that the system automatically resolves to a working stable alternative.
-
-## Technology stack
+## Tech stack
 
 - HTML5
 - CSS3
 - Vanilla JavaScript (ES6+)
 - Google Gemini API (`v1beta:generateContent`)
-- Gemini Files API for video uploads
-- Chart.js via jsDelivr CDN
-- Google Fonts: Outfit & JetBrains Mono
+- Gemini Files API for video upload handling
+- Chart.js via jsDelivr
+- Google Fonts
 
-## Getting started
+## Local setup
 
-Run locally using any static web server:
+Because this is a static frontend app, you can run it from any local web server.
+
+### Option 1: Python
 
 ```bash
-# Python
 python -m http.server 8000
+```
 
-# or Node
+Then open:
+
+```text
+http://localhost:8000
+```
+
+### Option 2: Node
+
+```bash
 npx serve .
 ```
 
-Open `http://localhost:8000` in your browser, connect your Gemini API key, and begin analyzing sports footage.
+## Required configuration
+
+Before using the analysis tools, you must:
+
+- open the app in a browser
+- provide a valid Google Gemini API key via the settings modal
+- keep an internet connection available for API requests
+
+The app stores the API key in the browser's `localStorage` so it remains available between sessions on the same device/browser.
+
+## Project structure
+
+```text
+.
+├── index.html
+├── style.css
+├── app.js
+├── README.md
+└── assets or generated UI states (runtime-generated)
+```
+
+## Notes
+
+- The app is designed for front-end-only local experimentation and demos.
+- Analysis depends on external Gemini availability and quota.
+- The code includes a fallback and retry strategy for model resolution, so users can continue with alternate models when a preferred model is unavailable.
+- The app includes robust parsing logic for model responses, including handling markdown wrappers or partial JSON output.
+
+## Status
+
+The repository contains a complete front-end sports scouting interface with dynamic model resolution and AI analysis flow. It is ready to run locally for browser-based testing and evaluation.
+
+## License
+
+This repository currently does not specify a license file, so usage rights are governed by the repository owner unless otherwise stated.
