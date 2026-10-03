@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ScoutAI — AI-Powered Sports Performance Analysis</title>
+  <meta name="description" content="Upload your sports video and get a comprehensive AI-powered scouting report with ratings, metrics, and professional analysis across football, basketball, tennis, and more." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ─── BACKGROUND ORBS ─── -->
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+
+  <!-- ─── NAV ─── -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <div class="nav-logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" stroke="url(#lg1)" stroke-width="2"/>
+          <path d="M10 16 L14 12 L18 16 L22 10" stroke="url(#lg2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="22" cy="10" r="2" fill="#7c3aed"/>
+          <defs>
+            <linearGradient id="lg1" x1="2" y1="2" x2="30" y2="30" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/>
+            </linearGradient>
+            <linearGradient id="lg2" x1="10" y1="16" x2="22" y2="10" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#38bdf8"/><stop offset="1" stop-color="#818cf8"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span>Scout<span class="logo-accent">AI</span></span>
+      </div>
+      <div class="nav-links">
+        <a href="#upload-section">Analyze</a>
+        <a href="#dashboard-section" id="navDashboardLink">Dashboard</a>
+        <a href="#how-it-works">How It Works</a>
+        <a href="#sports-section">Sports</a>
+      </div>
+      <div class="nav-actions">
+        <button class="nav-model-badge" id="navModelBadge" title="Dynamic Model Resolution: Click to configure models">
+          <span class="pulse-dot green"></span>
+          <span id="navModelName">gemini-2.5-flash</span>
+        </button>
+        <button class="btn-nav-profile" id="openProfileModal" title="My Profile">
+          <span class="profile-nav-avatar" id="navProfileAvatar">👤</span>
+          <span id="navProfileName">My Profile</span>
+        </button>
+        <button class="btn-nav" id="openApiModal">Connect API Key</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ─── HERO ─── -->
+  <header class="hero" id="home">
+    <div class="hero-badge">
+      <span class="pulse-dot"></span>
+      AI-Powered Sports Intelligence
+    </div>
+    <h1 class="hero-title">
+      Professional Scout<br/>
+      <span class="gradient-text">In Your Pocket</span>
+    </h1>
+    <p class="hero-subtitle">
+      Upload any sports video and receive a full professional scouting report — powered by advanced AI vision analysis. Ratings, strengths, weaknesses, and improvement areas across every major sport.
+    </p>
+    <div class="hero-actions">
+      <a href="#upload-section" class="btn-primary">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload Video
+      </a>
+      <a href="#how-it-works" class="btn-secondary">See How It Works</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat-item"><span class="stat-num">10+</span><span class="stat-label">Sports</span></div>
+      <div class="stat-divider"></div>
+      <div class="stat-item"><span class="stat-num">50+</span><span class="stat-label">Metrics</span></div>
+      <div class="stat-divider"></div>
+      <div class="stat-item"><span class="stat-num">AI</span><span class="stat-label">Powered</span></div>
+    </div>
+  </header>
+
+  <!-- ─── HOW IT WORKS ─── -->
+  <section class="how-section" id="how-it-works">
+    <div class="section-label">Process</div>
+    <h2 class="section-title">How It Works</h2>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-num">01</div>
+        <div class="step-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <h3>Select Your Sport</h3>
+        <p>Choose from 10+ supported sports. Each sport has tailored metrics and evaluation criteria.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">02</div>
+        <div class="step-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <h3>Upload Video</h3>
+        <p>Upload any video footage of the athlete in action. Supports MP4, MOV, AVI and more.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">03</div>
+        <div class="step-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M16 11c0 2.21-1.79 4-4 4s-4-1.79-4-4 1.79-4 4-4 4 1.79 4 4z"/><path d="M3 11c0-4.97 4.03-9 9-9s9 4.03 9 9"/></svg>
+        </div>
+        <h3>Select Player(s)</h3>
+        <p>If multiple players appear, AI detects them all — you pick who to scout. Analyze one or the whole team.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">04</div>
+        <div class="step-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </div>
+        <h3>Full Scout Report</h3>
+        <p>Receive a professional-grade scouting report with scores, insights, and actionable recommendations.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── SPORTS SELECTOR ─── -->
+  <section class="sports-section" id="sports-section">
+    <div class="section-label">Supported</div>
+    <h2 class="section-title">Choose Your Sport</h2>
+    <p class="section-sub">Select the sport to tailor the AI analysis specifically for that discipline's requirements.</p>
+    <div class="sports-grid" id="sportsGrid">
+      <button class="sport-btn active" data-sport="football" id="sport-football">
+        <span class="sport-emoji">⚽</span>
+        <span class="sport-name">Football</span>
+        <span class="sport-sub">Soccer</span>
+      </button>
+      <button class="sport-btn" data-sport="basketball" id="sport-basketball">
+        <span class="sport-emoji">🏀</span>
+        <span class="sport-name">Basketball</span>
+        <span class="sport-sub">NBA style</span>
+      </button>
+      <button class="sport-btn" data-sport="tennis" id="sport-tennis">
+        <span class="sport-emoji">🎾</span>
+        <span class="sport-name">Tennis</span>
+        <span class="sport-sub">Singles/Doubles</span>
+      </button>
+      <button class="sport-btn" data-sport="swimming" id="sport-swimming">
+        <span class="sport-emoji">🏊</span>
+        <span class="sport-name">Swimming</span>
+        <span class="sport-sub">Competitive</span>
+      </button>
+      <button class="sport-btn" data-sport="athletics" id="sport-athletics">
+        <span class="sport-emoji">🏃</span>
+        <span class="sport-name">Athletics</span>
+        <span class="sport-sub">Track & Field</span>
+      </button>
+      <button class="sport-btn" data-sport="volleyball" id="sport-volleyball">
+        <span class="sport-emoji">🏐</span>
+        <span class="sport-name">Volleyball</span>
+        <span class="sport-sub">Indoor/Beach</span>
+      </button>
+      <button class="sport-btn" data-sport="boxing" id="sport-boxing">
+        <span class="sport-emoji">🥊</span>
+        <span class="sport-name">Boxing</span>
+        <span class="sport-sub">Combat Sports</span>
+      </button>
+      <button class="sport-btn" data-sport="gymnastics" id="sport-gymnastics">
+        <span class="sport-emoji">🤸</span>
+        <span class="sport-name">Gymnastics</span>
+        <span class="sport-sub">Artistic</span>
+      </button>
+      <button class="sport-btn" data-sport="cycling" id="sport-cycling">
+        <span class="sport-emoji">🚴</span>
+        <span class="sport-name">Cycling</span>
+        <span class="sport-sub">Road/Track</span>
+      </button>
+      <button class="sport-btn" data-sport="baseball" id="sport-baseball">
+        <span class="sport-emoji">⚾</span>
+        <span class="sport-name">Baseball</span>
+        <span class="sport-sub">Batting/Pitching</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ─── UPLOAD SECTION ─── -->
+  <section class="upload-section" id="upload-section">
+    <div class="section-label">Analysis</div>
+    <h2 class="section-title">Upload & Analyze</h2>
+    <p class="section-sub">Upload your video footage and let AI generate your complete scouting report.</p>
+
+    <div class="upload-container">
+      <!-- Upload Zone -->
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="videoInput" accept="video/*" hidden />
+        <div class="upload-icon-wrap">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="url(#ugr)" stroke-width="1.5">
+            <defs>
+              <linearGradient id="ugr" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/>
+              </linearGradient>
+            </defs>
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <h3 class="upload-title">Drop Your Video Here</h3>
+        <p class="upload-hint">Supports MP4, MOV, AVI, WEBM • Any size via Frame Analysis · Up to 2GB for Full Upload</p>
+        <button class="btn-upload" id="chooseFileBtn">Choose File</button>
+      </div>
+
+      <!-- Video Preview (hidden until file chosen) -->
+      <!-- Large-video notice banner (shown when file > 2GB) -->
+      <div class="large-video-notice hidden" id="largeVideoNotice">
+        <div class="lvn-icon">⚡</div>
+        <div class="lvn-body">
+          <strong>Large Video Detected</strong>
+          <span id="lvnFilename"></span> — The Gemini API accepts a maximum of 2 GB per upload.
+          <strong>Frame Analysis</strong> is already active (no upload needed). You can also
+          <button class="lvn-clip-btn" id="openClipperBtn">✂️ Trim a Clip</button> to upload a specific segment.
+        </div>
+        <button class="lvn-close" id="closeLvnBtn" title="Dismiss">×</button>
+      </div>
+
+      <div class="video-preview-wrap hidden" id="videoPreviewWrap">
+        <video id="videoPreview" controls></video>
+        <div class="video-meta" id="videoMeta"></div>
+
+        <!-- ── Player Detection Banner (shown after scan) ── -->
+        <div class="player-detect-banner hidden" id="playerDetectBanner">
+          <div class="pdb-icon">👥</div>
+          <div class="pdb-text">
+            <strong id="pdbCount">Multiple players detected</strong>
+            <span id="pdbSub">Select who you want to analyze below</span>
+          </div>
+          <button class="pdb-reset" id="pdbReset" title="Re-scan">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+          </button>
+        </div>
+
+        <!-- ── Player Cards Grid ── -->
+        <div class="player-select-area hidden" id="playerSelectArea">
+          <div class="psa-header">
+            <span class="psa-title">Detected Players</span>
+            <div class="psa-actions">
+              <button class="psa-pill" id="selectAllBtn">Select All</button>
+              <button class="psa-pill" id="clearAllBtn">Clear</button>
+            </div>
+          </div>
+          <div class="player-cards-grid" id="playerCardsGrid"></div>
+          <div class="psa-note" id="psaNote">💡 You can select multiple players to get individual reports for each.</div>
+        </div>
+
+        <div class="analyze-actions">
+          <button class="btn-scan" id="scanPlayersBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            Detect Players
+          </button>
+          <button class="btn-analyze hidden" id="analyzeBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span id="analyzeBtnLabel">Analyze Selected Player</span>
+          </button>
+          <button class="btn-ghost" id="clearVideoBtn">Change Video</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── RESULTS SECTION ─── -->
+  <section class="results-section hidden" id="resultsSection">
+    <div class="results-header">
+      <div class="section-label">Scouting Report</div>
+      <h2 class="section-title" id="reportTitle">Player Analysis Report</h2>
+      <div class="report-meta" id="reportMeta"></div>
+    </div>
+
+    <!-- Loading state -->
+    <div class="loading-state" id="loadingState">
+      <div class="loader-ring"></div>
+      <p class="loading-label" id="loadingLabel">Analyzing footage...</p>
+      <div class="loading-steps" id="loadingSteps">
+        <div class="load-step active" id="ls1">📡 Uploading video to AI...</div>
+        <div class="load-step" id="ls2">🎯 Focusing on selected player(s)...</div>
+        <div class="load-step" id="ls3">📊 Generating performance metrics...</div>
+        <div class="load-step" id="ls4">📝 Compiling scouting report...</div>
+      </div>
+    </div>
+
+    <!-- Report content -->
+    <div class="report-content hidden" id="reportContent">
+
+      <!-- Overall Score -->
+      <div class="overall-score-card" id="overallScoreCard">
+        <div class="score-left">
+          <div class="score-ring-wrap">
+            <canvas id="scoreRing" width="160" height="160"></canvas>
+            <div class="score-center">
+              <span class="score-num" id="overallScoreNum">--</span>
+              <span class="score-label">/ 100</span>
+            </div>
+          </div>
+          <div class="score-grade" id="scoreGrade">—</div>
+          <div class="score-grade-label">Overall Grade</div>
+        </div>
+        <div class="score-right">
+          <div class="score-sport-badge" id="scoreSportBadge"></div>
+          <span class="score-position-badge" id="scorePositionBadge"></span>
+          <h3 id="scorePlayerSummary">Analyzing...</h3>
+          <p id="scoreOneLiner"></p>
+          <div class="score-tags" id="scoreTags"></div>
+        </div>
+      </div>
+
+      <!-- Tactical Position Profile Card -->
+      <div class="glass-card position-profile-card" id="positionProfileCard">
+        <div class="pp-header">
+          <div class="pp-left">
+            <div class="pp-tag-row">
+              <span class="pp-sport-chip" id="ppSportChip">⚽ Football</span>
+              <span class="pp-role-badge" id="ppRoleBadge">Position: --</span>
+              <span class="pp-category-chip" id="ppCategoryChip">Tactical Role</span>
+            </div>
+            <h3 class="pp-role-title" id="ppRoleTitle">Position Profile &amp; Role Suitability</h3>
+            <p class="pp-role-desc" id="ppRoleDesc">Calibrated positional analysis based on sport standards and tactical execution.</p>
+          </div>
+          <div class="pp-right">
+            <div class="pp-meter-box">
+              <div class="pp-meter-num" id="ppSuitabilityNum">--%</div>
+              <div class="pp-meter-label">Role Suitability</div>
+            </div>
+          </div>
+        </div>
+        <div class="pp-duty-box">
+          <div class="pp-duty-label">Tactical Duty &amp; Pitch Execution</div>
+          <p class="pp-duty-text" id="ppDutyText">Evaluating positional responsibilities...</p>
+        </div>
+        <div class="pp-key-metrics-bar">
+          <span class="pp-km-title">Primary Position Metrics:</span>
+          <div class="pp-km-list" id="ppKeyMetricsList"></div>
+        </div>
+      </div>
+
+      <!-- Playing Time, Points & Substitution Exchanges Card -->
+      <div class="glass-card playing-time-card hidden" id="playingTimeCard">
+        <div class="pt-header">
+          <div class="pt-left">
+            <div class="pt-tag-row">
+              <span class="pt-status-badge" id="ptStatusBadge">⏱️ On-Field Analysis</span>
+              <span class="pt-sub-badge" id="ptSubBadge">Starter / Active</span>
+            </div>
+            <h3 class="pt-title" id="ptTitle">Playing Time &amp; Court Exchanges</h3>
+            <p class="pt-desc">On-field duration, points scored/differential, and entry/exit substitution timeline.</p>
+          </div>
+          <div class="pt-right">
+            <div class="pt-meter-box">
+              <div class="pt-meter-num" id="ptMinutesNum">--</div>
+              <div class="pt-meter-label">Active Court Time</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-metrics-bar">
+          <div class="pt-metric-tile">
+            <div class="pt-metric-label">Points &amp; Scoring Impact</div>
+            <div class="pt-metric-val" id="ptPointsVal">--</div>
+          </div>
+          <div class="pt-metric-tile">
+            <div class="pt-metric-label">Court Workload</div>
+            <div class="pt-workload-bar-wrap">
+              <div class="pt-workload-fill" id="ptWorkloadFill" style="width: 0%;"></div>
+            </div>
+            <div class="pt-workload-text" id="ptWorkloadText">0% of match</div>
+          </div>
+        </div>
+
+        <div class="pt-exchanges-box" id="ptExchangesBox">
+          <div class="pt-section-title">🔄 Court Exchanges &amp; Substitutions Timeline</div>
+          <div class="pt-exchanges-timeline" id="ptExchangesTimeline">
+            <!-- Dynamically populated exchange items -->
+          </div>
+        </div>
+
+        <div class="pt-impact-box" id="ptImpactBox">
+          <div class="pt-impact-label">Tactical Impact &amp; Team Momentum Shift</div>
+          <p class="pt-impact-text" id="ptImpactText">Evaluating game momentum...</p>
+        </div>
+      </div>
+
+      <!-- Vertical Jump & Flight Kinematics Card -->
+      <div class="glass-card kinematics-card hidden" id="kinematicsCard">
+        <div class="kine-header">
+          <div class="kine-left">
+            <div class="kine-tag-row">
+              <span class="kine-status-badge" id="kineSportBadge">🦘 Flight Kinematics</span>
+              <span class="kine-standard-badge" id="kineStandardBadge">FIVB / Second Spectrum Biomechanics</span>
+            </div>
+            <h3 class="kine-title" id="kineTitle">Vertical Jump &amp; Flight Kinematics ("Hang Time")</h3>
+            <p class="kine-desc">Ground contact impulse, peak elevation clearance, flight duration &amp; impact flexion safety.</p>
+          </div>
+          <div class="kine-right">
+            <div class="kine-meter-box">
+              <div class="kine-meter-num" id="kineHangTimeNum">--s</div>
+              <div class="kine-meter-label">Estimated Hang Time</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="kine-metrics-grid">
+          <div class="kine-metric-tile">
+            <div class="kine-metric-label">Peak Vertical Displacement</div>
+            <div class="kine-metric-val highlight-cyan" id="kinePeakVertVal">-- cm</div>
+            <div class="kine-metric-sub">Hip center clearance above baseline</div>
+          </div>
+          <div class="kine-metric-tile">
+            <div class="kine-metric-label">Takeoff Quality Score</div>
+            <div class="kine-metric-val highlight-indigo" id="kineTakeoffVal">-- / 100</div>
+            <div class="kine-metric-sub">Impulse sync &amp; plant mechanics</div>
+          </div>
+          <div class="kine-metric-tile">
+            <div class="kine-metric-label">Landing Impact Flexion</div>
+            <div class="kine-landing-badge kine-badge-none" id="kineLandingBadge">--</div>
+            <div class="kine-metric-sub">Knee flexion &amp; force dissipation</div>
+          </div>
+          <div class="kine-metric-tile">
+            <div class="kine-metric-label">Ground Contact Time (GCT)</div>
+            <div class="kine-metric-val highlight-emerald" id="kineGctVal">-- ms</div>
+            <div class="kine-metric-sub">Final foot-plant duration</div>
+          </div>
+        </div>
+
+        <div class="kine-bio-box" id="kineBioBox">
+          <div class="kine-bio-label">🔬 Biomechanical Breakdown &amp; Kinetic Chain</div>
+          <p class="kine-bio-text" id="kineBioText">Analyzing jump elevation and kinetic chain efficiency...</p>
+        </div>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="stats-row">
+        <!-- Radar Chart -->
+        <div class="glass-card radar-card">
+          <h3 class="card-title">Performance Radar</h3>
+          <div class="radar-wrap">
+            <canvas id="radarChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Bar Chart -->
+        <div class="glass-card bars-card">
+          <h3 class="card-title">Metric Breakdown</h3>
+          <div class="bars-wrap">
+            <canvas id="barsChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detailed Metrics Cards -->
+      <div class="metrics-grid" id="metricsGrid"></div>
+
+      <!-- Strengths & Weaknesses -->
+      <div class="sw-row">
+        <div class="glass-card sw-card strengths-card">
+          <h3 class="card-title">
+            <span class="card-icon green">✦</span> Strengths
+          </h3>
+          <ul class="sw-list" id="strengthsList"></ul>
+        </div>
+        <div class="glass-card sw-card weaknesses-card">
+          <h3 class="card-title">
+            <span class="card-icon red">✦</span> Areas to Improve
+          </h3>
+          <ul class="sw-list" id="weaknessesList"></ul>
+        </div>
+      </div>
+
+      <!-- Recommendations -->
+      <div class="glass-card recs-card">
+        <h3 class="card-title">
+          <span class="card-icon blue">⚡</span> AI Recommendations
+        </h3>
+        <div class="recs-list" id="recsList"></div>
+      </div>
+
+      <!-- Full Narrative -->
+      <div class="glass-card narrative-card">
+        <h3 class="card-title">
+          <span class="card-icon purple">📋</span> Full Scout's Report
+        </h3>
+        <div class="narrative-text" id="narrativeText"></div>
+      </div>
+
+      <!-- Comparison -->
+      <div class="glass-card comparison-card">
+        <h3 class="card-title">
+          <span class="card-icon gold">🏆</span> Pro Player Comparison
+        </h3>
+        <div class="comparison-content" id="comparisonContent"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="report-actions">
+        <button class="btn-primary" id="downloadReportBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export &amp; Download Report
+        </button>
+        <button class="btn-secondary" id="printReportBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Save PDF / Print Dossier
+        </button>
+        <button class="btn-ghost" id="newAnalysisBtn">Analyze Another Video</button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ─── PERFORMANCE DASHBOARD SECTION ─── -->
+  <section class="dashboard-section" id="dashboard-section">
+    <div class="dashboard-header-wrap">
+      <div class="dashboard-header-left">
+        <div class="section-label">Performance Engine</div>
+        <h2 class="section-title">Performance Intelligence Dashboard</h2>
+        <p class="section-sub">Track player progression, peak ratings, and club team aggregations across scouting sessions.</p>
+      </div>
+
+      <div class="dashboard-header-actions">
+        <!-- View Role Tabs -->
+        <div class="dashboard-role-tabs" id="dashRoleTabs">
+          <button class="dash-role-tab active" data-view="player" id="dashTabPlayer">
+            <span>🏃</span> Player Tracking
+          </button>
+          <button class="dash-role-tab" data-view="club" id="dashTabClub">
+            <span>🏟️</span> Club &amp; Teams
+          </button>
+          <button class="dash-role-tab" data-view="all" id="dashTabAll">
+            <span>🔭</span> Talent Pool
+          </button>
+        </div>
+
+        <!-- Sport Filter Dropdown -->
+        <div class="dashboard-filter-wrap">
+          <label for="dashSportFilter" class="dash-filter-label">Sport:</label>
+          <select id="dashSportFilter" class="dash-select">
+            <option value="football">⚽ Football / Soccer</option>
+            <option value="basketball">🏀 Basketball</option>
+            <option value="tennis">🎾 Tennis</option>
+            <option value="swimming">🏊 Swimming</option>
+            <option value="athletics">🏃 Athletics</option>
+            <option value="volleyball">🏐 Volleyball</option>
+            <option value="boxing">🥊 Boxing</option>
+            <option value="gymnastics">🤸 Gymnastics</option>
+            <option value="cycling">🚴 Cycling</option>
+            <option value="baseball">⚾ Baseball</option>
+          </select>
+        </div>
+
+        <!-- Re-sync Performance Action Button -->
+        <button class="btn-resync" id="resyncDashboardBtn" title="Re-sync ratings from newly uploaded scouting reports in real time">
+          <svg class="resync-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          <span>Re-sync Performance</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Profile Context Bar -->
+    <div class="dash-profile-bar" id="dashProfileBar">
+      <div class="dpb-left">
+        <span class="dpb-avatar" id="dpbAvatar">👤</span>
+        <div>
+          <div class="dpb-name-wrap">
+            <span class="dpb-name" id="dpbName">Guest Athlete</span>
+            <span class="dpb-role-badge" id="dpbRoleBadge">Player</span>
+            <span class="dpb-sport-badge" id="dpbSportBadge">⚽ Football</span>
+          </div>
+          <div class="dpb-details" id="dpbDetails">Set up your profile to customize this dashboard</div>
+        </div>
+      </div>
+      <div class="dpb-right">
+        <button class="btn-secondary btn-sm" id="dashEditProfileBtn">Edit Profile</button>
+        <button class="btn-ghost btn-sm" id="dashLoadDemoBtn" title="Load sample evaluations and teams for quick testing">🧪 Load Demo Data</button>
+        <button class="btn-ghost btn-sm" id="dashClearHistoryBtn" title="Reset evaluations history">🗑️ Clear History</button>
+      </div>
+    </div>
+
+    <!-- VIEW 1: PLAYER DASHBOARD VIEW (User Type = "Player") -->
+    <div class="dash-view" id="playerDashboardView">
+      <!-- KPI Rating Cards -->
+      <div class="kpi-grid">
+        <!-- Current Performance Rating -->
+        <div class="glass-card kpi-card kpi-current">
+          <div class="kpi-header">
+            <span class="kpi-label">Current Performance Rating</span>
+            <span class="kpi-tag" id="playerCurrentGrade">Grade —</span>
+          </div>
+          <div class="kpi-value-row">
+            <span class="kpi-num" id="playerCurrentRating">--</span>
+            <span class="kpi-scale">/ 100</span>
+          </div>
+          <div class="kpi-footer">
+            <span class="kpi-sub" id="playerCurrentSub">Most recent analyzed report</span>
+            <span class="kpi-date" id="playerCurrentDate">No evaluations yet</span>
+          </div>
+        </div>
+
+        <!-- Best / Peak Performance Rating -->
+        <div class="glass-card kpi-card kpi-peak">
+          <div class="kpi-header">
+            <span class="kpi-label">Peak Performance Rating</span>
+            <span class="kpi-icon-gold">🏆 All-Time Best</span>
+          </div>
+          <div class="kpi-value-row">
+            <span class="kpi-num gold" id="playerBestRating">--</span>
+            <span class="kpi-scale">/ 100</span>
+          </div>
+          <div class="kpi-footer">
+            <span class="kpi-sub" id="playerBestSub">Highest score recorded</span>
+            <span class="kpi-delta" id="playerDeltaBadge">+0 pts</span>
+          </div>
+        </div>
+
+        <!-- Total Sessions & Baseline -->
+        <div class="glass-card kpi-card kpi-sessions">
+          <div class="kpi-header">
+            <span class="kpi-label">Evaluation History</span>
+            <span class="kpi-tag blue" id="playerFormBadge">Awaiting</span>
+          </div>
+          <div class="kpi-value-row">
+            <span class="kpi-num blue" id="playerTotalSessions">0</span>
+            <span class="kpi-scale">Sessions</span>
+          </div>
+          <div class="kpi-footer">
+            <span class="kpi-sub" id="playerBaselineSub">Baseline: --</span>
+            <span class="kpi-delta" id="playerProgressionSummary">--</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progression Trajectory & Visual Comparison -->
+      <div class="glass-card progression-card">
+        <div class="progression-header">
+          <div>
+            <h3 class="card-title">Performance Trajectory &amp; Growth</h3>
+            <p class="progression-sub">Visual comparison showing rating progress from initial evaluation to peak performance.</p>
+          </div>
+          <div class="progression-badges" id="progressionBadges">
+            <span class="trajectory-badge" id="trajectoryBadge">Baseline established</span>
+          </div>
+        </div>
+
+        <div class="progression-visual">
+          <div class="progression-steps">
+            <div class="prog-step" id="progStepBaseline">
+              <span class="prog-step-dot"></span>
+              <span class="prog-step-label">Initial Baseline</span>
+              <span class="prog-step-val" id="progValInitial">--</span>
+            </div>
+            <div class="prog-step active" id="progStepCurrent">
+              <span class="prog-step-dot pulse"></span>
+              <span class="prog-step-label">Current Rating</span>
+              <span class="prog-step-val" id="progValCurrent">--</span>
+            </div>
+            <div class="prog-step peak" id="progStepPeak">
+              <span class="prog-step-dot"></span>
+              <span class="prog-step-label">Peak Rating</span>
+              <span class="prog-step-val" id="progValPeak">--</span>
+            </div>
+          </div>
+
+          <!-- Visual Progress Bar -->
+          <div class="prog-bar-track">
+            <div class="prog-bar-fill" id="progBarFill" style="width: 0%;"></div>
+            <div class="prog-marker" id="progMarkerCurrent" style="left: 0%;"></div>
+          </div>
+          <div class="prog-bar-labels">
+            <span>0</span>
+            <span id="progBarStatusText">Upload video evaluations to track growth trajectory</span>
+            <span>100</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Evaluation History Timeline -->
+      <div class="glass-card history-card">
+        <div class="history-card-header">
+          <h3 class="card-title">Scouting Evaluations Timeline</h3>
+          <span class="history-count" id="historyCount">0 Reports</span>
+        </div>
+        <div class="history-list" id="playerHistoryList">
+          <div class="empty-state">
+            <span class="empty-icon">📊</span>
+            <h4>No Performance History Recorded Yet</h4>
+            <p>Upload video clips in the Analyze section above to record keyframe evaluations and track progress ratings.</p>
+            <a href="#upload-section" class="btn-primary btn-sm" style="margin-top:10px;">Upload Footage</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: CLUB DASHBOARD & TEAM AGGREGATION VIEW (User Type = "Club") -->
+    <div class="dash-view hidden" id="clubDashboardView">
+      <div class="club-controls-bar">
+        <div class="club-info-summary">
+          <h3 id="clubDashName">My Club / Team</h3>
+          <p id="clubDashSub">Manage rosters, evaluate talent, and monitor dynamic team ratings.</p>
+        </div>
+        <button class="btn-primary btn-sm" id="btnToggleCreateTeam">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Create Team Roster
+        </button>
+      </div>
+
+      <!-- Inline Team Creation Form -->
+      <div class="glass-card create-team-box hidden" id="createTeamFormWrap">
+        <h4>Create New Team Roster</h4>
+        <div class="profile-fields-row" style="margin-top:12px;">
+          <div class="input-group">
+            <label for="newTeamName">Team / Squad Name</label>
+            <input type="text" id="newTeamName" placeholder="e.g. Under-19 Academy, First Team" />
+          </div>
+          <div class="input-group">
+            <label for="newTeamSport">Sport</label>
+            <select id="newTeamSport">
+              <option value="football">⚽ Football / Soccer</option>
+              <option value="basketball">🏀 Basketball</option>
+              <option value="tennis">🎾 Tennis</option>
+              <option value="swimming">🏊 Swimming</option>
+              <option value="athletics">🏃 Athletics</option>
+              <option value="volleyball">🏐 Volleyball</option>
+              <option value="boxing">🥊 Boxing</option>
+              <option value="gymnastics">🤸 Gymnastics</option>
+              <option value="cycling">🚴 Cycling</option>
+              <option value="baseball">⚾ Baseball</option>
+            </select>
+          </div>
+        </div>
+        <div class="team-form-actions" style="margin-top:14px; display:flex; gap:10px;">
+          <button class="btn-primary btn-sm" id="saveNewTeamBtn">Save Team</button>
+          <button class="btn-secondary btn-sm" id="cancelNewTeamBtn">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Teams Grid -->
+      <div class="teams-grid" id="teamsGrid"></div>
+    </div>
+
+    <!-- VIEW 3: TALENT POOL / ALL PLAYERS VIEW (Scouter / Evaluator) -->
+    <div class="dash-view hidden" id="allPlayersDashboardView">
+      <div class="glass-card pool-card">
+        <div class="history-card-header">
+          <div>
+            <h3 class="card-title">Evaluated Talent Pool</h3>
+            <p class="section-sub" style="margin:4px 0 0 0;">All players evaluated across video scouting sessions.</p>
+          </div>
+          <span class="history-count" id="poolPlayerCount">0 Athletes</span>
+        </div>
+        <div class="pool-grid" id="poolPlayersGrid"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── PLAYER SELECTION MODAL (scanning state) ─── -->
+  <div class="modal-overlay hidden" id="scanModal">
+    <div class="modal-card scan-modal-card">
+      <div class="scan-anim">
+        <div class="scan-ring"></div>
+        <div class="scan-ring scan-ring-2"></div>
+        <span class="scan-eye">👁</span>
+      </div>
+      <h3 id="scanModalTitle">Scanning Video for Players...</h3>
+      <p id="scanModalSub">AI is identifying all players in the footage. This takes a few seconds.</p>
+      <div class="scan-progress">
+        <div class="scan-progress-bar" id="scanProgressBar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── API KEY & DYNAMIC MODEL RESOLUTION MODAL ─── -->
+  <div class="modal-overlay hidden" id="apiModal">
+    <div class="modal-card">
+      <button class="modal-close" id="closeApiModal">✕</button>
+      <div class="modal-icon">🔑</div>
+      <h2>Gemini & Model Settings</h2>
+      <p>Configure your Gemini API key and preferred models. ScoutAI automatically resolves to stable fallbacks if a model is unavailable.</p>
+
+      <div class="input-group">
+        <label for="apiKeyInput">Gemini API Key</label>
+        <div class="input-wrap">
+          <input type="password" id="apiKeyInput" placeholder="AIza..." autocomplete="off" />
+          <button class="toggle-vis" id="toggleApiVis">👁</button>
+        </div>
+        <small>Your key is stored locally and never sent to our servers. <a href="https://aistudio.google.com/app/apikey" target="_blank">Get a free key →</a></small>
+      </div>
+
+      <div class="input-group">
+        <label for="primaryModelSelect">Preferred Primary Model</label>
+        <div class="input-wrap">
+          <select id="primaryModelSelect" class="model-select">
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended · Fast Multimodal)</option>
+            <option value="gemini-2.0-flash">Gemini 2.0 Flash (Proven Workhorse)</option>
+            <option value="gemini-1.5-flash">Gemini 1.5 Flash (Universal Fallback)</option>
+            <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview (Latest Recommended)</option>
+            <option value="gemini-3.1-flash-tts">Gemini 3.1 Flash TTS (gemini-3.1-flash-tts)</option>
+            <option value="gemini-lite-latest">Gemini Lite Latest (gemini-lite-latest)</option>
+            <option value="gemini-3.8-flash-tts">Gemini 3.8 Flash TTS (gemini-3.8-flash-tts)</option>
+            <option value="gemini-3.8-flash-lite-tts">Gemini 3.8 Flash-Lite TTS (gemini-3.8-flash-lite-tts)</option>
+            <option value="gemini-3.8-flsah-tts">gemini-3.8-flsah-tts (Flsah Typo Fallback)</option>
+            <option value="gemma-4-31b">Gemma 4 31B (gemma-4-31b)</option>
+            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (High Speed)</option>
+            <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Scouting Analysis)</option>
+            <option value="gemini-3.8-flash">gemini-3.8-flash (Test Auto-Fallback)</option>
+            <option value="custom">Custom Model Identifier...</option>
+          </select>
+        </div>
+        <div id="customModelWrap" class="hidden" style="margin-top: 8px;">
+          <input type="text" id="customModelInput" placeholder="e.g. gemini-2.5-flash" style="width: 100%; padding: 10px 14px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border2); color: var(--text-1); font-family: var(--mono); font-size: 13px;" />
+        </div>
+      </div>
+
+      <!-- Dynamic Model Resolution Info & Live Test -->
+      <div class="model-resolution-box">
+        <div class="mrb-header">
+          <span class="mrb-title">⚡ Dynamic Model Resolution</span>
+          <span class="mrb-active-badge" id="modalActiveModelBadge">gemini-2.5-flash</span>
+        </div>
+        <p class="mrb-desc">
+          Built-in priority list ensures continuous uptime. If your primary model is unavailable (404), rate-limited (429), or overloaded (503), the engine automatically switches to a working alternative:
+        </p>
+        <div class="priority-chips">
+          <span class="p-chip p-1">1. gemini-2.5-flash</span>
+          <span class="p-arrow">➔</span>
+          <span class="p-chip">2. gemini-2.0-flash</span>
+          <span class="p-arrow">➔</span>
+          <span class="p-chip">3. gemini-1.5-flash</span>
+          <span class="p-arrow">➔</span>
+          <span class="p-chip">4. gemini-3.1-pro-preview</span>
+          <span class="p-arrow">➔</span>
+          <span class="p-chip">5. gemini-1.5-pro</span>
+        </div>
+        <div class="test-resolution-wrap">
+          <button type="button" class="btn-secondary test-model-btn" id="testModelBtn">
+            🧪 Test Dynamic Resolution
+          </button>
+          <div id="testModelOutput" class="test-model-output hidden"></div>
+        </div>
+      </div>
+
+      <button class="btn-primary full-width" id="saveApiKey">Save & Apply Settings</button>
+    </div>
+  </div>
+
+  <!-- ─── USER PROFILE MODAL ─── -->
+  <div class="modal-overlay hidden" id="profileModal">
+    <div class="modal-card profile-modal-card">
+      <button class="modal-close" id="closeProfileModal">✕</button>
+
+      <!-- Header -->
+      <div class="profile-modal-header">
+        <div class="profile-avatar-large" id="profileAvatarLarge">👤</div>
+        <div>
+          <div class="modal-icon-label">Account Profile</div>
+          <h2>Your ScoutAI Profile</h2>
+          <p class="profile-header-sub">Personalize your experience — reports are tailored to your role &amp; sport.</p>
+        </div>
+      </div>
+
+      <!-- Step 1: Sport Selection (First Step in Registration) -->
+      <div class="profile-step" id="profileSportStep">
+        <div class="profile-step-header">
+          <span class="profile-step-num">1</span>
+          <label class="profile-step-label" id="sportStepLabel">Select Primary Sport</label>
+        </div>
+        <div class="profile-sport-grid" id="profileSportGrid">
+          <button class="psport-btn" data-sport="football"   id="ps-football">   <span>⚽</span><span>Football</span>   </button>
+          <button class="psport-btn" data-sport="basketball" id="ps-basketball"> <span>🏀</span><span>Basketball</span> </button>
+          <button class="psport-btn" data-sport="tennis"     id="ps-tennis">     <span>🎾</span><span>Tennis</span>     </button>
+          <button class="psport-btn" data-sport="swimming"   id="ps-swimming">   <span>🏊</span><span>Swimming</span>   </button>
+          <button class="psport-btn" data-sport="athletics"  id="ps-athletics">  <span>🏃</span><span>Athletics</span>  </button>
+          <button class="psport-btn" data-sport="volleyball" id="ps-volleyball"> <span>🏐</span><span>Volleyball</span> </button>
+          <button class="psport-btn" data-sport="boxing"     id="ps-boxing">     <span>🥊</span><span>Boxing</span>     </button>
+          <button class="psport-btn" data-sport="gymnastics" id="ps-gymnastics"> <span>🤸</span><span>Gymnastics</span> </button>
+          <button class="psport-btn" data-sport="cycling"    id="ps-cycling">    <span>🚴</span><span>Cycling</span>    </button>
+          <button class="psport-btn" data-sport="baseball"   id="ps-baseball">   <span>⚾</span><span>Baseball</span>   </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Account Type (revealed after sport) -->
+      <div class="profile-step hidden" id="profileAccountStep">
+        <div class="profile-step-header">
+          <span class="profile-step-num">2</span>
+          <label class="profile-step-label" id="acctStepLabel">Account Type</label>
+        </div>
+        <div class="account-type-grid" id="accountTypeGrid">
+          <button class="acct-type-btn" data-type="player" id="acctPlayer">
+            <span class="acct-emoji">🏃</span>
+            <span class="acct-label">Player</span>
+            <span class="acct-sub">I want to be scouted</span>
+          </button>
+          <button class="acct-type-btn" data-type="club" id="acctClub">
+            <span class="acct-emoji">🏟️</span>
+            <span class="acct-label">Club / Team</span>
+            <span class="acct-sub">Scouting for my club</span>
+          </button>
+          <button class="acct-type-btn" data-type="scouter" id="acctScouter">
+            <span class="acct-emoji">🔭</span>
+            <span class="acct-label">Scouter</span>
+            <span class="acct-sub">Talent evaluator</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: Basic Info (revealed after sport) -->
+      <div class="profile-step hidden" id="profileBasicStep">
+        <div class="profile-step-header">
+          <span class="profile-step-num">3</span>
+          <label class="profile-step-label">Basic Information</label>
+        </div>
+        <div class="profile-fields-row">
+          <div class="input-group">
+            <label for="profileName">Full Name</label>
+            <input type="text" id="profileName" placeholder="e.g. Javier Morales" />
+          </div>
+          <div class="input-group">
+            <label for="profileAge">Age</label>
+            <input type="number" id="profileAge" placeholder="e.g. 22" min="5" max="80" />
+          </div>
+        </div>
+        <div class="input-group" style="margin-top:14px;">
+          <label for="profileCountry">Country / Region</label>
+          <input type="text" id="profileCountry" placeholder="e.g. Spain" />
+        </div>
+      </div>
+
+      <!-- Step 4: Dynamic Role + Sport Fields (revealed after basic info) -->
+      <div class="profile-step hidden" id="profileRoleStep">
+        <div class="profile-step-header">
+          <span class="profile-step-num">4</span>
+          <label class="profile-step-label" id="roleStepLabel">Sport &amp; Role Details</label>
+        </div>
+
+        <!-- Player dynamic fields (rendered by JS per sport) -->
+        <div class="role-fields" id="fieldsPlayer" style="display:none;">
+          <div id="playerDynamicFields"></div>
+          <div class="input-group" style="margin-top:14px;">
+            <label for="playerClub">Current Club / Academy</label>
+            <input type="text" id="playerClub" placeholder="e.g. FC Barcelona Academy" />
+          </div>
+          <div class="input-group" style="margin-top:14px;">
+            <label for="playerGoal">Career Goal</label>
+            <input type="text" id="playerGoal" placeholder="e.g. Play in the top division within 3 years" />
+          </div>
+        </div>
+
+        <!-- Club fields -->
+        <div class="role-fields" id="fieldsClub" style="display:none;">
+          <div class="profile-fields-row">
+            <div class="input-group">
+              <label for="clubName">Club / Team Name</label>
+              <input type="text" id="clubName" placeholder="e.g. Real Sporting FC" />
+            </div>
+            <div class="input-group">
+              <label for="clubLeague">League / Division</label>
+              <input type="text" id="clubLeague" placeholder="e.g. Segunda División" />
+            </div>
+          </div>
+          <div class="profile-fields-row" style="margin-top:14px;">
+            <div class="input-group">
+              <label for="clubBudget">Transfer / Signing Budget</label>
+              <select id="clubBudget">
+                <option value="">Select range...</option>
+                <option value="free">Free / Amateur</option>
+                <option value="low">€10K – €100K</option>
+                <option value="mid">€100K – €1M</option>
+                <option value="high">€1M – €10M</option>
+                <option value="elite">€10M+</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label for="clubPositionNeeded" id="clubPositionLabel">Position / Role Sought</label>
+              <input type="text" id="clubPositionNeeded" placeholder="e.g. Striker, Left Winger" />
+            </div>
+          </div>
+          <div class="input-group" style="margin-top:14px;">
+            <label for="clubNotes">Scouting Focus / Requirements</label>
+            <textarea id="clubNotes" rows="2" placeholder="e.g. Looking for high-pressing forwards with strong aerial ability"></textarea>
+          </div>
+        </div>
+
+        <!-- Scouter fields -->
+        <div class="role-fields" id="fieldsScouter" style="display:none;">
+          <div class="profile-fields-row">
+            <div class="input-group">
+              <label for="scouterOrg">Organization / Agency</label>
+              <input type="text" id="scouterOrg" placeholder="e.g. Elite Scout Network" />
+            </div>
+            <div class="input-group">
+              <label for="scouterExperience">Years of Experience</label>
+              <input type="number" id="scouterExperience" placeholder="e.g. 12" min="0" max="60" />
+            </div>
+          </div>
+          <div class="profile-fields-row" style="margin-top:14px;">
+            <div class="input-group">
+              <label for="scouterLevel">Level Scouted</label>
+              <select id="scouterLevel">
+                <option value="">Select...</option>
+                <option value="youth">Youth / Academy</option>
+                <option value="semi">Semi-Professional</option>
+                <option value="pro">Professional</option>
+                <option value="elite">Elite / International</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label for="scouterRegion">Primary Scouting Region</label>
+              <input type="text" id="scouterRegion" placeholder="e.g. Europe, South America" />
+            </div>
+          </div>
+          <div class="input-group" style="margin-top:14px;">
+            <label for="scouterNotes">Evaluation Focus / Style</label>
+            <textarea id="scouterNotes" rows="2" placeholder="e.g. I focus on technical ability and off-ball movement..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profile Preview Banner -->
+      <div class="profile-preview-banner hidden" id="profilePreviewBanner">
+        <span class="ppb-icon" id="ppbIcon">👤</span>
+        <div class="ppb-content">
+          <div class="ppb-name" id="ppbName">—</div>
+          <div class="ppb-role" id="ppbRole">Set your account type to personalize reports</div>
+        </div>
+        <div class="ppb-checkmark">✓ Profile Ready</div>
+      </div>
+
+      <button class="btn-primary full-width" id="saveProfileBtn">Save Profile</button>
+    </div>
+  </div>
+
+  <!-- ─── FOOTER ─── -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="nav-logo">
+        <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" stroke="url(#flg)" stroke-width="2"/>
+          <path d="M10 16 L14 12 L18 16 L22 10" stroke="#818cf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs><linearGradient id="flg" x1="2" y1="2" x2="30" y2="30"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs>
+        </svg>
+        <span>Scout<span class="logo-accent">AI</span></span>
+      </div>
+      <p class="footer-copy">© 2026 ScoutAI · AI-Powered Sports Intelligence</p>
+    </div>
+  </footer>
+
+  <!-- ─── VIDEO CLIPPER MODAL ─── -->
+  <div class="modal-overlay hidden" id="clipperModal" role="dialog" aria-modal="true" aria-label="Video Clip Trimmer">
+    <div class="modal-box clipper-box" style="max-width:700px;">
+      <div class="modal-header">
+        <div class="modal-title">✂️ Trim &amp; Export Clip</div>
+        <button class="modal-close" id="closeClipperModal" aria-label="Close">✕</button>
+      </div>
+      <p class="modal-desc" style="margin-bottom:16px;">
+        Your video is over 2 GB. Select a <strong>start</strong> and <strong>end</strong> time to extract a smaller clip
+        that can be uploaded to the Gemini API (max 2 GB). The clip is encoded <em>entirely in your browser</em> — nothing leaves your device until you click Analyze.
+      </p>
+
+      <!-- Preview -->
+      <video id="clipperVideoPreview" controls style="width:100%;border-radius:10px;background:#000;margin-bottom:16px;max-height:280px;"></video>
+
+      <!-- Range pickers -->
+      <div class="clipper-range-row">
+        <div class="clipper-time-field">
+          <label for="clipStart">Start (seconds)</label>
+          <input type="number" id="clipStart" min="0" step="0.5" value="0" />
+          <button class="clipper-set-btn" id="clipSetStart" title="Set to current playhead">Use Current</button>
+        </div>
+        <div class="clipper-time-field">
+          <label for="clipEnd">End (seconds)</label>
+          <input type="number" id="clipEnd" min="0" step="0.5" value="30" />
+          <button class="clipper-set-btn" id="clipSetEnd" title="Set to current playhead">Use Current</button>
+        </div>
+        <div class="clipper-duration-badge" id="clipDurationBadge">Duration: 30s</div>
+      </div>
+
+      <!-- Quality -->
+      <div class="clipper-quality-row">
+        <label>Output Quality</label>
+        <div class="clipper-quality-pills">
+          <button class="quality-pill active" data-kbps="2500">HD (2.5 Mbps)</button>
+          <button class="quality-pill" data-kbps="1000">SD (1 Mbps)</button>
+          <button class="quality-pill" data-kbps="500">Low (500 Kbps)</button>
+        </div>
+        <span class="clipper-est-size" id="clipEstSize">Estimated: ~9 MB</span>
+      </div>
+
+      <!-- Progress -->
+      <div class="clipper-progress-wrap hidden" id="clipperProgress">
+        <div class="clipper-progress-bar"><div id="clipperProgressFill"></div></div>
+        <span id="clipperProgressLabel">Recording…</span>
+      </div>
+
+      <div class="modal-actions" style="margin-top:20px;">
+        <button class="btn-primary" id="startClipBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+          Record Clip
+        </button>
+        <button class="btn-secondary" id="useClipBtn" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Use This Clip for Analysis
+        </button>
+        <button class="btn-ghost" id="downloadClipBtn" disabled>⬇ Download Clip</button>
+      </div>
+  <!-- ─── EXPORT & DOWNLOAD REPORT MODAL ─── -->
+  <div class="modal-overlay hidden" id="downloadModal">
+    <div class="modal-card export-modal-card">
+      <button class="modal-close" id="closeDownloadModal">&times;</button>
+      <div class="modal-header">
+        <span class="modal-tag">ScoutAI Dossier Export</span>
+        <h3 id="exportModalTitle">Export Scouting Report</h3>
+        <p>Choose an export format to save, print, or share this verified scouting evaluation.</p>
+      </div>
+
+      <div class="export-grid">
+        <!-- Option 1: Print / Save as PDF -->
+        <div class="export-opt-card" id="optPrintPdf">
+          <div class="export-opt-icon">🖨️</div>
+          <div class="export-opt-info">
+            <h4>Official PDF Dossier (Print View)</h4>
+            <p>Formatted executive scouting dossier with official badges, radar breakdown, and print-ready page layout.</p>
+          </div>
+          <button class="btn-primary btn-sm" id="btnExportPrint">Print / Save PDF</button>
+        </div>
+
+        <!-- Option 2: Standalone HTML Dossier -->
+        <div class="export-opt-card" id="optHtmlDossier">
+          <div class="export-opt-icon">🌐</div>
+          <div class="export-opt-info">
+            <h4>Interactive HTML Dossier (.html)</h4>
+            <p>Self-contained offline file with dark theme, responsive layout, full player metrics, and comparisons. Viewable anywhere.</p>
+          </div>
+          <button class="btn-secondary btn-sm" id="btnExportHtml">Download HTML</button>
+        </div>
+
+        <!-- Option 3: Formatted Text Summary -->
+        <div class="export-opt-card" id="optTextSummary">
+          <div class="export-opt-icon">📄</div>
+          <div class="export-opt-info">
+            <h4>Structured Scout Notes (.txt)</h4>
+            <p>Clean text summary with position metrics, strengths/weaknesses, and tactical assessment for easy copy-pasting.</p>
+          </div>
+          <button class="btn-ghost btn-sm" id="btnExportTxt">Download .TXT</button>
+        </div>
+
+        <!-- Option 4: Raw JSON Data -->
+        <div class="export-opt-card" id="optJsonData">
+          <div class="export-opt-icon">💾</div>
+          <div class="export-opt-info">
+            <h4>Raw Scout Data (.json)</h4>
+            <p>Complete structured data package suitable for recruitment databases, analytics tools, or club platforms.</p>
+          </div>
+          <button class="btn-ghost btn-sm" id="btnExportJson">Download .JSON</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
