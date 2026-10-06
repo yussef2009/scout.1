@@ -1,0 +1,10 @@
+{
+  "description": "ScoutAI is an athletic performance analytics platform that empowers players, coaches, and scouts with real-time insights and metrics to enhance training and scouting efforts.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
