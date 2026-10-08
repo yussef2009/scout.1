@@ -1,4 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  analyzeVideoPlayer,
+  detectVideoPlayers,
+  extractVideoFrames,
+  fetchAvailableGeminiModels,
+  type AvailableGeminiModel,
+  type DetectedPlayer,
+  type VideoAnalysisReport,
+  type VideoFrame,
+} from "./video-analysis";
+import { isSupabaseConfigured, supabase, type ProfileRow, type SupabaseUser } from "./supabase";
 
 type IconName =
   | "bolt"
@@ -53,6 +64,34 @@ const sportMetrics: Record<string, { label: string; value: string; unit: string;
     { label: "Ground contact", value: "192", unit: "ms", delta: "Optimal" },
     { label: "Landing flexion", value: "44.1", unit: "°", delta: "Low risk" },
   ],
+  Tennis: [
+    { label: "Serve velocity", value: "186", unit: "km/h", delta: "+3.6%" },
+    { label: "Court coverage", value: "92", unit: "/100", delta: "Top 5%" },
+    { label: "Split-step reaction", value: "214", unit: "ms", delta: "Elite" },
+    { label: "Lateral acceleration", value: "3.42", unit: "m/s²", delta: "+2.8%" },
+    { label: "Rally endurance", value: "88", unit: "/100", delta: "Optimal" },
+  ],
+  Boxing: [
+    { label: "Punch velocity", value: "10.8", unit: "m/s", delta: "+4.2%" },
+    { label: "Reaction time", value: "164", unit: "ms", delta: "Elite" },
+    { label: "Footwork agility", value: "91", unit: "/100", delta: "Top 5%" },
+    { label: "Combination speed", value: "6.4", unit: "strikes/s", delta: "+3.1%" },
+    { label: "Guard recovery", value: "0.38", unit: "sec", delta: "Optimal" },
+  ],
+  Gymnastics: [
+    { label: "Flight elevation", value: "1.24", unit: "m", delta: "+4.3%" },
+    { label: "Rotation velocity", value: "5.8", unit: "rad/s", delta: "Elite" },
+    { label: "Landing control", value: "94", unit: "/100", delta: "Low risk" },
+    { label: "Balance stability", value: "96", unit: "/100", delta: "Top 3%" },
+    { label: "Ground contact", value: "184", unit: "ms", delta: "Optimal" },
+  ],
+  Cycling: [
+    { label: "Peak power", value: "1,184", unit: "W", delta: "+5.1%" },
+    { label: "Power-to-weight", value: "6.2", unit: "W/kg", delta: "Elite" },
+    { label: "Sprint velocity", value: "68.4", unit: "km/h", delta: "+2.9%" },
+    { label: "Cadence", value: "104", unit: "rpm", delta: "Optimal" },
+    { label: "Endurance index", value: "92", unit: "/100", delta: "Top 4%" },
+  ],
   Soccer: [
     { label: "Max sprint speed", value: "34.8", unit: "km/h", delta: "+3.8%" },
     { label: "0–10m acceleration", value: "1.72", unit: "sec", delta: "Elite" },
@@ -94,7 +133,19 @@ function Logo() {
   return <div className="logo"><span className="logo-mark"><Icon name="bolt" size={17} /></span><span>SC<span>O</span>T</span></div>;
 }
 
-type AuthPayload = { mode: string; role: string; sport: string; name: string };
+type AuthMode = "Register" | "Sign in";
+type AuthPayload = {
+  mode: AuthMode;
+  role: string;
+  sport: string;
+  name: string;
+  email: string;
+  password: string;
+  country: string;
+  city: string;
+};
+type AuthProfileDraft = Omit<AuthPayload, "password" | "email">;
+type AuthProvider = "google" | "facebook";
 
 function toPanelRole(role: string) {
   if (role.startsWith("Club")) return "Club";
@@ -102,18 +153,110 @@ function toPanelRole(role: string) {
   return "Player";
 }
 
-function AuthModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (payload: AuthPayload) => void }) {
+function preferenceRecord(value: unknown): Record<string, unknown> {
+  return isRecord(value)
+    ? value
+    : {};
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function authProfileDraft(value: unknown): Partial<AuthProfileDraft> {
+  if (!isRecord(value)) return {};
+  return {
+    mode: value.mode === "Register" || value.mode === "Sign in" ? value.mode : undefined,
+    role: typeof value.role === "string" ? value.role : undefined,
+    sport: typeof value.sport === "string" ? value.sport : undefined,
+    name: typeof value.name === "string" ? value.name : undefined,
+    country: typeof value.country === "string" ? value.country : undefined,
+    city: typeof value.city === "string" ? value.city : undefined,
+  };
+}
+
+function profileRole(value: unknown): string {
+  if (typeof value !== "string") return "Player";
+  return toPanelRole(value);
+}
+
+function preferenceString(value: unknown, fallback: string): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function AuthModal({
+  onClose,
+  onEmailAuth,
+  onOAuth,
+  onAuthenticated,
+}: {
+  onClose: () => void;
+  onEmailAuth: (payload: AuthPayload) => Promise<boolean>;
+  onOAuth: (provider: AuthProvider, profile: AuthProfileDraft) => Promise<void>;
+  onAuthenticated: (mode: AuthMode) => void;
+}) {
   const [role, setRole] = useState("Player");
-  const [mode, setMode] = useState("Register");
+  const [mode, setMode] = useState<AuthMode>("Register");
   const [name, setName] = useState("");
   const [sport, setSelectedSport] = useState("Basketball");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [country, setCountry] = useState("Egypt");
+  const [city, setCity] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
-  const finish = () => onSuccess({
+  const profileDraft = (): AuthProfileDraft => ({
     mode,
-    role: toPanelRole(role),
+    role,
     sport,
     name: name.trim() || (role.startsWith("Club") ? "Alexandria Falcons" : role.startsWith("Scout") ? "Independent Scout" : "Omar Khalil"),
+    country,
+    city: city.trim(),
   });
+
+  const submitEmail = async () => {
+    setError("");
+    setNotice("");
+    if (!email.trim() || !password) {
+      setError("Enter your email address and password.");
+      return;
+    }
+    if (mode === "Register" && password.length < 8) {
+      setError("Choose a password with at least 8 characters.");
+      return;
+    }
+    if (mode === "Register" && !name.trim()) {
+      setError("Enter your name or organization name to create your profile.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const requiresConfirmation = await onEmailAuth({ ...profileDraft(), email: email.trim(), password });
+      if (requiresConfirmation) {
+        setNotice("Account created. Check your email to confirm your address, then sign in.");
+      } else {
+        onAuthenticated(mode);
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Supabase authentication failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const signInWithProvider = async (provider: AuthProvider) => {
+    setError("");
+    setNotice("");
+    setBusy(true);
+    try {
+      await onOAuth(provider, profileDraft());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : `Could not start ${provider} sign-in.`);
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
@@ -122,14 +265,15 @@ function AuthModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (pa
         <div className="modal-brand"><Logo /></div>
         <div className="auth-heading">
           <div><p className="eyebrow">BUILD YOUR PERFORMANCE IDENTITY</p><h2 id="auth-title">{mode === "Register" ? "JOIN THE NETWORK." : "WELCOME BACK."}</h2><p className="modal-copy">One account. Local analysis. Global opportunity.</p></div>
-          <div className="mode-switch">{["Register", "Sign in"].map((item) => <button key={item} className={mode === item ? "active" : ""} onClick={() => setMode(item)}>{item}</button>)}</div>
+          <div className="mode-switch">{(["Register", "Sign in"] as const).map((item) => <button key={item} className={mode === item ? "active" : ""} onClick={() => setMode(item)}>{item}</button>)}</div>
         </div>
         <div className="social-row">
-          <button type="button" onClick={finish}><Icon name="google" /> Continue with Google</button>
-          <button type="button" onClick={finish}><Icon name="facebook" /> Continue with Facebook</button>
+          <button type="button" disabled={busy || !isSupabaseConfigured} onClick={() => signInWithProvider("google")}><Icon name="google" /> Continue with Google</button>
+          <button type="button" disabled={busy || !isSupabaseConfigured} onClick={() => signInWithProvider("facebook")}><Icon name="facebook" /> Continue with Facebook</button>
         </div>
+        {!isSupabaseConfigured && <p className="analysis-error" role="alert">Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your local environment.</p>}
         <div className="divider"><span>{mode === "Register" ? "OR REGISTER WITH EMAIL" : "OR SIGN IN WITH EMAIL"}</span></div>
-        {mode === "Register" && <>
+        {mode === "Register" ? <>
           <span className="form-section-label">01 · SELECT YOUR ROLE</span>
           <div className="role-cards">
             {[
@@ -139,15 +283,15 @@ function AuthModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (pa
             ].map(([name, copy]) => <button key={name} className={role === name ? "active" : ""} onClick={() => setRole(name)}><span className="radio-dot"><i /></span><strong>{name}</strong><small>{copy}</small></button>)}
           </div>
           <span className="form-section-label">02 · {role.toUpperCase()} DETAILS</span>
-        </>}
+        </> : <label className="field-label">WORKSPACE ROLE<select value={role} onChange={(event) => setRole(event.target.value)}><option>Player</option><option>Club / Academy</option><option>Scout / Agent</option></select></label>}
         <div className="registration-grid">
           {mode === "Register" && <label className="field-label">{role === "Club / Academy" ? "CLUB / ACADEMY NAME" : "FULL NAME"}<input value={name} onChange={(event) => setName(event.target.value)} placeholder={role === "Club / Academy" ? "Alexandria Falcons" : "Your full name"} /></label>}
           {mode === "Register" && role === "Scout / Agent" && <label className="field-label">AFFILIATION<select><option>Club Scout</option><option>Independent Agent</option><option>University Recruiter</option></select></label>}
-          <label className="field-label">EMAIL ADDRESS<input type="email" placeholder="name@example.com" /></label>
-          <label className="field-label">PASSWORD<input type="password" placeholder="8+ characters" /></label>
+          <label className="field-label">EMAIL ADDRESS<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" /></label>
+          <label className="field-label">PASSWORD<input type="password" autoComplete={mode === "Register" ? "new-password" : "current-password"} required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8+ characters" /></label>
           {mode === "Register" && role === "Player" && <>
-            <label className="field-label">COUNTRY<select><option>Egypt</option><option>Spain</option><option>United Kingdom</option><option>United States</option></select></label>
-            <label className="field-label">CITY / TOWN<input placeholder="Alexandria" /></label>
+            <label className="field-label">COUNTRY<select value={country} onChange={(event) => setCountry(event.target.value)}><option>Egypt</option><option>Spain</option><option>United Kingdom</option><option>United States</option></select></label>
+            <label className="field-label">CITY / TOWN<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Alexandria" /></label>
             <label className="field-label">PRIMARY SPORT<select value={sport} onChange={(event) => setSelectedSport(event.target.value)}>{sports.map((item) => <option key={item}>{item}</option>)}</select></label>
             <label className="field-label">DATE OF BIRTH<input type="date" /></label>
             <label className="field-label">HEIGHT / WEIGHT<div className="split-fields"><input type="number" placeholder="Height cm" /><input type="number" placeholder="Weight kg" /></div></label>
@@ -156,8 +300,8 @@ function AuthModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (pa
             <label className="field-label">PERFORMANCE TARGET<input placeholder="e.g. 80 cm vertical" /></label>
           </>}
           {mode === "Register" && role === "Club / Academy" && <>
-            <label className="field-label">COUNTRY / REGION<div className="split-fields"><select><option>Egypt</option><option>Spain</option></select><input placeholder="Region" /></div></label>
-            <label className="field-label">CITY / TOWN<input placeholder="Alexandria" /></label>
+            <label className="field-label">COUNTRY / REGION<select value={country} onChange={(event) => setCountry(event.target.value)}><option>Egypt</option><option>Spain</option><option>United Kingdom</option><option>United States</option></select></label>
+            <label className="field-label">CITY / TOWN<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Alexandria" /></label>
             <label className="field-label">COMPETITION LEVEL<select><option>Youth Academy U-18</option><option>Regional League</option><option>Professional</option></select></label>
             <label className="field-label">SPORTS MANAGED<input placeholder="Basketball, Volleyball..." /></label>
             <label className="field-label wide-field">INITIAL ROSTER IMPORT<span className="mini-drop">DROP CSV ROSTER OR BROWSE</span></label>
@@ -171,7 +315,9 @@ function AuthModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (pa
             <label className="field-label wide-field">RATING ALERTS<input placeholder="Alert me when rating exceeds 90 in Alexandria" /></label>
           </>}
         </div>
-        <button className="primary-button auth-submit" onClick={finish}>{mode === "Register" ? `CREATE ${role.toUpperCase()} PROFILE` : "SIGN IN TO SCOT"} <Icon name="arrow" /></button>
+        {error && <p className="analysis-error" role="alert">{error}</p>}
+        {notice && <p className="model-list-status" role="status">{notice}</p>}
+        <button className="primary-button auth-submit" disabled={busy || !isSupabaseConfigured} onClick={submitEmail}>{busy ? "CONNECTING…" : mode === "Register" ? `CREATE ${role.toUpperCase()} PROFILE` : "SIGN IN TO SCOT"} <Icon name="arrow" /></button>
         <p className="legal"><Icon name="shield" size={14} /> Your data is encrypted and never sold.</p>
       </section>
     </div>
@@ -210,14 +356,119 @@ function RolePanel({ role, setRole, onOpenProfile }: { role: string; setRole: (r
   );
 }
 
-function ProfileView({ sport, role, name, model, processing }: { sport: string; role: string; name: string; model: string; processing: string }) {
-  const [fileName, setFileName] = useState("");
-  const [analysisReady, setAnalysisReady] = useState(false);
+function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSettings, onModelChange }: {
+  sport: string; role: string; name: string; model: string; frameCount: number;
+  apiKey: string; onOpenSettings: () => void; onModelChange: (model: string) => void;
+}) {
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [frames, setFrames] = useState<VideoFrame[]>([]);
+  const [players, setPlayers] = useState<DetectedPlayer[]>([]);
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+  const [reports, setReports] = useState<{ player?: DetectedPlayer; report: VideoAnalysisReport }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!videoFile) {
+      setVideoUrl("");
+      return;
+    }
+    const url = URL.createObjectURL(videoFile);
+    setVideoUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [videoFile]);
 
   const acceptFile = (file?: File) => {
     if (!file) return;
-    setFileName(file.name);
-    setAnalysisReady(false);
+    if (!file.type.startsWith("video/")) {
+      setError("Choose a supported video file (MP4, MOV, or WebM).");
+      return;
+    }
+    setVideoFile(file);
+    setFrames([]);
+    setPlayers([]);
+    setSelectedPlayerIds([]);
+    setReports([]);
+    setStatus("");
+    setError("");
+  };
+
+  const scanPlayers = async () => {
+    if (!videoFile) return;
+    setBusy(true);
+    setError("");
+    setReports([]);
+    let activeModel = model;
+    const handleModelChange = (nextModel: string) => {
+      activeModel = nextModel;
+      onModelChange(nextModel);
+      setStatus(`The previous model was unavailable or overloaded. Switched to ${nextModel}.`);
+    };
+    try {
+      if (!apiKey) {
+        throw new Error("Add your Gemini API key in Settings → AI Vision Engine before scanning.");
+      }
+      const extracted = await extractVideoFrames(videoFile, setStatus, frameCount);
+      setFrames(extracted);
+      setStatus("Identifying athletes in the selected sport…");
+      const detected = await detectVideoPlayers(apiKey, sport, extracted, activeModel, handleModelChange);
+      setPlayers(detected);
+      setSelectedPlayerIds(detected.length === 1 ? [detected[0].id] : []);
+      setStatus(detected.length ? `${detected.length} athlete${detected.length === 1 ? "" : "s"} detected.` : "No athletes were identified; you can still analyze the visible performance.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Player scan failed.");
+      setStatus("");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runAnalysis = async () => {
+    if (!videoFile) return;
+    setBusy(true);
+    setError("");
+    let activeModel = model;
+    const handleModelChange = (nextModel: string) => {
+      activeModel = nextModel;
+      onModelChange(nextModel);
+      setStatus(`The previous model was unavailable or overloaded. Switched to ${nextModel}.`);
+    };
+    try {
+      if (!apiKey) {
+        throw new Error("Add your Gemini API key in Settings → AI Vision Engine before analysis.");
+      }
+      const analysisFrames = frames.length ? frames : await extractVideoFrames(videoFile, setStatus, frameCount);
+      setFrames(analysisFrames);
+      const selectedPlayers = players.filter((player) => selectedPlayerIds.includes(player.id));
+      const targets: (DetectedPlayer | undefined)[] = selectedPlayers.length ? selectedPlayers : [undefined];
+      const nextReports: { player?: DetectedPlayer; report: VideoAnalysisReport }[] = [];
+      const failures: string[] = [];
+      for (const [index, player] of targets.entries()) {
+        setStatus(`Analyzing ${player?.label ?? "the performance"} (${index + 1} of ${targets.length})…`);
+        try {
+          const report = await analyzeVideoPlayer(apiKey, sport, analysisFrames, activeModel, player, handleModelChange);
+          nextReports.push({ player, report });
+        } catch (cause) {
+          failures.push(`${player?.label ?? "Performance"}: ${cause instanceof Error ? cause.message : "analysis failed"}`);
+        }
+      }
+      if (nextReports.length) setReports(nextReports);
+      if (failures.length) throw new Error(failures.join(" "));
+      setStatus("Video analysis complete.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Video analysis failed.");
+      setStatus("");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const togglePlayer = (playerId: string) => {
+    setSelectedPlayerIds((selected) => selected.includes(playerId)
+      ? selected.filter((id) => id !== playerId)
+      : [...selected, playerId]);
   };
 
   return (
@@ -229,21 +480,34 @@ function ProfileView({ sport, role, name, model, processing }: { sport: string; 
 
       <div className="profile-grid">
         <section className="upload-card">
-          <div className="panel-title"><div><span className="section-kicker">NEW ANALYSIS</span><h2>VIDEO INPUT</h2></div><span className="secure-label"><Icon name="shield" size={13} /> ON-DEVICE PROCESSING</span></div>
+          <div className="panel-title"><div><span className="section-kicker">NEW ANALYSIS</span><h2>VIDEO INPUT</h2></div><span className="secure-label"><Icon name="shield" size={13} /> GEMINI · DIRECT API</span></div>
           <label
-            className={`dropzone ${fileName ? "has-file" : ""}`}
+            className={`dropzone ${videoFile ? "has-file" : ""}`}
             onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => { event.preventDefault(); acceptFile(event.dataTransfer.files[0]); }}
+            onDrop={(event) => { event.preventDefault(); if (!busy) acceptFile(event.dataTransfer.files[0]); }}
           >
-            <input type="file" accept="video/mp4,video/quicktime,video/webm" onChange={(event) => acceptFile(event.target.files?.[0])} />
-            <span className="drop-icon"><Icon name={fileName ? "shield" : "arrow"} size={24} /></span>
-            <strong>{fileName || "DROP PERFORMANCE FOOTAGE"}</strong>
-            <small>{fileName ? `${model} · ${processing}` : "MP4, MOV, or WebM · Maximum 500 MB · on-device WebGPU"}</small>
-            <span className="browse-button">{fileName ? "REPLACE VIDEO" : "BROWSE FILES"}</span>
+            <input type="file" accept="video/mp4,video/quicktime,video/webm" disabled={busy} onChange={(event) => acceptFile(event.target.files?.[0])} />
+            <span className="drop-icon"><Icon name={videoFile ? "shield" : "arrow"} size={24} /></span>
+            <strong>{videoFile?.name ?? "DROP PERFORMANCE FOOTAGE"}</strong>
+            <small>{videoFile ? `${model} · ${(videoFile.size / (1024 * 1024)).toFixed(1)} MB` : "MP4, MOV, or WebM · Maximum 2 GB · keyframes extracted on-device"}</small>
+            <span className="browse-button">{videoFile ? "REPLACE VIDEO" : "BROWSE FILES"}</span>
           </label>
-          {fileName && <div className="processing-status"><span><b>{analysisReady ? "KEYFRAMES EXTRACTED" : "READY FOR LOCAL ANALYSIS"}</b><small>{analysisReady ? `${model} · 32 joints tracked · 486 frames` : `${processing} · ${processing === "High-Performance" ? "WebGPU acceleration available" : "CPU fallback ready"}`}</small></span><strong>{analysisReady ? "100%" : "READY"}</strong><i><em style={{ width: analysisReady ? "100%" : "18%" }} /></i></div>}
+          {videoUrl && <video className="analysis-video-preview" src={videoUrl} controls playsInline preload="metadata" aria-label="Uploaded performance video preview" />}
+          {videoFile && <div className="processing-status"><span><b>{busy ? "ANALYSIS IN PROGRESS" : status || "VIDEO READY"}</b><small>{frames.length ? `${frames.length} keyframes prepared locally` : "The full video stays in this browser; selected keyframes are sent to Google Gemini when you run analysis."}</small></span><strong>{busy ? "WORKING" : frames.length ? "READY" : "LOCAL"}</strong><i><em style={{ width: busy ? "68%" : frames.length ? "100%" : "18%" }} /></i></div>}
+          {error && <div className="analysis-error" role="alert">{error}{!apiKey && <button className="text-button" onClick={onOpenSettings}>OPEN AI VISION SETTINGS</button>}</div>}
+          {players.length > 0 && <div className="detected-player-list">
+            <div className="panel-title"><div><span className="section-kicker">PLAYER SCAN</span><h2>SELECT ATHLETES</h2></div><button className="text-button" disabled={busy} onClick={() => setSelectedPlayerIds(players.map((player) => player.id))}>SELECT ALL</button></div>
+            {players.map((player) => <label className="detected-player" key={player.id}>
+              <input type="checkbox" checked={selectedPlayerIds.includes(player.id)} disabled={busy} onChange={() => togglePlayer(player.id)} />
+              <span><strong>{player.label}</strong><small>{player.position}{player.team ? ` · ${player.team}` : ""} · {player.confidence}% confidence</small><small>{player.description || player.standoutTrait}</small></span>
+            </label>)}
+          </div>}
+          {status && <p className="analysis-status" role="status">{status}</p>}
           <div className="upload-guidance"><div><b>01</b><span>Full body visible</span></div><div><b>02</b><span>Stable camera angle</span></div><div><b>03</b><span>Minimum 30 FPS</span></div></div>
-          <button className="primary-button analyze-button" disabled={!fileName} onClick={() => setAnalysisReady(true)}>{analysisReady ? "ANALYSIS COMPLETE" : "RUN KINEMATICS MODEL"} <Icon name={analysisReady ? "shield" : "arrow"} size={15} /></button>
+          <div className="analysis-actions">
+            <button className="outline-button" disabled={!videoFile || busy} onClick={scanPlayers}>{busy ? "SCANNING…" : "SCAN PLAYERS"} <Icon name="search" size={15} /></button>
+            <button className="primary-button analyze-button" disabled={!videoFile || busy} onClick={runAnalysis}>{busy ? "ANALYZING…" : selectedPlayerIds.length ? `ANALYZE ${selectedPlayerIds.length} SELECTED` : "ANALYZE PERFORMANCE"} <Icon name="arrow" size={15} /></button>
+          </div>
         </section>
 
         <section className="profile-summary">
@@ -255,26 +519,18 @@ function ProfileView({ sport, role, name, model, processing }: { sport: string; 
         </section>
       </div>
 
-      <section className={`output-panel ${analysisReady ? "is-ready" : ""}`}>
-        <div className="panel-title"><div><span className="section-kicker">KINEMATICS OUTPUT · LAST SESSION</span><h2>FLIGHT & LANDING TELEMETRY</h2></div><button className="text-button">EXPORT REPORT <Icon name="arrow" size={15} /></button></div>
-        <div className="output-grid">
-          <div className="motion-chart">
-            <div className="chart-labels"><span>VERTICAL DISPLACEMENT</span><b>78.4 CM PEAK</b></div>
-            <svg viewBox="0 0 600 180" preserveAspectRatio="none" aria-label="Vertical displacement curve">
-              <defs><linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#D4AF37" stopOpacity=".3" /><stop offset="1" stopColor="#D4AF37" stopOpacity="0" /></linearGradient></defs>
-              <path className="chart-area" d="M0 158 C85 158 102 150 148 132 C212 108 220 20 300 19 C382 18 395 111 453 136 C505 158 548 158 600 158 L600 180 L0 180Z" />
-              <path className="chart-line" d="M0 158 C85 158 102 150 148 132 C212 108 220 20 300 19 C382 18 395 111 453 136 C505 158 548 158 600 158" />
-              <line x1="300" y1="19" x2="300" y2="180" className="chart-marker" />
-            </svg>
-            <div className="chart-axis"><span>TAKEOFF</span><span>APEX · 0.41S</span><span>LANDING</span></div>
+      <section className={`output-panel ${reports.length ? "is-ready" : ""}`}>
+        <div className="panel-title"><div><span className="section-kicker">AI VIDEO ANALYSIS</span><h2>{reports.length ? "SCOUTING REPORT" : "ANALYSIS REPORT"}</h2></div></div>
+        {reports.length ? <div className="analysis-reports">{reports.map(({ player, report }) => <article className="analysis-report" key={player?.id ?? "performance"}>
+          <div className="analysis-report-heading"><div><span className="section-kicker">{report.position} · GRADE {report.overallGrade}</span><h3>{player?.label ?? report.playerSummary}</h3><p>{report.oneLiner}</p></div><ScoreRing score={report.overallScore} /></div>
+          <div className="analysis-report-metrics">{report.metrics.map((metric) => <div key={metric.name}><span>{metric.name}</span><strong>{metric.score}<small>/100</small></strong><p>{metric.note}</p></div>)}</div>
+          <div className="analysis-report-columns">
+            <div><h3>OBSERVED STRENGTHS</h3><ul>{report.strengths.map((item) => <li key={item}>{item}</li>)}</ul></div>
+            <div><h3>AREAS TO IMPROVE</h3><ul>{report.areasToImprove.map((item) => <li key={item}>{item}</li>)}</ul></div>
+            <div><h3>RECOMMENDATIONS</h3><ul>{report.recommendations.map((item) => <li key={item}>{item}</li>)}</ul></div>
           </div>
-          <div className="output-metrics">
-            <div><span>TAKEOFF VELOCITY</span><strong>3.84 <small>m/s</small></strong><b>+8.2%</b></div>
-            <div><span>FLIGHT TIME</span><strong>0.83 <small>sec</small></strong><b>ELITE</b></div>
-            <div><span>GROUND CONTACT</span><strong>186 <small>ms</small></strong><b>−12 ms</b></div>
-            <div><span>LANDING FLEXION</span><strong>42.6 <small>°</small></strong><b className="safe">LOW RISK</b></div>
-          </div>
-        </div>
+          {report.narrative && <p className="analysis-narrative">{report.narrative}</p>}
+        </article>)}</div> : <p className="setting-description">Upload a clip and run analysis to see evidence-based sport metrics and scouting notes here.</p>}
       </section>
 
       <section className="media-report-grid">
@@ -304,23 +560,58 @@ function ProfileView({ sport, role, name, model, processing }: { sport: string; 
 }
 
 function SettingsView({
-  theme, setTheme, model, setModel, sport, setSport, role, setRole, name,
-  processing, setProcessing, units, setUnits, accent, setAccent, filterMetrics, setFilterMetrics,
+  theme, setTheme, model, setModel, sport, setSport, role, setRole, name, email, onSaveName,
+  apiKey, onSaveApiKey, modelSaveError,
+  country, setCountry, city, setCity, timeZone, setTimeZone,
+  frameCount, setFrameCount, units, setUnits, accent, setAccent,
+  filterMetrics, setFilterMetrics, localLeaderboardFirst, setLocalLeaderboardFirst,
+  onLocalLeaderboardPreferenceChange,
 }: {
   theme: string; setTheme: (theme: string) => void;
   model: string; setModel: (model: string) => void;
   sport: string; setSport: (sport: string) => void;
   role: string; setRole: (role: string) => void;
-  name: string;
-  processing: string; setProcessing: (value: string) => void;
+  name: string; email: string;
+  onSaveName: (name: string) => void;
+  apiKey: string; onSaveApiKey: (apiKey: string) => void;
+  modelSaveError: string;
+  country: string; setCountry: (country: string) => void;
+  city: string; setCity: (city: string) => void;
+  timeZone: string; setTimeZone: (timeZone: string) => void;
+  frameCount: number; setFrameCount: (value: number) => void;
   units: string; setUnits: (value: string) => void;
   accent: string; setAccent: (value: string) => void;
   filterMetrics: boolean; setFilterMetrics: (value: boolean) => void;
+  localLeaderboardFirst: boolean; setLocalLeaderboardFirst: (value: boolean) => void;
+  onLocalLeaderboardPreferenceChange: (enabled: boolean) => void;
 }) {
   const [section, setSection] = useState("Account & Security");
   const [twoFactor, setTwoFactor] = useState(true);
-  const [fps, setFps] = useState(30);
+  const [nameDraft, setNameDraft] = useState(name);
+  const [accountSaved, setAccountSaved] = useState(false);
+  const [apiKeyDraft, setApiKeyDraft] = useState(apiKey);
+  const [apiKeySaved, setApiKeySaved] = useState(false);
+  const [apiKeySaveError, setApiKeySaveError] = useState("");
+  const [availableModels, setAvailableModels] = useState<AvailableGeminiModel[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsError, setModelsError] = useState("");
   const accountRole = role === "Club" ? "Club / Academy" : role === "Scout" ? "Scout / Agent" : "Player";
+
+  const loadAvailableModels = async () => {
+    setModelsLoading(true);
+    setModelsError("");
+    try {
+      const models = await fetchAvailableGeminiModels(apiKeyDraft);
+      setAvailableModels(models);
+      if (!models.some((availableModel) => availableModel.id === model)) {
+        setModel(models[0].id);
+      }
+    } catch (cause) {
+      setModelsError(cause instanceof Error ? cause.message : "Could not load available Gemini models.");
+    } finally {
+      setModelsLoading(false);
+    }
+  };
 
   return (
     <div className="page-shell settings-shell">
@@ -330,8 +621,8 @@ function SettingsView({
       <div className="settings-layout">
         <aside className="settings-nav">
           <span>SETTINGS</span>
-          {["Account & Security", "Interface & Theme", "Sport & Dashboard", "AI Vision Engine"].map((item) => <button key={item} className={section === item ? "active" : ""} onClick={() => setSection(item)}>{item}</button>)}
-          <span>LOCAL WORKSPACE</span><div className="storage-indicator"><b>184 MB</b><small>OF 2 GB USED</small><i><em /></i></div>
+          {["Account & Security", "Interface & Theme", "Regional Preferences", "Sport & Dashboard", "AI Vision Engine"].map((item) => <button key={item} className={section === item ? "active" : ""} onClick={() => setSection(item)}>{item}</button>)}
+          <span>LOCAL WORKSPACE</span><div className="storage-indicator"><b>ON DEVICE</b><small>VIDEO KEYFRAMES PREPARED LOCALLY</small><i><em /></i></div>
         </aside>
         <div className="settings-content">
           {section === "Account & Security" && <section className="settings-card">
@@ -339,13 +630,13 @@ function SettingsView({
             <p className="setting-description">Manage your profile identity, account role, and access protection.</p>
             <div className="account-profile"><img src={athletes[0].image} alt={name} /><div><strong>{name}</strong><span>{accountRole} account · SC-28491</span></div><button className="outline-button">CHANGE PHOTO</button></div>
             <div className="settings-form-grid">
-              <label className="field-label">FULL NAME<input defaultValue={name} /></label>
-              <label className="field-label">EMAIL ADDRESS<input defaultValue="omar@scot.performance" /></label>
+              <label className="field-label">FULL NAME<input value={nameDraft} onChange={(event) => { setNameDraft(event.target.value); setAccountSaved(false); }} /></label>
+              <label className="field-label">EMAIL ADDRESS<input value={email} readOnly /></label>
               <label className="field-label">ACCOUNT ROLE<select value={accountRole} onChange={(event) => setRole(toPanelRole(event.target.value))}><option>Player</option><option>Club / Academy</option><option>Scout / Agent</option></select></label>
-              <label className="field-label">PASSWORD<input type="password" defaultValue="performance" /></label>
+              <label className="field-label">AUTHENTICATION<input value="Managed by Supabase Auth" readOnly /></label>
             </div>
             <div className="setting-row"><div><strong>TWO-FACTOR AUTHENTICATION</strong><span>Require a verification code for new devices.</span></div><button className={`toggle ${twoFactor ? "active" : ""}`} onClick={() => setTwoFactor(!twoFactor)} aria-label="Toggle two-factor authentication"><i /></button></div>
-            <button className="primary-button save-settings">SAVE ACCOUNT CHANGES <Icon name="arrow" size={15} /></button>
+            <button className="primary-button save-settings" onClick={() => { onSaveName(nameDraft.trim() || name); setAccountSaved(true); }}>{accountSaved ? "ACCOUNT CHANGES SAVED" : "SAVE ACCOUNT CHANGES"} <Icon name="arrow" size={15} /></button>
           </section>}
 
           {section === "Interface & Theme" && <section className="settings-card">
@@ -358,33 +649,52 @@ function SettingsView({
             <div className="accent-options">{[["Pure Gold", "gold"], ["Electric Amber", "amber"], ["Platinum", "platinum"], ["Champion Bronze", "bronze"]].map(([name, color]) => <button key={name} className={accent === name ? "active" : ""} onClick={() => setAccent(name)}><i className={color} /><span>{name}</span><b>{accent === name ? "✓" : ""}</b></button>)}</div>
           </section>}
 
+          {section === "Regional Preferences" && <section className="settings-card">
+            <div className="panel-title"><div><span className="section-kicker">LOCALIZATION</span><h2>REGIONAL PREFERENCES</h2></div></div>
+            <p className="setting-description">Set your home region, local time zone, and preferred measurement system.</p>
+            <div className="settings-form-grid">
+              <label className="field-label">COUNTRY / REGION<select value={country} onChange={(event) => setCountry(event.target.value)}><option>Egypt</option><option>Spain</option><option>United Kingdom</option><option>United States</option></select></label>
+              <label className="field-label">CITY / TOWN<input value={city} onChange={(event) => setCity(event.target.value)} /></label>
+              <label className="field-label">TIME ZONE<select value={timeZone} onChange={(event) => setTimeZone(event.target.value)}><option>Africa/Cairo</option><option>Europe/Madrid</option><option>Europe/London</option><option>America/New_York</option></select></label>
+            </div>
+            <div className="preference-block"><span className="settings-subtitle">MEASUREMENT SYSTEM</span><div className="segmented-setting">{["Metric", "Imperial"].map((item) => <button key={item} className={units === item ? "active" : ""} onClick={() => setUnits(item)}>{item}<small>{item === "Metric" ? "cm · kg · m/s" : "in · lb · ft/s"}</small></button>)}</div></div>
+          </section>}
+
           {section === "Sport & Dashboard" && <section className="settings-card">
             <div className="panel-title"><div><span className="section-kicker">WORKSPACE DEFAULTS</span><h2>SPORT & DASHBOARD</h2></div></div>
             <p className="setting-description">Define the context Scot loads when you enter your performance workspace.</p>
             <div className="settings-form-grid">
               <label className="field-label">DEFAULT SPORT<select value={sport} onChange={(event) => setSport(event.target.value)}>{sports.map((item) => <option key={item}>{item}</option>)}</select></label>
-              <label className="field-label">PRIMARY LOCATION<input defaultValue="Alexandria, Egypt" /></label>
             </div>
-            <div className="preference-block"><span className="settings-subtitle">MEASUREMENT SYSTEM</span><div className="segmented-setting">{["Metric", "Imperial"].map((item) => <button key={item} className={units === item ? "active" : ""} onClick={() => setUnits(item)}>{item}<small>{item === "Metric" ? "cm · kg · m/s" : "in · lb · ft/s"}</small></button>)}</div></div>
             <div className="setting-row"><div><strong>AUTO-SWITCH METRIC SCHEMA</strong><span>Hide irrelevant metrics when changing sports.</span></div><button className={`toggle ${filterMetrics ? "active" : ""}`} onClick={() => setFilterMetrics(!filterMetrics)} aria-label="Toggle automatic metric filtering"><i /></button></div>
-            <div className="setting-row"><div><strong>LOCAL LEADERBOARD FIRST</strong><span>Open on town/city rankings before country results.</span></div><button className="toggle active" aria-label="Toggle local leaderboard preference"><i /></button></div>
+            <div className="setting-row"><div><strong>LOCAL LEADERBOARD FIRST</strong><span>Open on town/city rankings before country results.</span></div><button className={`toggle ${localLeaderboardFirst ? "active" : ""}`} onClick={() => { const nextValue = !localLeaderboardFirst; setLocalLeaderboardFirst(nextValue); onLocalLeaderboardPreferenceChange(nextValue); }} aria-label="Toggle local leaderboard preference"><i /></button></div>
           </section>}
 
           {section === "AI Vision Engine" && <section className="settings-card">
-            <div className="panel-title"><div><span className="section-kicker">INFERENCE ENGINE</span><h2>AI MODEL</h2></div><span className="secure-label"><Icon name="shield" size={13} /> BROWSER NATIVE</span></div>
-            <p className="setting-description">Select the balance of speed and biomechanical precision for new analysis sessions.</p>
-            <div className="model-options">
-              {[
-                ["Scot Precision", "Maximum joint tracking fidelity for scouting-grade reports.", "±2.4%", "RECOMMENDED"],
-                ["Scot Rapid", "Faster analysis for live training and high-volume team sessions.", "±4.1%", "2.3× FASTER"],
-                ["Scot Edge", "Experimental model with advanced landing-risk classification.", "BETA", "EARLY ACCESS"],
-              ].map(([name, detail, metric, badge]) => <button key={name} className={model === name ? "active" : ""} onClick={() => setModel(name)}><span className="radio-dot"><i /></span><div><strong>{name}</strong><p>{detail}</p><small>{badge}</small></div><b>{metric}</b></button>)}
+            <div className="panel-title"><div><span className="section-kicker">INFERENCE ENGINE</span><h2>AI MODEL</h2></div>            <span className="secure-label"><Icon name="shield" size={13} /> GEMINI API</span></div>
+            <p className="setting-description">Video keyframes are prepared in your browser and sent directly to Google Gemini for player detection and scouting analysis.</p>
+            <div className="settings-form-grid api-key-setting">
+              <label className="field-label">GOOGLE GEMINI API KEY<input type="password" autoComplete="off" value={apiKeyDraft} onChange={(event) => { setApiKeyDraft(event.target.value); setApiKeySaved(false); setAvailableModels([]); setModelsError(""); }} placeholder="Enter your Gemini API key" /></label>
+              <div className="api-key-actions"><button className="primary-button" onClick={() => { try { const key = apiKeyDraft.trim(); onSaveApiKey(key); setApiKeyDraft(key); setApiKeySaved(true); setApiKeySaveError(""); } catch { setApiKeySaveError("Could not save the key in this browser. Check storage permissions and try again."); } }}>{apiKeySaved ? "API KEY SAVED" : "SAVE API KEY"}</button><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">Get a Gemini API key</a></div>
             </div>
-            <span className="settings-subtitle">PROCESSING MODE</span>
-            <div className="segmented-setting processing-mode">{["High-Performance", "Fallback Mode"].map((item) => <button key={item} className={processing === item ? "active" : ""} onClick={() => setProcessing(item)}>{item}<small>{item === "High-Performance" ? "WebGPU · local acceleration" : "CPU · compatibility first"}</small></button>)}</div>
-            <div className="range-setting"><div><strong>FRAME RATE SAMPLER</strong><span>Higher sampling improves fast-motion precision.</span></div><b>{fps} FPS</b><input type="range" min="10" max="60" step="10" value={fps} onChange={(event) => setFps(Number(event.target.value))} /><small><span>10 FPS</span><span>60 FPS</span></small></div>
-            <div className="local-data"><div><span>STORED KEYFRAME METADATA</span><strong>184 MB</strong><small>14 sessions · Last updated today</small></div><button className="danger-button">CLEAR LOCAL CACHE</button></div>
-            <div className="privacy-note"><Icon name="shield" size={18} /><div><strong>YOUR FOOTAGE NEVER LEAVES YOUR DEVICE</strong><span>All models run locally through WebGPU. Scot cannot access, store, or resell raw performance footage.</span></div></div>
+            {apiKeySaveError && <p className="analysis-error" role="alert">{apiKeySaveError}</p>}
+            <p className="setting-description">The key is stored in this browser only. It is included in requests sent directly to Google; do not use a key you are not authorized to use.</p>
+            <p className="setting-description">Load the models available to this API key, then choose the primary model for video analysis.</p>
+            <div className="model-discovery">
+              <label className="field-label">PRIMARY GEMINI MODEL
+                <select value={model} onChange={(event) => setModel(event.target.value)}>
+                  {!availableModels.some((availableModel) => availableModel.id === model) && <option value={model}>{model} · current</option>}
+                  {availableModels.length
+                    ? availableModels.map((availableModel) => <option key={availableModel.id} value={availableModel.id}>{availableModel.displayName} · {availableModel.id}</option>)
+                    : ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"].map((id) => <option key={id} value={id}>{id} · fallback</option>)}
+                </select>
+              </label>
+              <button className="outline-button" disabled={modelsLoading} onClick={loadAvailableModels}>{modelsLoading ? "LOADING MODELS…" : "REFRESH AVAILABLE MODELS"} <Icon name="arrow" size={15} /></button>
+            </div>
+            <p className="model-list-status" role={modelsError ? "alert" : "status"}>{modelsError || (availableModels.length ? `${availableModels.length} models support generateContent for this API key.` : "Model availability has not been checked yet.")}</p>
+            {modelSaveError && <p className="analysis-error" role="alert">{modelSaveError}</p>}
+            <div className="range-setting"><div><strong>KEYFRAME SAMPLE COUNT</strong><span>Controls the number of locally extracted frames sent for each scan.</span></div><b>{frameCount} FRAMES</b><input type="range" min="3" max="12" step="1" value={frameCount} onChange={(event) => setFrameCount(Number(event.target.value))} /><small><span>3 FRAMES</span><span>12 FRAMES</span></small></div>
+            <div className="privacy-note"><Icon name="shield" size={18} /><div><strong>LOCAL VIDEO PREPARATION · DIRECT GEMINI REQUESTS</strong><span>The full video is processed locally to extract keyframes. Those images and your API key are sent directly from this browser to Google Gemini for analysis.</span></div></div>
           </section>}
         </div>
       </div>
@@ -416,14 +726,275 @@ function App() {
   const [authOpen, setAuthOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [userName, setUserName] = useState("Omar Khalil");
+  const [userEmail, setUserEmail] = useState("");
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem("scoutai_gemini_key")?.trim() ?? "");
   const [view, setView] = useState("Dashboard");
   const [theme, setTheme] = useState("Dark");
-  const [model, setModel] = useState("Scot Precision");
-  const [processing, setProcessing] = useState("High-Performance");
+  const [model, setModel] = useState(() => {
+    const savedModel = localStorage.getItem("scoutai_primary_model");
+    return savedModel && /^(gemini|gemma)-/i.test(savedModel) ? savedModel : "gemini-2.5-flash";
+  });
+  const [modelSaveError, setModelSaveError] = useState("");
+  const [frameCount, setFrameCount] = useState(6);
   const [units, setUnits] = useState("Metric");
   const [accent, setAccent] = useState("Pure Gold");
   const [filterMetrics, setFilterMetrics] = useState(true);
+  const [localLeaderboardFirst, setLocalLeaderboardFirst] = useState(true);
+  const [country, setCountry] = useState("Egypt");
+  const [city, setCity] = useState("Alexandria");
+  const [timeZone, setTimeZone] = useState("Africa/Cairo");
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client) {
+      setAuthReady(true);
+      return;
+    }
+    let active = true;
+
+    const hydrateProfile = async (user: SupabaseUser | null) => {
+      if (!active) return;
+      setAuthReady(true);
+      setAuthError("");
+      setSupabaseUser(user);
+      setAuthenticated(Boolean(user));
+      setProfileLoaded(false);
+      if (!user) {
+        setUserEmail("");
+        return;
+      }
+      setUserEmail(user.email ?? "");
+
+      try {
+        const { data: existingProfile, error: loadError } = await client
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (loadError) throw loadError;
+
+        let profile: ProfileRow;
+        if (existingProfile) {
+          profile = existingProfile;
+        } else {
+          let pending: Partial<AuthProfileDraft> = {};
+          const pendingValue = localStorage.getItem("scot_pending_auth_profile");
+          if (pendingValue) {
+            try {
+              pending = authProfileDraft(JSON.parse(pendingValue));
+            } catch {
+              localStorage.removeItem("scot_pending_auth_profile");
+            }
+          }
+          const metadata = user.user_metadata;
+          const metadataName = typeof metadata.full_name === "string" ? metadata.full_name : "";
+          const metadataRole = typeof metadata.role === "string" ? metadata.role : "";
+          const metadataSport = typeof metadata.sport === "string" ? metadata.sport : "";
+          const { data: createdProfile, error: createError } = await client
+            .from("profiles")
+            .upsert({
+              id: user.id,
+              email: user.email ?? null,
+              full_name: pending.name || metadataName || user.email?.split("@")[0] || "SCOT athlete",
+              role: pending.role || metadataRole || "Player",
+              sport: pending.sport || metadataSport || "Basketball",
+              country: pending.country || "Egypt",
+              city: pending.city || "",
+              preferences: {},
+            })
+            .select()
+            .single();
+          if (createError) throw createError;
+          profile = createdProfile;
+        }
+
+        if (!active) return;
+        const preferences = preferenceRecord(profile.preferences);
+        setUserName(profile.full_name);
+        setRole(profileRole(profile.role));
+        setSport(profile.sport || "Basketball");
+        setCountry(profile.country || "Egypt");
+        setCity(profile.city || "");
+        setTheme(preferenceString(preferences.theme, "Dark"));
+        setAccent(preferenceString(preferences.accent, "Pure Gold"));
+        setUnits(preferenceString(preferences.units, "Metric"));
+        setTimeZone(preferenceString(preferences.timeZone, "Africa/Cairo"));
+        setModel(preferenceString(preferences.model, "gemini-2.5-flash"));
+        setFrameCount(typeof preferences.frameCount === "number" ? preferences.frameCount : 6);
+        setFilterMetrics(typeof preferences.filterMetrics === "boolean" ? preferences.filterMetrics : true);
+        const leaderboardFirst = typeof preferences.localLeaderboardFirst === "boolean"
+          ? preferences.localLeaderboardFirst
+          : true;
+        setLocalLeaderboardFirst(leaderboardFirst);
+        setScope(leaderboardFirst ? "Town / City Level" : "Country / National Level");
+
+        const pendingValue = localStorage.getItem("scot_pending_auth_profile");
+        if (pendingValue) {
+          try {
+            const pending = authProfileDraft(JSON.parse(pendingValue));
+            setView(pending.mode === "Register" ? "Profile" : "Dashboard");
+          } catch {
+            localStorage.removeItem("scot_pending_auth_profile");
+          }
+          localStorage.removeItem("scot_pending_auth_profile");
+        }
+        setProfileLoaded(true);
+      } catch (cause) {
+        if (!active) return;
+        setAuthError(cause instanceof Error
+          ? `Signed in, but the Supabase profile could not be loaded: ${cause.message}`
+          : "Signed in, but the Supabase profile could not be loaded.");
+      }
+    };
+
+    const { data: authListener } = client.auth.onAuthStateChange((_event, session) => {
+      window.setTimeout(() => void hydrateProfile(session?.user ?? null), 0);
+    });
+    void client.auth.getSession().then(({ data, error }) => {
+      if (!active) return;
+      if (error) {
+        setAuthError(`Could not restore your Supabase session: ${error.message}`);
+        setAuthReady(true);
+        return;
+      }
+      void hydrateProfile(data.session?.user ?? null);
+    }).catch((cause: unknown) => {
+      if (!active) return;
+      setAuthError(cause instanceof Error ? `Could not restore your Supabase session: ${cause.message}` : "Could not restore your Supabase session.");
+      setAuthReady(true);
+    });
+
+    return () => {
+      active = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client || !supabaseUser || !profileLoaded) return;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const { error } = await client.from("profiles").upsert({
+            id: supabaseUser.id,
+            email: supabaseUser.email ?? null,
+            full_name: userName,
+            role,
+            sport,
+            country,
+            city,
+            preferences: {
+              theme,
+              accent,
+              units,
+              timeZone,
+              model,
+              frameCount,
+              filterMetrics,
+              localLeaderboardFirst,
+            },
+            updated_at: new Date().toISOString(),
+          });
+          if (error) throw error;
+          setAuthError("");
+        } catch (cause) {
+          setAuthError(cause instanceof Error
+            ? `Your settings changed, but Supabase could not save them: ${cause.message}`
+            : "Your settings changed, but Supabase could not save them.");
+        }
+      })();
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [
+    supabaseUser,
+    profileLoaded,
+    userName,
+    role,
+    sport,
+    country,
+    city,
+    theme,
+    accent,
+    units,
+    timeZone,
+    model,
+    frameCount,
+    filterMetrics,
+    localLeaderboardFirst,
+  ]);
+
+  const handleEmailAuth = async (payload: AuthPayload): Promise<boolean> => {
+    if (!supabase) throw new Error("Supabase is not configured. Set the required Vite environment variables and restart the app.");
+    if (payload.mode === "Register") {
+      localStorage.setItem("scot_pending_auth_profile", JSON.stringify({
+        mode: payload.mode,
+        role: payload.role,
+        sport: payload.sport,
+        name: payload.name,
+        country: payload.country,
+        city: payload.city,
+      }));
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: payload.email,
+          password: payload.password,
+          options: {
+            emailRedirectTo: window.location.origin,
+            data: {
+              full_name: payload.name,
+              role: payload.role,
+              sport: payload.sport,
+              country: payload.country,
+              city: payload.city,
+            },
+          },
+        });
+        if (error) throw error;
+        if (!data.session) return true;
+        return false;
+      } catch (cause) {
+        localStorage.removeItem("scot_pending_auth_profile");
+        throw cause;
+      }
+    }
+    localStorage.removeItem("scot_pending_auth_profile");
+    const { error } = await supabase.auth.signInWithPassword({
+      email: payload.email,
+      password: payload.password,
+    });
+    if (error) throw error;
+    return false;
+  };
+
+  const handleOAuth = async (provider: AuthProvider, profile: AuthProfileDraft) => {
+    if (!supabase) throw new Error("Supabase is not configured. Set the required Vite environment variables and restart the app.");
+    localStorage.setItem("scot_pending_auth_profile", JSON.stringify(profile));
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) {
+      localStorage.removeItem("scot_pending_auth_profile");
+      throw error;
+    }
+  };
+
+  const completeAuth = (mode: AuthMode) => {
+    setAuthOpen(false);
+    setView(mode === "Register" ? "Profile" : "Dashboard");
+  };
+
+  const handleSignOut = async () => {
+    if (!supabase) return;
+    const { error } = await supabase.auth.signOut();
+    if (error) setAuthError(`Could not sign out: ${error.message}`);
+  };
 
   const visibleAthletes = useMemo(() => athletes.filter((athlete) =>
     (region === "All regions" || athlete.town === region) &&
@@ -435,20 +1006,24 @@ function App() {
   const primaryMetric = (rank: number) => {
     if (sport === "Basketball" || sport === "Volleyball") return `${(80.8 - rank * 2.4).toFixed(1)} ${units === "Metric" ? "cm" : "in"}`;
     if (sport === "Soccer") return `${(35.5 - rank * .7).toFixed(1)} km/h`;
+    if (sport === "Tennis") return `${186 - rank * 2} km/h`;
+    if (sport === "Boxing") return `${(10.8 - rank * .2).toFixed(1)} m/s`;
+    if (sport === "Gymnastics") return `${(1.3 - rank * .03).toFixed(2)} m`;
+    if (sport === "Cycling") return `${1184 - rank * 22} W`;
     if (sport === "Track & Field") return `${134 + rank * 4} ms`;
     if (sport === "Swimming") return `${(1.94 - rank * .04).toFixed(2)} kN`;
     if (sport === "Baseball") return `${(93.8 - rank * 0.8).toFixed(1)} mph`;
     return `${94 - rank * 2} /100`;
   };
   const palette = accentTokens[accent] ?? accentTokens["Pure Gold"];
-
-  const completeAuth = (payload: AuthPayload) => {
-    setAuthenticated(true);
-    setRole(payload.role);
-    setUserName(payload.name);
-    if (payload.mode === "Register") setSport(payload.sport);
-    setAuthOpen(false);
-    setView(payload.mode === "Register" ? "Profile" : "Dashboard");
+  const selectModel = (selectedModel: string) => {
+    setModel(selectedModel);
+    try {
+      localStorage.setItem("scoutai_primary_model", selectedModel);
+      setModelSaveError("");
+    } catch {
+      setModelSaveError("The model is selected for this session but could not be saved in browser storage.");
+    }
   };
 
   return (
@@ -457,13 +1032,14 @@ function App() {
         <Logo />
         <nav className={menuOpen ? "is-open" : ""}>{["Dashboard", "Profile", "Settings"].map((item) => <button key={item} className={view === item ? "active" : ""} onClick={() => { setView(item); setMenuOpen(false); }}>{item}</button>)}<button onClick={() => { setView("Dashboard"); setMenuOpen(false); setTimeout(() => document.getElementById("leaderboard")?.scrollIntoView(), 0); }}>Leaderboards</button></nav>
         <div className="header-actions">
-          <span className="role-badge"><i /> {authenticated ? `${role.toUpperCase()} SESSION` : "PUBLIC VIEW"}</span>
+          <span className="role-badge"><i /> {!authReady ? "CONNECTING" : authenticated ? `${role.toUpperCase()} SESSION` : "PUBLIC VIEW"}</span>
           {authenticated
-            ? <button className="primary-button" onClick={() => setView("Profile")}>{userName.toUpperCase()} <Icon name="arrow" size={15} /></button>
-            : <button className="primary-button" onClick={() => setAuthOpen(true)}>SIGN IN / JOIN <Icon name="arrow" size={15} /></button>}
+            ? <><button className="primary-button" onClick={() => setView("Profile")}>{userName.toUpperCase()} <Icon name="arrow" size={15} /></button><button className="text-button" onClick={() => void handleSignOut()}>SIGN OUT</button></>
+            : <button className="primary-button" disabled={!authReady} onClick={() => setAuthOpen(true)}>SIGN IN / JOIN <Icon name="arrow" size={15} /></button>}
           <button className="icon-button mobile-menu" aria-label="Open navigation" onClick={() => setMenuOpen(!menuOpen)}><Icon name="menu" /></button>
         </div>
       </header>
+      {authError && <div className="analysis-error" role="alert">{authError}</div>}
 
       {view === "Dashboard" && <section className="sport-strip" aria-label="Select a sport">
         <span>SPORT SCHEMA</span>
@@ -524,20 +1100,40 @@ function App() {
           </div>
         </section>
       </div>}
-      {view === "Profile" && <ProfileView sport={sport} role={role} name={userName} model={model} processing={processing} />}
+      {view === "Profile" && <ProfileView sport={sport} role={role} name={userName} model={model} frameCount={frameCount} apiKey={apiKey} onOpenSettings={() => setView("Settings")} onModelChange={selectModel} />}
       {view === "Settings" && <SettingsView
         theme={theme} setTheme={setTheme}
-        model={model} setModel={setModel}
+        model={model} setModel={selectModel}
+        modelSaveError={modelSaveError}
         sport={sport} setSport={setSport}
         role={role} setRole={setRole}
         name={userName}
-        processing={processing} setProcessing={setProcessing}
+        email={userEmail}
+        onSaveName={setUserName}
+        apiKey={apiKey}
+        onSaveApiKey={(key) => {
+          setApiKey(key);
+          if (key) localStorage.setItem("scoutai_gemini_key", key);
+          else localStorage.removeItem("scoutai_gemini_key");
+        }}
+        country={country} setCountry={setCountry}
+        city={city} setCity={setCity}
+        timeZone={timeZone} setTimeZone={setTimeZone}
+        frameCount={frameCount} setFrameCount={setFrameCount}
         units={units} setUnits={setUnits}
         accent={accent} setAccent={setAccent}
         filterMetrics={filterMetrics} setFilterMetrics={setFilterMetrics}
+        localLeaderboardFirst={localLeaderboardFirst}
+        setLocalLeaderboardFirst={setLocalLeaderboardFirst}
+        onLocalLeaderboardPreferenceChange={(enabled) => setScope(enabled ? "Town / City Level" : "Country / National Level")}
       />}
       <footer><Logo /><span>SERVERLESS ATHLETIC INTELLIGENCE · BUILT FOR THE NEXT PLAY</span><small>© 2026 SCOT</small></footer>
-      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} onSuccess={completeAuth} />}
+      {authOpen && <AuthModal
+        onClose={() => setAuthOpen(false)}
+        onEmailAuth={handleEmailAuth}
+        onOAuth={handleOAuth}
+        onAuthenticated={completeAuth}
+      />}
     </main>
   );
 }

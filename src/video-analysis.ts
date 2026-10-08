@@ -1,0 +1,412 @@
+export type VideoFrame = { data: string; timestamp: number };
+
+export type DetectedPlayer = {
+  id: string;
+  label: string;
+  jerseyNumber: string;
+  position: string;
+  team: string;
+  confidence: number;
+  description: string;
+  standoutTrait: string;
+};
+
+export type AnalysisMetric = { name: string; score: number; note: string };
+
+export type VideoAnalysisReport = {
+  overallScore: number;
+  overallGrade: string;
+  playerSummary: string;
+  oneLiner: string;
+  position: string;
+  metrics: AnalysisMetric[];
+  strengths: string[];
+  areasToImprove: string[];
+  recommendations: string[];
+  narrative: string;
+};
+
+export type AvailableGeminiModel = { id: string; displayName: string };
+
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+const MAX_FRAME_EDGE = 960;
+const MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024;
+const DEPRECATED_MODEL_PATTERN = /gemini-2\.5-pro$|gemini-1\.0/i;
+const CAPACITY_ERROR_PATTERN = /resource has been exhausted|quota|rate.?limit|high demand|overloaded|temporarily unavailable|try again later/i;
+const UNAVAILABLE_MODEL_PATTERN = /model.{0,40}(?:not found|not available|unsupported|deprecated|retired|discontinued)|(?:not found|not available|unsupported|deprecated|retired|discontinued).{0,40}model|not supported for generatecontent/i;
+
+const SPORT_METRICS: Record<string, string[]> = {
+  Soccer: ["Passing", "Progressive carries", "Shooting", "Defending", "Aerial duels", "Pace", "Positioning"],
+  Basketball: ["Shooting", "Ball handling", "Passing", "Defense", "Vertical jump", "Rebounding", "Basketball IQ"],
+  Tennis: ["Serve", "Forehand", "Backhand", "Footwork", "Rally win rate", "Court coverage"],
+  Boxing: ["Punch technique", "Combination speed", "Defense", "Footwork", "Ring control", "Conditioning"],
+  Swimming: ["Stroke technique", "Turn efficiency", "Underwater phase", "Body position", "Pacing", "Kick"],
+  "Track & Field": ["Start and reaction", "Acceleration", "Top speed", "Stride mechanics", "Finish", "Jump technique"],
+  Volleyball: ["Serve", "Attack", "Block", "Dig", "Court movement", "Jump mechanics"],
+  Gymnastics: ["Execution", "Amplitude", "Rotation control", "Body alignment", "Landing", "Balance"],
+  Cycling: ["Pedaling technique", "Cadence", "Riding position", "Acceleration", "Cornering", "Pacing"],
+  Baseball: ["Pitching", "Hitting", "Fielding", "Throwing mechanics", "Base running", "Reaction"],
+};
+
+function waitForMediaEvent(video: HTMLVideoElement, eventName: "loadedmetadata" | "loadeddata" | "seeked"): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Timed out while preparing the video. Try a shorter or browser-compatible clip."));
+    }, 15_000);
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      video.removeEventListener(eventName, onReady);
+      video.removeEventListener("error", onError);
+    };
+    const onReady = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error("This video could not be decoded by the browser."));
+    };
+    video.addEventListener(eventName, onReady, { once: true });
+    video.addEventListener("error", onError, { once: true });
+  });
+}
+
+export async function extractVideoFrames(
+  file: File,
+  onProgress?: (message: string) => void,
+  frameCount = 6,
+): Promise<VideoFrame[]> {
+  if (!file.type.startsWith("video/")) throw new Error("Choose an MP4, MOV, or WebM video file.");
+  if (file.size > MAX_VIDEO_BYTES) throw new Error("The selected video exceeds the 2 GB analysis limit.");
+
+  const source = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.preload = "auto";
+  video.muted = true;
+  video.playsInline = true;
+  video.src = source;
+
+  try {
+    onProgress?.("Loading video metadata locally…");
+    await waitForMediaEvent(video, "loadedmetadata");
+    if (!Number.isFinite(video.duration) || video.duration <= 0) {
+      throw new Error("The selected video has no readable duration.");
+    }
+    if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) await waitForMediaEvent(video, "loadeddata");
+
+    const scale = Math.min(1, MAX_FRAME_EDGE / Math.max(video.videoWidth, video.videoHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("The browser could not initialize video frame extraction.");
+
+    const frames: VideoFrame[] = [];
+    const sampleCount = Math.max(3, Math.min(12, Math.round(frameCount)));
+    for (let index = 0; index < sampleCount; index++) {
+      const progress = 0.05 + (0.9 * index) / (sampleCount - 1);
+      const timestamp = Math.max(0, Math.min(video.duration * progress, video.duration - 0.01));
+      onProgress?.(`Extracting keyframe ${index + 1} of ${sampleCount} locally…`);
+      if (Math.abs(video.currentTime - timestamp) > 0.001) {
+        const seeked = waitForMediaEvent(video, "seeked");
+        video.currentTime = timestamp;
+        await seeked;
+      }
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const data = canvas.toDataURL("image/jpeg", 0.78).split(",")[1];
+      if (!data) throw new Error("The browser could not encode an extracted video frame.");
+      frames.push({ data, timestamp });
+    }
+    return frames;
+  } finally {
+    video.removeAttribute("src");
+    video.load();
+    URL.revokeObjectURL(source);
+  }
+}
+
+function parseModelJson(text: string): unknown {
+  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start < 0 || end < start) throw new Error("The vision model returned an invalid report. Please try again.");
+  try {
+    return JSON.parse(cleaned.slice(start, end + 1));
+  } catch {
+    throw new Error("The vision model returned malformed JSON. Please try again.");
+  }
+}
+
+export async function fetchAvailableGeminiModels(apiKey: string): Promise<AvailableGeminiModel[]> {
+  if (!apiKey.trim()) throw new Error("Enter and save a Gemini API key before loading available models.");
+
+  const models: AvailableGeminiModel[] = [];
+  const pageTokens = new Set<string>();
+  let pageToken: string | undefined;
+
+  do {
+    const params = new URLSearchParams({ pageSize: "100" });
+    if (pageToken) params.set("pageToken", pageToken);
+
+    let response: Response;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15_000);
+    try {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?${params}`, {
+        headers: { "x-goog-api-key": apiKey.trim() },
+        signal: controller.signal,
+      });
+    } catch (cause) {
+      if (controller.signal.aborted) {
+        throw new Error("Timed out while loading Gemini models. Check your connection and try again.");
+      }
+      const detail = cause instanceof Error ? cause.message : "unknown network error";
+      throw new Error(`Could not connect to Google Gemini model discovery: ${detail}`);
+    } finally {
+      window.clearTimeout(timeout);
+    }
+
+    const body: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(`Gemini model discovery failed (${response.status}): ${getGeminiErrorMessage(body) ?? "Check the API key and its model-list permissions."}`);
+    }
+    if (!isRecord(body) || !Array.isArray(body.models)) {
+      throw new Error("Gemini returned an invalid available-models list.");
+    }
+
+    for (const model of body.models) {
+      if (!isRecord(model) || typeof model.name !== "string") continue;
+      const id = model.name.replace(/^models\//, "");
+      const methods = model.supportedGenerationMethods;
+      if (!Array.isArray(methods) || !methods.includes("generateContent") || DEPRECATED_MODEL_PATTERN.test(id)) continue;
+      models.push({
+        id,
+        displayName: typeof model.displayName === "string" ? model.displayName : id,
+      });
+    }
+
+    const nextPageToken = typeof body.nextPageToken === "string" ? body.nextPageToken : "";
+    if (!nextPageToken || pageTokens.has(nextPageToken)) break;
+    pageTokens.add(nextPageToken);
+    pageToken = nextPageToken;
+  } while (pageToken);
+
+  if (!models.length) throw new Error("No Gemini models supporting generateContent are available for this API key.");
+
+  const uniqueModels = [...new Map(models.map((model) => [model.id, model])).values()];
+  const preference = (id: string) => {
+    if (/gemini-2\.5-flash$/i.test(id)) return 100;
+    if (/gemini-2\.0-flash$/i.test(id)) return 90;
+    if (/gemini-1\.5-flash$/i.test(id)) return 80;
+    if (/flash/i.test(id)) return 70;
+    if (/pro/i.test(id)) return 60;
+    return 50;
+  };
+  return uniqueModels.sort((first, second) =>
+    preference(second.id) - preference(first.id) || first.id.localeCompare(second.id),
+  );
+}
+
+async function requestGemini(
+  apiKey: string,
+  prompt: string,
+  frames: VideoFrame[],
+  preset: string,
+  onModelChange?: (model: string) => void,
+): Promise<unknown> {
+  let lastError = "Gemini could not complete the request.";
+  const preferredModel = preset.trim() || GEMINI_MODELS[0];
+  const modelPriority = [...new Set([preferredModel, ...GEMINI_MODELS])];
+  for (const model of modelPriority) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let response: Response;
+      try {
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+            body: JSON.stringify({
+              contents: [{
+                role: "user",
+                parts: [
+                  ...frames.map((frame) => ({ inlineData: { mimeType: "image/jpeg", data: frame.data } })),
+                  { text: prompt },
+                ],
+              }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: "application/json" },
+            }),
+          },
+        );
+      } catch (cause) {
+        const detail = cause instanceof Error ? cause.message : "unknown network error";
+        throw new Error(`Could not connect to Google Gemini: ${detail}`);
+      }
+
+      const body: unknown = await response.json().catch(() => null);
+      const errorMessage = getGeminiErrorMessage(body) ?? `Gemini request failed (${response.status}).`;
+      if (response.ok) {
+        const text = getGeminiText(body);
+        if (!text) throw new Error("Gemini returned an empty response. Try another clip.");
+        const result = parseModelJson(text);
+        if (model !== preferredModel) onModelChange?.(model);
+        return result;
+      }
+      if (response.status === 401 || response.status === 403 || /api key|key not valid|permission denied/i.test(errorMessage)) {
+        throw new Error(`Gemini rejected the API key or its permissions: ${errorMessage}`);
+      }
+
+      lastError = `${errorMessage} (${response.status})`;
+      if (CAPACITY_ERROR_PATTERN.test(errorMessage)
+        || [408, 429, 500, 502, 503, 504].includes(response.status)) {
+        if (attempt === 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, 1000));
+          continue;
+        }
+        break;
+      }
+      if (response.status === 404 || response.status === 410 || UNAVAILABLE_MODEL_PATTERN.test(errorMessage)) {
+        break;
+      }
+      throw new Error(`Gemini analysis failed: ${lastError}`);
+    }
+  }
+  throw new Error(`Gemini analysis failed across the available fallback models: ${lastError}`);
+}
+
+function getGeminiErrorMessage(body: unknown): string | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const error = (body as { error?: { message?: unknown } }).error?.message;
+  return typeof error === "string" ? error : undefined;
+}
+
+function getGeminiText(body: unknown): string | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const candidates = (body as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> }).candidates;
+  return candidates?.[0]?.content?.parts?.map((part) => part.text).find((text): text is string => typeof text === "string");
+}
+
+function asText(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function asStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+export async function detectVideoPlayers(
+  apiKey: string,
+  sport: string,
+  frames: VideoFrame[],
+  preset: string,
+  onModelChange?: (model: string) => void,
+): Promise<DetectedPlayer[]> {
+  const prompt = `Inspect these ${frames.length} ordered keyframes sampled from a ${sport} video. Identify distinct athletes visible across the frames. Do not guess jersey numbers or details that are not clearly visible. Merge duplicate appearances of an athlete across frames. Return only JSON with shape {"players":[{"label":"visible identifier or concise description","jerseyNumber":"clearly visible digits, otherwise empty","position":"observed or likely role","team":"kit color/team if distinguishable","confidence":0,"description":"visible evidence","standoutTrait":"observable trait"}]}. Return an empty players array if no athlete can be identified reliably.`;
+  const result = await requestGemini(apiKey, prompt, frames, preset, onModelChange);
+  const rawPlayers = (result as { players?: unknown })?.players;
+  if (!Array.isArray(rawPlayers)) throw new Error("Gemini returned an invalid player list.");
+  if (rawPlayers.some((player) => !isRecord(player))) {
+    throw new Error("Gemini returned malformed player details. Please scan the clip again.");
+  }
+  const normalized = rawPlayers
+    .map((player, index) => ({
+      id: `player-${index + 1}`,
+      label: asText(player.label, `Athlete ${index + 1}`),
+      jerseyNumber: asText(player.jerseyNumber).replace(/\D/g, ""),
+      position: asText(player.position, "Athlete"),
+      team: asText(player.team),
+      confidence: Math.max(0, Math.min(100, Math.round(Number(player.confidence) || 0))),
+      description: asText(player.description),
+      standoutTrait: asText(player.standoutTrait),
+    }));
+  const distinct: DetectedPlayer[] = [];
+  for (const player of normalized) {
+    const duplicate = distinct.find((candidate) =>
+      player.label.trim().toLowerCase() === candidate.label.trim().toLowerCase()
+      || (player.jerseyNumber && player.team && player.jerseyNumber === candidate.jerseyNumber
+        && player.team.trim().toLowerCase() === candidate.team.trim().toLowerCase()),
+    );
+    if (!duplicate) distinct.push(player);
+    else if (player.confidence > duplicate.confidence) Object.assign(duplicate, player, { id: duplicate.id });
+  }
+  return distinct.map((player, index) => ({ ...player, id: `player-${index + 1}` }));
+}
+
+export async function analyzeVideoPlayer(
+  apiKey: string,
+  sport: string,
+  frames: VideoFrame[],
+  preset: string,
+  player?: DetectedPlayer,
+  onModelChange?: (model: string) => void,
+): Promise<VideoAnalysisReport> {
+  const metrics = SPORT_METRICS[sport] ?? ["Movement", "Technique", "Speed", "Control", "Decision making"];
+  const playerContext = player
+    ? `Focus only on ${player.label}, identified as ${player.position} for ${player.team || "an indistinct team"}. Evidence from the scan: ${player.description}.`
+    : "Analyze the primary clearly visible athlete. If several are visible and no player was selected, report observable team-level performance and avoid attributing actions to a named individual.";
+  const prompt = `You are a video analyst assessing a ${sport} performance from ${frames.length} ordered video keyframes. ${playerContext}
+Base findings only on visible evidence; do not invent precise timings, scores, measurements, or events that cannot be established from still keyframes. Return only valid JSON with this shape:
+{"overallScore":0,"overallGrade":"A","playerSummary":"short role summary","oneLiner":"concise evidence-based assessment","position":"observed role","metrics":[{"name":"metric","score":0,"note":"visible evidence or not observable"}],"strengths":["observable strength"],"areasToImprove":["specific improvement supported by footage"],"recommendations":["practical training recommendation"],"narrative":"brief scouting summary"}
+Include one metric for each of these sport-specific categories: ${metrics.join(", ")}. Score metrics from 0 to 100; use 0 and say not observable where footage does not support a score. Keep strengths, improvements and recommendations concise.`;
+
+  const response = await requestGemini(apiKey, prompt, frames, preset, onModelChange);
+  if (!response || typeof response !== "object") {
+    throw new Error("Gemini returned an incomplete performance report. Please try again.");
+  }
+  const raw = response as Record<string, unknown>;
+  if (
+    typeof raw.overallScore !== "number"
+    || !Number.isFinite(raw.overallScore)
+    || raw.overallScore < 0
+    || raw.overallScore > 100
+    || typeof raw.overallGrade !== "string"
+    || typeof raw.playerSummary !== "string"
+    || typeof raw.oneLiner !== "string"
+    || typeof raw.position !== "string"
+    || typeof raw.narrative !== "string"
+    || !Array.isArray(raw.metrics)
+    || !Array.isArray(raw.strengths)
+    || !Array.isArray(raw.areasToImprove)
+    || !Array.isArray(raw.recommendations)
+  ) {
+    throw new Error("Gemini returned an incomplete performance report. Please try again.");
+  }
+  const result = raw;
+  const rawMetrics = raw.metrics as unknown[];
+  if (!rawMetrics.length) throw new Error("Gemini returned no sport metrics for this clip. Please try another video.");
+  const normalizedMetrics = rawMetrics.map((metric) => {
+    if (!isRecord(metric)
+      || typeof metric.name !== "string"
+      || typeof metric.score !== "number"
+      || !Number.isFinite(metric.score)
+      || metric.score < 0
+      || metric.score > 100
+      || typeof metric.note !== "string") {
+      throw new Error("Gemini returned malformed report metrics. Please run the analysis again.");
+    }
+    return { name: metric.name, score: Math.round(metric.score), note: metric.note };
+  });
+  if ([raw.strengths, raw.areasToImprove, raw.recommendations].some((items) =>
+    !Array.isArray(items) || !items.every((item) => typeof item === "string"),
+  )) {
+    throw new Error("Gemini returned malformed report details. Please run the analysis again.");
+  }
+  const report: VideoAnalysisReport = {
+    overallScore: Math.round(Number(result.overallScore)),
+    overallGrade: asText(result.overallGrade, "—"),
+    playerSummary: asText(result.playerSummary, player?.label ?? `${sport} analysis`),
+    oneLiner: asText(result.oneLiner),
+    position: asText(result.position, player?.position ?? "Athlete"),
+    metrics: normalizedMetrics,
+    strengths: asStringList(result.strengths),
+    areasToImprove: asStringList(result.areasToImprove),
+    recommendations: asStringList(result.recommendations),
+    narrative: asText(result.narrative),
+  };
+  return report;
+}
