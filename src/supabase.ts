@@ -1,4 +1,5 @@
 import { createClient, type User } from "@supabase/supabase-js";
+import { projectId, publicAnonKey as legacyAnonKey } from "../utils/supabase/info";
 
 type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
@@ -52,18 +53,24 @@ type Database = {
   };
 };
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+// Connected Supabase project configuration (siolmrynjrusybcrwixb)
+const DEFAULT_SUPABASE_URL = "https://siolmrynjrusybcrwixb.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_B84Adhf0eTk3hLGcOI0oAw_q9uH8Tng";
 
-export const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      persistSession: true,
-    },
-  })
-  : null;
-export const isSupabaseConfigured = supabase !== null;
+const envUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
+const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
+
+const supabaseUrl = envUrl || (projectId ? `https://${projectId}.supabase.co` : "") || DEFAULT_SUPABASE_URL;
+const supabaseAnonKey = envKey || legacyAnonKey || DEFAULT_SUPABASE_ANON_KEY;
+
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    persistSession: true,
+  },
+});
+
+export const isSupabaseConfigured = true;
 
 export type SupabaseUser = User;
