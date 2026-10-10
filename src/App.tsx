@@ -328,37 +328,95 @@ function ScoreRing({ score }: { score: number }) {
   return <div className="score-ring" style={{ "--score": `${score * 3.6}deg` } as React.CSSProperties}><span>{score}</span><small>/100</small></div>;
 }
 
-function RolePanel({ role, setRole, onOpenProfile }: { role: string; setRole: (role: string) => void; onOpenProfile: () => void }) {
+function RolePanel({
+  role,
+  setRole,
+  onOpenProfile,
+  demoMode,
+  userName,
+  onToggleDemo,
+}: {
+  role: string;
+  setRole: (role: string) => void;
+  onOpenProfile: () => void;
+  demoMode: boolean;
+  userName: string;
+  onToggleDemo: (enabled: boolean) => void;
+}) {
   return (
     <aside className="role-panel">
       <div className="role-heading">
         <div><span className="section-kicker">ROLE INTELLIGENCE</span><h3>{role === "Player" ? "PERSONAL SPOTLIGHT" : role === "Club" ? "TEAM AGGREGATION" : "FLIGHT TELEMETRY"}</h3></div>
         <div className="mini-tabs">{["Player", "Club", "Scout"].map((item) => <button key={item} className={role === item ? "active" : ""} onClick={() => setRole(item)}>{item}</button>)}</div>
       </div>
-      {role === "Player" && <div className="spotlight">
-        <div className="spotlight-profile"><img src={athletes[0].image} alt="Omar Khalil" /><div><strong>Omar Khalil</strong><span>Alexandria Falcons</span></div><b>#01</b></div>
-        <div className="spotlight-score"><ScoreRing score={94} /><div><span>National rank</span><strong>Top 2%</strong><small><Icon name="trend" size={13} /> 6 places this month</small></div></div>
-        <div className="stat-pair"><div><span>Peak velocity</span><strong>8.42 <small>m/s</small></strong></div><div><span>Power index</span><strong>88.6</strong></div></div>
-      </div>}
-      {role === "Club" && <div className="club-view">
-        <div className="club-total"><span>ACTIVE ROSTER</span><strong>24</strong><small>18 athletes trending upward</small></div>
-        <div className="bars">{[["Explosiveness", 86], ["Recovery", 71], ["Consistency", 78]].map(([label, value]) => <div key={label}><span>{label}<b>{value}%</b></span><i><em style={{ width: `${value}%` }} /></i></div>)}</div>
-      </div>}
-      {role === "Scout" && <div className="scout-view">
-        <svg viewBox="0 0 240 150" aria-label="Athlete performance radar chart">
-          <g className="radar-grid"><polygon points="120,10 218,62 181,140 59,140 22,62" /><polygon points="120,35 190,72 163,126 77,126 50,72" /><line x1="120" y1="10" x2="120" y2="140" /><line x1="22" y1="62" x2="181" y2="140" /><line x1="218" y1="62" x2="59" y2="140" /></g>
-          <polygon className="radar-data" points="120,23 195,70 170,128 72,130 46,68" />
-        </svg>
-        <div className="radar-labels"><span>Acceleration</span><span>Control</span><span>Landing</span></div>
-      </div>}
-      <button className="text-button" onClick={onOpenProfile}>VIEW FULL {role === "Club" ? "ROSTER" : role === "Scout" ? "WATCHLIST" : "ATHLETE"} PROFILE <Icon name="arrow" size={15} /></button>
+      {role === "Player" && (
+        demoMode ? (
+          <div className="spotlight">
+            <div className="spotlight-profile"><img src={athletes[0].image} alt="Omar Khalil" /><div><strong>Omar Khalil</strong><span>Alexandria Falcons</span></div><b>#01</b></div>
+            <div className="spotlight-score"><ScoreRing score={94} /><div><span>National rank</span><strong>Top 2%</strong><small><Icon name="trend" size={13} /> 6 places this month</small></div></div>
+            <div className="stat-pair"><div><span>Peak velocity</span><strong>8.42 <small>m/s</small></strong></div><div><span>Power index</span><strong>88.6</strong></div></div>
+          </div>
+        ) : (
+          <div className="spotlight">
+            <div className="spotlight-profile">
+              <div className="score-ring" style={{ width: 43, height: 43, display: "grid", placeItems: "center", borderRadius: "50%", background: "var(--panel-raised)", border: "1px solid var(--line)" }}><Icon name="bolt" size={16} /></div>
+              <div><strong>{userName}</strong><span>Personal Athlete Session</span></div>
+              <b style={{ fontSize: 13, color: "var(--muted)" }}>STANDBY</b>
+            </div>
+            <div className="spotlight-score">
+              <ScoreRing score={0} />
+              <div><span>Current status</span><strong>Awaiting Video</strong><small style={{ color: "var(--muted)" }}>No live sessions recorded</small></div>
+            </div>
+            <div className="stat-pair">
+              <div><span>Peak velocity</span><strong>—</strong></div>
+              <div><span>Power index</span><strong>—</strong></div>
+            </div>
+          </div>
+        )
+      )}
+      {role === "Club" && (
+        demoMode ? (
+          <div className="club-view">
+            <div className="club-total"><span>ACTIVE ROSTER</span><strong>24</strong><small>18 athletes trending upward</small></div>
+            <div className="bars">{[["Explosiveness", 86], ["Recovery", 71], ["Consistency", 78]].map(([label, value]) => <div key={label}><span>{label}<b>{value}%</b></span><i><em style={{ width: `${value}%` }} /></i></div>)}</div>
+          </div>
+        ) : (
+          <div className="club-view">
+            <div className="club-total"><span>ACTIVE ROSTER</span><strong>0</strong><small style={{ color: "var(--muted)" }}>Workspace in clean mode</small></div>
+            <div className="bars">{[["Explosiveness", 0], ["Recovery", 0], ["Consistency", 0]].map(([label, value]) => <div key={label}><span>{label}<b>0%</b></span><i><em style={{ width: "0%" }} /></i></div>)}</div>
+          </div>
+        )
+      )}
+      {role === "Scout" && (
+        demoMode ? (
+          <div className="scout-view">
+            <svg viewBox="0 0 240 150" aria-label="Athlete performance radar chart">
+              <g className="radar-grid"><polygon points="120,10 218,62 181,140 59,140 22,62" /><polygon points="120,35 190,72 163,126 77,126 50,72" /><line x1="120" y1="10" x2="120" y2="140" /><line x1="22" y1="62" x2="181" y2="140" /><line x1="218" y1="62" x2="59" y2="140" /></g>
+              <polygon className="radar-data" points="120,23 195,70 170,128 72,130 46,68" />
+            </svg>
+            <div className="radar-labels"><span>Acceleration</span><span>Control</span><span>Landing</span></div>
+          </div>
+        ) : (
+          <div className="scout-view">
+            <svg viewBox="0 0 240 150" aria-label="Empty radar chart">
+              <g className="radar-grid"><polygon points="120,10 218,62 181,140 59,140 22,62" /><polygon points="120,35 190,72 163,126 77,126 50,72" /><line x1="120" y1="10" x2="120" y2="140" /><line x1="22" y1="62" x2="181" y2="140" /><line x1="218" y1="62" x2="59" y2="140" /></g>
+            </svg>
+            <div className="radar-labels"><span>Acceleration</span><span>Control</span><span>Landing</span></div>
+          </div>
+        )
+      )}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
+        <button className="text-button" onClick={onOpenProfile}>VIEW FULL {role === "Club" ? "ROSTER" : role === "Scout" ? "WATCHLIST" : "ATHLETE"} PROFILE <Icon name="arrow" size={15} /></button>
+        {!demoMode && <button className="text-button" style={{ color: "var(--gold)" }} onClick={() => onToggleDemo(true)}>LOAD DEMO</button>}
+      </div>
     </aside>
   );
 }
 
-function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSettings, onModelChange }: {
+function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSettings, onModelChange, demoMode = true }: {
   sport: string; role: string; name: string; model: string; frameCount: number;
   apiKey: string; onOpenSettings: () => void; onModelChange: (model: string) => void;
+  demoMode?: boolean;
 }) {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState("");
@@ -511,10 +569,17 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
         </section>
 
         <section className="profile-summary">
-          <div className="panel-title"><div><span className="section-kicker">CAREER SIGNAL</span><h2>ATHLETE BASELINE</h2></div><span className="updated"><i /> MODEL READY</span></div>
-          <div className="baseline-score"><ScoreRing score={94} /><div><span>SCOT RATING · PEAK 96</span><strong>ELITE TRAJECTORY</strong><small><Icon name="trend" size={13} /> 4.8% above position average</small></div></div>
+          <div className="panel-title"><div><span className="section-kicker">CAREER SIGNAL</span><h2>ATHLETE BASELINE</h2></div><span className="updated"><i /> {demoMode || reports.length ? "MODEL READY" : "AWAITING SESSION"}</span></div>
+          <div className="baseline-score">
+            <ScoreRing score={reports.length ? reports[0].report.overallScore : demoMode ? 94 : 0} />
+            <div>
+              <span>{reports.length ? "SCOT AI RATING" : demoMode ? "SCOT RATING · PEAK 96" : "SCOT RATING · PENDING"}</span>
+              <strong>{reports.length ? `GRADE ${reports[0].report.overallGrade}` : demoMode ? "ELITE TRAJECTORY" : "AWAITING VIDEO INPUT"}</strong>
+              <small><Icon name="trend" size={13} /> {demoMode ? "4.8% above position average" : "Upload footage to calculate metrics"}</small>
+            </div>
+          </div>
           <div className="baseline-list">
-            {[["Explosive power", "92", "Top 4%"], ["Landing control", "88", "Low risk"], ["Reactive strength", "91", "+6.2%"], ["Movement symmetry", "96", "Optimal"]].map(([label, value, tag]) => <div key={label}><span>{label}</span><strong>{value}</strong><b>{tag}</b></div>)}
+            {[["Explosive power", demoMode ? "92" : "—", demoMode ? "Top 4%" : "Pending"], ["Landing control", demoMode ? "88" : "—", demoMode ? "Low risk" : "Pending"], ["Reactive strength", demoMode ? "91" : "—", demoMode ? "+6.2%" : "Pending"], ["Movement symmetry", demoMode ? "96" : "—", demoMode ? "Optimal" : "Pending"]].map(([label, value, tag]) => <div key={label}><span>{label}</span><strong>{value}</strong><b>{tag}</b></div>)}
           </div>
         </section>
       </div>
@@ -535,24 +600,42 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
 
       <section className="media-report-grid">
         <div className="media-gallery">
-          <div className="panel-title"><div><span className="section-kicker">MEDIA CENTER</span><h2>ANALYZED CLIPS</h2></div><button className="text-button">VIEW ALL 12 <Icon name="arrow" size={15} /></button></div>
-          <div className="clip-grid">
-            {[
-              ["0.83s", "Hang time", "SESSION 18", "https://images.unsplash.com/photo-1762025884013-8a42741468e2?auto=format&fit=crop&w=500&q=80"],
-              ["78.4cm", "Vertical", "SESSION 17", "https://images.unsplash.com/photo-1762025753986-b6227fe6debb?auto=format&fit=crop&w=500&q=80"],
-              ["186ms", "Contact", "SESSION 16", "https://images.unsplash.com/photo-1762025721967-76b6280f8e04?auto=format&fit=crop&w=500&q=80"],
-            ].map(([value, label, session, image]) => <button className="clip-card" key={session}><img src={image} alt="" /><span className="clip-play"><Icon name="play" size={13} /></span><small>{session}</small><div><strong>{value}</strong><span>{label}</span></div></button>)}
-          </div>
+          <div className="panel-title"><div><span className="section-kicker">MEDIA CENTER</span><h2>ANALYZED CLIPS</h2></div>{demoMode && <button className="text-button">VIEW ALL 12 <Icon name="arrow" size={15} /></button>}</div>
+          {demoMode ? (
+            <div className="clip-grid">
+              {[
+                ["0.83s", "Hang time", "SESSION 18", "https://images.unsplash.com/photo-1762025884013-8a42741468e2?auto=format&fit=crop&w=500&q=80"],
+                ["78.4cm", "Vertical", "SESSION 17", "https://images.unsplash.com/photo-1762025753986-b6227fe6debb?auto=format&fit=crop&w=500&q=80"],
+                ["186ms", "Contact", "SESSION 16", "https://images.unsplash.com/photo-1762025721967-76b6280f8e04?auto=format&fit=crop&w=500&q=80"],
+              ].map(([value, label, session, image]) => <button className="clip-card" key={session}><img src={image} alt="" /><span className="clip-play"><Icon name="play" size={13} /></span><small>{session}</small><div><strong>{value}</strong><span>{label}</span></div></button>)}
+            </div>
+          ) : (
+            <div className="empty-state demo-empty-notice" style={{ padding: "40px 16px" }}>
+              <Icon name="play" size={24} />
+              <strong>NO RECORDED SESSIONS YET</strong>
+              <p>Demo clips have been removed. Drag and drop game footage above to extract keyframes and record verified analysis clips.</p>
+            </div>
+          )}
         </div>
         <div className="report-card">
-          <div className="panel-title"><div><span className="section-kicker">SCOUT READY</span><h2>PERFORMANCE REPORT</h2></div><span className="verified-stamp"><Icon name="shield" size={13} /> VERIFIED</span></div>
+          <div className="panel-title"><div><span className="section-kicker">SCOUT READY</span><h2>PERFORMANCE REPORT</h2></div><span className="verified-stamp"><Icon name="shield" size={13} /> {demoMode || reports.length ? "VERIFIED" : "STANDBY"}</span></div>
           <div className="report-preview">
-            <div className="report-top"><Logo /><span>ATHLETE ID · SC-28491</span></div>
-            <div className="report-athlete"><img src={athletes[0].image} alt="" /><div><strong>OMAR KHALIL</strong><span>Basketball · Point Guard</span><small>Alexandria, Egypt</small></div><b>94</b></div>
-            <div className="report-stats"><span><b>78.4</b>VERTICAL CM</span><span><b>0.83</b>FLIGHT SEC</span><span><b>186</b>CONTACT MS</span></div>
+            <div className="report-top"><Logo /><span>ATHLETE ID · {demoMode ? "SC-28491" : "SC-LOCAL"}</span></div>
+            <div className="report-athlete">
+              <div className="score-ring" style={{ width: 40, height: 40, display: "grid", placeItems: "center", borderRadius: "50%", background: "#fff", border: "1px solid rgba(0,0,0,0.15)" }}>
+                <Icon name="bolt" size={16} />
+              </div>
+              <div><strong>{demoMode ? "OMAR KHALIL" : name.toUpperCase()}</strong><span>{sport} · {role}</span><small>{demoMode ? "Alexandria, Egypt" : "Local Workspace"}</small></div>
+              <b>{reports.length ? reports[0].report.overallScore : demoMode ? 94 : "—"}</b>
+            </div>
+            <div className="report-stats">
+              <span><b>{demoMode ? "78.4" : "—"}</b>VERTICAL CM</span>
+              <span><b>{demoMode ? "0.83" : "—"}</b>FLIGHT SEC</span>
+              <span><b>{demoMode ? "186" : "—"}</b>CONTACT MS</span>
+            </div>
             <div className="report-footer"><div className="qr-code"><i /><i /><i /><i /><i /><i /><i /><i /><i /></div><span>Scan to verify report<br />scot.performance/verify</span><strong>LOCAL MODEL<br />SCOT PRECISION</strong></div>
           </div>
-          <button className="outline-button report-export">EXPORT VERIFIED PDF <Icon name="arrow" size={15} /></button>
+          <button className="outline-button report-export" disabled={!demoMode && !reports.length}>EXPORT VERIFIED PDF <Icon name="arrow" size={15} /></button>
         </div>
       </section>
     </div>
@@ -566,6 +649,7 @@ function SettingsView({
   frameCount, setFrameCount, units, setUnits, accent, setAccent,
   filterMetrics, setFilterMetrics, localLeaderboardFirst, setLocalLeaderboardFirst,
   onLocalLeaderboardPreferenceChange,
+  onSaveAllSettings,
 }: {
   theme: string; setTheme: (theme: string) => void;
   model: string; setModel: (model: string) => void;
@@ -584,11 +668,16 @@ function SettingsView({
   filterMetrics: boolean; setFilterMetrics: (value: boolean) => void;
   localLeaderboardFirst: boolean; setLocalLeaderboardFirst: (value: boolean) => void;
   onLocalLeaderboardPreferenceChange: (enabled: boolean) => void;
+  onSaveAllSettings?: () => Promise<void> | void;
 }) {
   const [section, setSection] = useState("Account & Security");
   const [twoFactor, setTwoFactor] = useState(true);
   const [nameDraft, setNameDraft] = useState(name);
   const [accountSaved, setAccountSaved] = useState(false);
+  const [sectionSaved, setSectionSaved] = useState("");
+  const [savingGlobal, setSavingGlobal] = useState(false);
+  const [saveGlobalSuccess, setSaveGlobalSuccess] = useState(false);
+  const [globalSaveError, setGlobalSaveError] = useState("");
   const [apiKeyDraft, setApiKeyDraft] = useState(apiKey);
   const [apiKeySaved, setApiKeySaved] = useState(false);
   const [apiKeySaveError, setApiKeySaveError] = useState("");
@@ -596,6 +685,27 @@ function SettingsView({
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState("");
   const accountRole = role === "Club" ? "Club / Academy" : role === "Scout" ? "Scout / Agent" : "Player";
+
+  const handleSaveAll = async (sectionName?: string) => {
+    setSavingGlobal(true);
+    setGlobalSaveError("");
+    try {
+      onSaveName(nameDraft.trim() || name);
+      if (onSaveAllSettings) {
+        await onSaveAllSettings();
+      }
+      if (sectionName) {
+        setSectionSaved(sectionName);
+        setTimeout(() => setSectionSaved(""), 3000);
+      }
+      setSaveGlobalSuccess(true);
+      setTimeout(() => setSaveGlobalSuccess(false), 3000);
+    } catch (err) {
+      setGlobalSaveError(err instanceof Error ? err.message : "Failed to save settings.");
+    } finally {
+      setSavingGlobal(false);
+    }
+  };
 
   const loadAvailableModels = async () => {
     setModelsLoading(true);
@@ -636,7 +746,7 @@ function SettingsView({
               <label className="field-label">AUTHENTICATION<input value="Managed by Supabase Auth" readOnly /></label>
             </div>
             <div className="setting-row"><div><strong>TWO-FACTOR AUTHENTICATION</strong><span>Require a verification code for new devices.</span></div><button className={`toggle ${twoFactor ? "active" : ""}`} onClick={() => setTwoFactor(!twoFactor)} aria-label="Toggle two-factor authentication"><i /></button></div>
-            <button className="primary-button save-settings" onClick={() => { onSaveName(nameDraft.trim() || name); setAccountSaved(true); }}>{accountSaved ? "ACCOUNT CHANGES SAVED" : "SAVE ACCOUNT CHANGES"} <Icon name="arrow" size={15} /></button>
+            <button className="primary-button save-settings" disabled={savingGlobal} onClick={() => { onSaveName(nameDraft.trim() || name); setAccountSaved(true); void handleSaveAll("Account & Security"); }}>{accountSaved || sectionSaved === "Account & Security" ? "ACCOUNT CHANGES SAVED ✓" : savingGlobal ? "SAVING..." : "SAVE ACCOUNT CHANGES"} <Icon name="arrow" size={15} /></button>
           </section>}
 
           {section === "Interface & Theme" && <section className="settings-card">
@@ -647,6 +757,7 @@ function SettingsView({
             </div>
             <span className="settings-subtitle">ACCENT COLOR</span>
             <div className="accent-options">{[["Pure Gold", "gold"], ["Electric Amber", "amber"], ["Platinum", "platinum"], ["Champion Bronze", "bronze"]].map(([name, color]) => <button key={name} className={accent === name ? "active" : ""} onClick={() => setAccent(name)}><i className={color} /><span>{name}</span><b>{accent === name ? "✓" : ""}</b></button>)}</div>
+            <button className="primary-button save-settings" style={{ marginTop: 24 }} disabled={savingGlobal} onClick={() => void handleSaveAll("Interface & Theme")}>{sectionSaved === "Interface & Theme" ? "APPEARANCE SETTINGS SAVED ✓" : savingGlobal ? "SAVING..." : "SAVE APPEARANCE SETTINGS"} <Icon name="arrow" size={15} /></button>
           </section>}
 
           {section === "Regional Preferences" && <section className="settings-card">
@@ -658,6 +769,7 @@ function SettingsView({
               <label className="field-label">TIME ZONE<select value={timeZone} onChange={(event) => setTimeZone(event.target.value)}><option>Africa/Cairo</option><option>Europe/Madrid</option><option>Europe/London</option><option>America/New_York</option></select></label>
             </div>
             <div className="preference-block"><span className="settings-subtitle">MEASUREMENT SYSTEM</span><div className="segmented-setting">{["Metric", "Imperial"].map((item) => <button key={item} className={units === item ? "active" : ""} onClick={() => setUnits(item)}>{item}<small>{item === "Metric" ? "cm · kg · m/s" : "in · lb · ft/s"}</small></button>)}</div></div>
+            <button className="primary-button save-settings" style={{ marginTop: 24 }} disabled={savingGlobal} onClick={() => void handleSaveAll("Regional Preferences")}>{sectionSaved === "Regional Preferences" ? "REGIONAL PREFERENCES SAVED ✓" : savingGlobal ? "SAVING..." : "SAVE REGIONAL PREFERENCES"} <Icon name="arrow" size={15} /></button>
           </section>}
 
           {section === "Sport & Dashboard" && <section className="settings-card">
@@ -668,6 +780,7 @@ function SettingsView({
             </div>
             <div className="setting-row"><div><strong>AUTO-SWITCH METRIC SCHEMA</strong><span>Hide irrelevant metrics when changing sports.</span></div><button className={`toggle ${filterMetrics ? "active" : ""}`} onClick={() => setFilterMetrics(!filterMetrics)} aria-label="Toggle automatic metric filtering"><i /></button></div>
             <div className="setting-row"><div><strong>LOCAL LEADERBOARD FIRST</strong><span>Open on town/city rankings before country results.</span></div><button className={`toggle ${localLeaderboardFirst ? "active" : ""}`} onClick={() => { const nextValue = !localLeaderboardFirst; setLocalLeaderboardFirst(nextValue); onLocalLeaderboardPreferenceChange(nextValue); }} aria-label="Toggle local leaderboard preference"><i /></button></div>
+            <button className="primary-button save-settings" style={{ marginTop: 24 }} disabled={savingGlobal} onClick={() => void handleSaveAll("Sport & Dashboard")}>{sectionSaved === "Sport & Dashboard" ? "WORKSPACE PREFERENCES SAVED ✓" : savingGlobal ? "SAVING..." : "SAVE WORKSPACE PREFERENCES"} <Icon name="arrow" size={15} /></button>
           </section>}
 
           {section === "AI Vision Engine" && <section className="settings-card">
@@ -695,7 +808,24 @@ function SettingsView({
             {modelSaveError && <p className="analysis-error" role="alert">{modelSaveError}</p>}
             <div className="range-setting"><div><strong>KEYFRAME SAMPLE COUNT</strong><span>Controls the number of locally extracted frames sent for each scan.</span></div><b>{frameCount} FRAMES</b><input type="range" min="3" max="12" step="1" value={frameCount} onChange={(event) => setFrameCount(Number(event.target.value))} /><small><span>3 FRAMES</span><span>12 FRAMES</span></small></div>
             <div className="privacy-note"><Icon name="shield" size={18} /><div><strong>LOCAL VIDEO PREPARATION · DIRECT GEMINI REQUESTS</strong><span>The full video is processed locally to extract keyframes. Those images and your API key are sent directly from this browser to Google Gemini for analysis.</span></div></div>
+            <button className="primary-button save-settings" style={{ marginTop: 24 }} disabled={savingGlobal} onClick={() => void handleSaveAll("AI Vision Engine")}>{sectionSaved === "AI Vision Engine" ? "AI ENGINE CONFIG SAVED ✓" : savingGlobal ? "SAVING..." : "SAVE AI ENGINE SETTINGS"} <Icon name="arrow" size={15} /></button>
           </section>}
+
+          {globalSaveError && <p className="analysis-error" role="alert">{globalSaveError}</p>}
+          <div className="settings-save-bar">
+            <div>
+              <strong>SAVE ALL WORKSPACE & PREFERENCE CHANGES</strong>
+              <p>Persists all profile adjustments, regional tokens, interface styles, and AI engine configs to your local workspace and Supabase profile.</p>
+            </div>
+            <button
+              type="button"
+              className="primary-button save-all-btn"
+              disabled={savingGlobal}
+              onClick={() => void handleSaveAll("All")}
+            >
+              {saveGlobalSuccess ? "ALL CHANGES SAVED ✓" : savingGlobal ? "SAVING CHANGES..." : "SAVE ALL CHANGES"} <Icon name="arrow" size={15} />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -748,6 +878,69 @@ function App() {
   const [city, setCity] = useState("Alexandria");
   const [timeZone, setTimeZone] = useState("Africa/Cairo");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [demoMode, setDemoMode] = useState(() => localStorage.getItem("scot_demo_mode") !== "false");
+
+  const toggleDemoMode = (forcedState?: boolean) => {
+    setDemoMode((prev) => {
+      const next = typeof forcedState === "boolean" ? forcedState : !prev;
+      localStorage.setItem("scot_demo_mode", next ? "true" : "false");
+      return next;
+    });
+  };
+
+  const handleSaveAllSettings = async () => {
+    const payload = {
+      userName,
+      role,
+      sport,
+      country,
+      city,
+      timeZone,
+      theme,
+      accent,
+      units,
+      model,
+      frameCount,
+      filterMetrics,
+      localLeaderboardFirst,
+    };
+    try {
+      localStorage.setItem("scot_user_settings", JSON.stringify(payload));
+      localStorage.setItem("scoutai_primary_model", model);
+      if (apiKey) localStorage.setItem("scoutai_gemini_key", apiKey);
+    } catch {
+      // ignore localStorage quota errors
+    }
+
+    if (supabase && supabaseUser) {
+      const { error } = await supabase.from("profiles").upsert({
+        id: supabaseUser.id,
+        email: supabaseUser.email ?? null,
+        full_name: userName,
+        role,
+        sport,
+        country,
+        city,
+        preferences: {
+          theme,
+          accent,
+          units,
+          timeZone,
+          model,
+          frameCount,
+          filterMetrics,
+          localLeaderboardFirst,
+        },
+        updated_at: new Date().toISOString(),
+      });
+      if (error) {
+        setAuthError(`Saved locally, but Supabase sync failed: ${error.message}`);
+        throw error;
+      } else {
+        setAuthError("");
+      }
+    }
+  };
 
   useEffect(() => {
     const client = supabase;
@@ -996,13 +1189,26 @@ function App() {
     if (error) setAuthError(`Could not sign out: ${error.message}`);
   };
 
-  const visibleAthletes = useMemo(() => athletes.filter((athlete) =>
-    (region === "All regions" || athlete.town === region) &&
-    athlete.name.toLowerCase().includes(query.toLowerCase())
-  ), [region, query]);
-  const activeMetrics = filterMetrics
-    ? (sportMetrics[sport] ?? genericMetrics.filter((metric) => metric.label !== "Stroke rate" && metric.label !== "Pitch velocity"))
-    : genericMetrics;
+  const visibleAthletes = useMemo(() => {
+    if (!demoMode) return [];
+    return athletes.filter((athlete) =>
+      (region === "All regions" || athlete.town === region) &&
+      athlete.name.toLowerCase().includes(query.toLowerCase())
+    );
+  }, [demoMode, region, query]);
+
+  const activeMetrics = useMemo(() => {
+    const base = filterMetrics
+      ? (sportMetrics[sport] ?? genericMetrics.filter((metric) => metric.label !== "Stroke rate" && metric.label !== "Pitch velocity"))
+      : genericMetrics;
+    if (demoMode) return base;
+    return base.map((metric) => ({
+      ...metric,
+      value: "—",
+      delta: "Awaiting signal",
+    }));
+  }, [filterMetrics, sport, demoMode]);
+
   const primaryMetric = (rank: number) => {
     if (sport === "Basketball" || sport === "Volleyball") return `${(80.8 - rank * 2.4).toFixed(1)} ${units === "Metric" ? "cm" : "in"}`;
     if (sport === "Soccer") return `${(35.5 - rank * .7).toFixed(1)} km/h`;
@@ -1029,7 +1235,18 @@ function App() {
   return (
     <main className={theme === "Light" ? "theme-light" : ""} style={{ "--gold": palette.gold, "--gold-bright": palette.bright } as React.CSSProperties}>
       <header className="topbar">
-        <Logo />
+        <div className="topbar-left">
+          <Logo />
+          <button
+            type="button"
+            className={`demo-toggle-btn ${demoMode ? "active" : ""}`}
+            onClick={() => toggleDemoMode()}
+            title={demoMode ? "Click to clear demo data and test blank app state" : "Click to load sample athletes, clips, and benchmarks"}
+          >
+            <span className={`demo-indicator-dot ${demoMode ? "active" : ""}`} />
+            <span>DEMO INFO: <strong>{demoMode ? "ON" : "OFF"}</strong></span>
+          </button>
+        </div>
         <nav className={menuOpen ? "is-open" : ""}>{["Dashboard", "Profile", "Settings"].map((item) => <button key={item} className={view === item ? "active" : ""} onClick={() => { setView(item); setMenuOpen(false); }}>{item}</button>)}<button onClick={() => { setView("Dashboard"); setMenuOpen(false); setTimeout(() => document.getElementById("leaderboard")?.scrollIntoView(), 0); }}>Leaderboards</button></nav>
         <div className="header-actions">
           <span className="role-badge"><i /> {!authReady ? "CONNECTING" : authenticated ? `${role.toUpperCase()} SESSION` : "PUBLIC VIEW"}</span>
@@ -1049,7 +1266,7 @@ function App() {
       {view === "Dashboard" && <div className="page-shell" id="dashboard">
         <section className="hero-heading">
           <div><p className="eyebrow"><span /> LIVE PERFORMANCE NETWORK · {sport.toUpperCase()}</p><h1>FIND THE EDGE.<br /><em>PROVE THE IMPACT.</em></h1><p className="intro">Browser-native biomechanical intelligence for the athletes, clubs, and scouts shaping tomorrow's game.</p></div>
-          <div className="network-stat"><span>NETWORK SIGNAL</span><strong>12,842</strong><small>VERIFIED ATHLETES <b>LIVE</b></small></div>
+          <div className="network-stat"><span>NETWORK SIGNAL</span><strong>{demoMode ? "12,842" : "0"}</strong><small>{demoMode ? "VERIFIED ATHLETES" : "LOCAL ATHLETES TRACKED"} <b>LIVE</b></small></div>
         </section>
 
         <section className="control-deck">
@@ -1079,11 +1296,20 @@ function App() {
                   <td><ScoreRing score={athlete.score} /><span className="trend"><Icon name="trend" size={13} /> {athlete.trend}</span></td>
                 </tr>)}</tbody>
               </table>
-              {!visibleAthletes.length && <div className="empty-state">NO ATHLETES MATCH THIS SIGNAL.</div>}
+              {!demoMode ? (
+                <div className="empty-state demo-empty-notice">
+                  <div className="demo-empty-icon"><Icon name="shield" size={24} /></div>
+                  <strong>DEMO INFORMATION REMOVED</strong>
+                  <p>You are viewing Scot in clean mode with no mock athletes or demo benchmarks. Toggle Demo Info in the upper left or click below to restore sample records.</p>
+                  <button type="button" className="primary-button" onClick={() => toggleDemoMode(true)}>RESTORE DEMO DATA <Icon name="arrow" size={15} /></button>
+                </div>
+              ) : !visibleAthletes.length ? (
+                <div className="empty-state">NO ATHLETES MATCH THIS SIGNAL.</div>
+              ) : null}
             </div>
-            <div className="table-footer"><span>Showing {visibleAthletes.length} of 2,148 ranked athletes</span><button className="text-button">EXPLORE FULL RANKINGS <Icon name="arrow" size={15} /></button></div>
+            <div className="table-footer"><span>Showing {visibleAthletes.length} of {demoMode ? "2,148" : "0"} ranked athletes</span><button className="text-button">EXPLORE FULL RANKINGS <Icon name="arrow" size={15} /></button></div>
           </section>
-          <RolePanel role={role} setRole={setRole} onOpenProfile={() => setView("Profile")} />
+          <RolePanel role={role} setRole={setRole} onOpenProfile={() => setView("Profile")} demoMode={demoMode} userName={userName} onToggleDemo={toggleDemoMode} />
         </div>
 
         <section className="telemetry-section" id="telemetry">
@@ -1100,7 +1326,7 @@ function App() {
           </div>
         </section>
       </div>}
-      {view === "Profile" && <ProfileView sport={sport} role={role} name={userName} model={model} frameCount={frameCount} apiKey={apiKey} onOpenSettings={() => setView("Settings")} onModelChange={selectModel} />}
+      {view === "Profile" && <ProfileView sport={sport} role={role} name={userName} model={model} frameCount={frameCount} apiKey={apiKey} onOpenSettings={() => setView("Settings")} onModelChange={selectModel} demoMode={demoMode} />}
       {view === "Settings" && <SettingsView
         theme={theme} setTheme={setTheme}
         model={model} setModel={selectModel}
@@ -1126,6 +1352,7 @@ function App() {
         localLeaderboardFirst={localLeaderboardFirst}
         setLocalLeaderboardFirst={setLocalLeaderboardFirst}
         onLocalLeaderboardPreferenceChange={(enabled) => setScope(enabled ? "Town / City Level" : "Country / National Level")}
+        onSaveAllSettings={handleSaveAllSettings}
       />}
       <footer><Logo /><span>SERVERLESS ATHLETIC INTELLIGENCE · BUILT FOR THE NEXT PLAY</span><small>© 2026 SCOT</small></footer>
       {authOpen && <AuthModal
