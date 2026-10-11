@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext"],
+    "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": false,
+    "noImplicitAny": false,
+    "strict": false,
+    "jsx": "react-jsx"
+  },
+  "include": ["**/*", "server/deno.d.ts"]
+}

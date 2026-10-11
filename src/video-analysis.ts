@@ -29,7 +29,8 @@ export type VideoAnalysisReport = {
 export type AvailableGeminiModel = { id: string; displayName: string };
 
 const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
-const MAX_FRAME_EDGE = 960;
+const MAX_FRAME_EDGE = 1280; // Higher resolution improves jersey number and player detail detection
+
 const MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024;
 const DEPRECATED_MODEL_PATTERN = /gemini-2\.5-pro$|gemini-1\.0/i;
 const CAPACITY_ERROR_PATTERN = /resource has been exhausted|quota|rate.?limit|high demand|overloaded|temporarily unavailable|try again later/i;
@@ -235,7 +236,12 @@ async function requestGemini(
                   { text: prompt },
                 ],
               }],
-              generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: "application/json" },
+              generationConfig: {
+                temperature: 0.05, // Lower temperature = more deterministic, accurate output
+                maxOutputTokens: 8192,
+                responseMimeType: "application/json",
+              },
+
             }),
           },
         );
@@ -306,7 +312,31 @@ export async function detectVideoPlayers(
   preset: string,
   onModelChange?: (model: string) => void,
 ): Promise<DetectedPlayer[]> {
-  const prompt = `Inspect these ${frames.length} ordered keyframes sampled from a ${sport} video. Identify distinct athletes visible across the frames. Do not guess jersey numbers or details that are not clearly visible. Merge duplicate appearances of an athlete across frames. Return only JSON with shape {"players":[{"label":"visible identifier or concise description","jerseyNumber":"clearly visible digits, otherwise empty","position":"observed or likely role","team":"kit color/team if distinguishable","confidence":0,"description":"visible evidence","standoutTrait":"observable trait"}]}. Return an empty players array if no athlete can be identified reliably.`;
+  const prompt = `You are an elite sports video analyst with expert-level player recognition skills.
+Carefully examine these ${frames.length} sequential keyframes from a ${sport} video.
+
+TASK: Identify EVERY distinct athlete visible across these frames with maximum accuracy.
+
+CONFIDENCE SCORING RUBRIC (be strict and honest):
+- 90-100: Clear face OR jersey number clearly readable + consistent across 3+ frames
+- 75-89: Clear body silhouette + kit color clearly identifiable + visible in 2+ frames
+- 60-74: Partial body visible, kit distinguishable, actions observable in 1-2 frames
+- 40-59: Limited visibility but kit or build features allow differentiation
+- BELOW 40: Omit these players — insufficient visual evidence
+
+IDENTIFICATION RULES:
+1. Merge duplicate appearances of the same athlete across frames (same kit/number/build)
+2. Only report jersey numbers you can clearly read pixel-by-pixel — leave empty string if uncertain
+3. Describe the athlete's physical actions, body language, and court/field positioning as evidence
+4. Note the most distinctive observable athletic trait (explosive jumping, quick footwork, ball control, etc.)
+5. For team: describe the kit precisely (e.g. "blue #23 home jersey", "red away kit", "white training gear")
+6. "label" should be the most specific identifier: jersey number + team color if available, else descriptive phrase
+
+Return ONLY valid JSON matching this exact shape:
+{"players":[{"label":"#23 Blue","jerseyNumber":"23","position":"observed role","team":"blue home kit","confidence":87,"description":"Detailed description of what is visible across frames","standoutTrait":"Most notable athletic quality observed"}]}
+
+If NO athlete can be reliably identified with confidence >= 40, return: {"players":[]}`;
+
   const result = await requestGemini(apiKey, prompt, frames, preset, onModelChange);
   const rawPlayers = (result as { players?: unknown })?.players;
   if (!Array.isArray(rawPlayers)) throw new Error("Gemini returned an invalid player list.");
@@ -323,7 +353,8 @@ export async function detectVideoPlayers(
       confidence: Math.max(0, Math.min(100, Math.round(Number(player.confidence) || 0))),
       description: asText(player.description),
       standoutTrait: asText(player.standoutTrait),
-    }));
+    }))
+    .filter((player) => player.confidence >= 40); // Only include sufficiently confident detections
   const distinct: DetectedPlayer[] = [];
   for (const player of normalized) {
     const duplicate = distinct.find((candidate) =>
@@ -337,6 +368,7 @@ export async function detectVideoPlayers(
   return distinct.map((player, index) => ({ ...player, id: `player-${index + 1}` }));
 }
 
+
 export async function analyzeVideoPlayer(
   apiKey: string,
   sport: string,
@@ -347,12 +379,42 @@ export async function analyzeVideoPlayer(
 ): Promise<VideoAnalysisReport> {
   const metrics = SPORT_METRICS[sport] ?? ["Movement", "Technique", "Speed", "Control", "Decision making"];
   const playerContext = player
-    ? `Focus only on ${player.label}, identified as ${player.position} for ${player.team || "an indistinct team"}. Evidence from the scan: ${player.description}.`
-    : "Analyze the primary clearly visible athlete. If several are visible and no player was selected, report observable team-level performance and avoid attributing actions to a named individual.";
-  const prompt = `You are a video analyst assessing a ${sport} performance from ${frames.length} ordered video keyframes. ${playerContext}
-Base findings only on visible evidence; do not invent precise timings, scores, measurements, or events that cannot be established from still keyframes. Return only valid JSON with this shape:
-{"overallScore":0,"overallGrade":"A","playerSummary":"short role summary","oneLiner":"concise evidence-based assessment","position":"observed role","metrics":[{"name":"metric","score":0,"note":"visible evidence or not observable"}],"strengths":["observable strength"],"areasToImprove":["specific improvement supported by footage"],"recommendations":["practical training recommendation"],"narrative":"brief scouting summary"}
-Include one metric for each of these sport-specific categories: ${metrics.join(", ")}. Score metrics from 0 to 100; use 0 and say not observable where footage does not support a score. Keep strengths, improvements and recommendations concise.`;
+    ? `PRIMARY SUBJECT: "${player.label}" — ${player.position} wearing ${player.team || "an identifiable kit"}.
+Scan evidence: ${player.description}.
+Standout trait observed: ${player.standoutTrait || "not noted"}.
+IMPORTANT: Focus ALL analysis EXCLUSIVELY on this athlete. Track only their movements, technical actions, and positioning across all frames. Ignore other players entirely.`
+    : `Analyze the most active or centrally positioned athlete in these frames.
+If multiple athletes are present, select the one with the most clearly observable ${sport} actions.
+Avoid attributing actions to any named individual unless clearly identifiable by kit or number.`;
+
+  const prompt = `You are a world-class ${sport} performance scout and biomechanical analyst with 20+ years of experience.
+Analyze this athlete's performance from ${frames.length} ordered video keyframes.
+
+${playerContext}
+
+SCORING STANDARDS (use the full 0-100 range honestly):
+- 90-100: Elite / professional level — clearly exceptional technique or athleticism visible
+- 75-89: Above average / high amateur or semi-professional level
+- 60-74: Average / solid club-level performance
+- 40-59: Below average — notable weaknesses visible
+- 20-39: Significant technical issues clearly visible
+- 0-19: Poor performance or not observable from these frames
+
+METRIC SCORING RULES:
+- Only score metrics where you have direct visual evidence from the frames
+- If a metric cannot be reliably assessed from still keyframes, score it 0 and note "insufficient frame evidence"
+- Don't invent statistics, timings, or measurements — only describe what is literally visible
+- The overallScore should be a weighted average reflecting the athlete's total performance quality
+
+GRADING: A (90-100), B+ (85-89), B (75-84), C+ (70-74), C (60-69), D (40-59), F (<40)
+
+NARRATIVE: Write as a real scouting report — specific, evidence-based, professional.
+Mention observable body mechanics, court/field positioning, technical execution, and tactical awareness.
+
+Return ONLY valid JSON:
+{"overallScore":75,"overallGrade":"B","playerSummary":"brief role and playing style summary","oneLiner":"one-sentence evidence-based headline assessment","position":"observed position/role","metrics":[{"name":"metric name","score":75,"note":"specific observable evidence supporting this score"}],"strengths":["specific strength with visual evidence"],"areasToImprove":["specific area with footage evidence"],"recommendations":["concrete actionable training recommendation"],"narrative":"3-4 sentence professional scouting summary citing specific observations"}
+
+Include exactly one metric for each of these sport-specific categories: ${metrics.join(", ")}.`;
 
   const response = await requestGemini(apiKey, prompt, frames, preset, onModelChange);
   if (!response || typeof response !== "object") {

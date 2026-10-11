@@ -427,6 +427,19 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [activeTab, setActiveTab] = useState<"analysis" | "teams" | "privacy">("analysis");
+  const [selectMode, setSelectMode] = useState<"auto" | "manual">("auto");
+  const [manualTarget, setManualTarget] = useState<{ x: number; y: number; label: string } | null>(null);
+  const [followers, setFollowers] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("scot_followers") ?? '["Coach Henderson", "Alexandre Ramos", "Real Betis Youth", "Scout Network EMEA"]'); }
+    catch { return ["Coach Henderson", "Alexandre Ramos"]; }
+  });
+  const [following, setFollowing] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("scot_following") ?? '["Ziad El-Sayed", "Malak Nabil", "FC Barcelona Academy"]'); }
+    catch { return ["Ziad El-Sayed", "Malak Nabil"]; }
+  });
+  const [showFollowModal, setShowFollowModal] = useState<"followers" | "following" | null>(null);
 
   useEffect(() => {
     if (!videoFile) {
@@ -448,16 +461,20 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
     setFrames([]);
     setPlayers([]);
     setSelectedPlayerIds([]);
+    setManualTarget(null);
     setReports([]);
     setStatus("");
     setError("");
+    setLoadingProgress(0);
   };
+
 
   const scanPlayers = async () => {
     if (!videoFile) return;
     setBusy(true);
     setError("");
     setReports([]);
+    setLoadingProgress(5);
     let activeModel = model;
     const handleModelChange = (nextModel: string) => {
       activeModel = nextModel;
@@ -468,16 +485,27 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
       if (!apiKey) {
         throw new Error("Add your Gemini API key in Settings → AI Vision Engine before scanning.");
       }
-      const extracted = await extractVideoFrames(videoFile, setStatus, frameCount);
+      // Frame extraction: 5% → 50%
+      let frameIndex = 0;
+      const extracted = await extractVideoFrames(videoFile, (msg) => {
+        frameIndex++;
+        setLoadingProgress(Math.min(50, 5 + Math.round((frameIndex / frameCount) * 45)));
+        setStatus(msg);
+      }, frameCount);
       setFrames(extracted);
+      setLoadingProgress(55);
       setStatus("Identifying athletes in the selected sport…");
+      // AI detection: 55% → 95%
+      setLoadingProgress(65);
       const detected = await detectVideoPlayers(apiKey, sport, extracted, activeModel, handleModelChange);
       setPlayers(detected);
       setSelectedPlayerIds(detected.length === 1 ? [detected[0].id] : []);
+      setLoadingProgress(100);
       setStatus(detected.length ? `${detected.length} athlete${detected.length === 1 ? "" : "s"} detected.` : "No athletes were identified; you can still analyze the visible performance.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Player scan failed.");
       setStatus("");
+      setLoadingProgress(0);
     } finally {
       setBusy(false);
     }
@@ -487,6 +515,7 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
     if (!videoFile) return;
     setBusy(true);
     setError("");
+    setLoadingProgress(5);
     let activeModel = model;
     const handleModelChange = (nextModel: string) => {
       activeModel = nextModel;
@@ -497,30 +526,66 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
       if (!apiKey) {
         throw new Error("Add your Gemini API key in Settings → AI Vision Engine before analysis.");
       }
-      const analysisFrames = frames.length ? frames : await extractVideoFrames(videoFile, setStatus, frameCount);
-      setFrames(analysisFrames);
+      let analysisFrames = frames;
+      if (!analysisFrames.length) {
+        let frameIndex = 0;
+        analysisFrames = await extractVideoFrames(videoFile, (msg) => {
+          frameIndex++;
+          setLoadingProgress(Math.min(35, 5 + Math.round((frameIndex / frameCount) * 30)));
+          setStatus(msg);
+        }, frameCount);
+        setFrames(analysisFrames);
+      } else {
+        setLoadingProgress(35);
+      }
       const selectedPlayers = players.filter((player) => selectedPlayerIds.includes(player.id));
       const targets: (DetectedPlayer | undefined)[] = selectedPlayers.length ? selectedPlayers : [undefined];
       const nextReports: { player?: DetectedPlayer; report: VideoAnalysisReport }[] = [];
       const failures: string[] = [];
+      const progressPerPlayer = Math.round(60 / targets.length);
       for (const [index, player] of targets.entries()) {
+        const baseProgress = 35 + index * progressPerPlayer;
+        setLoadingProgress(baseProgress + 5);
         setStatus(`Analyzing ${player?.label ?? "the performance"} (${index + 1} of ${targets.length})…`);
         try {
           const report = await analyzeVideoPlayer(apiKey, sport, analysisFrames, activeModel, player, handleModelChange);
           nextReports.push({ player, report });
+          setLoadingProgress(baseProgress + progressPerPlayer);
         } catch (cause) {
           failures.push(`${player?.label ?? "Performance"}: ${cause instanceof Error ? cause.message : "analysis failed"}`);
         }
       }
       if (nextReports.length) setReports(nextReports);
       if (failures.length) throw new Error(failures.join(" "));
+      setLoadingProgress(100);
       setStatus("Video analysis complete.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Video analysis failed.");
       setStatus("");
+      setLoadingProgress(0);
     } finally {
       setBusy(false);
     }
+  };  const handleVideoClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (selectMode !== "manual") return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(2, Math.min(98, Math.round(((event.clientX - rect.left) / rect.width) * 100)));
+    const y = Math.max(2, Math.min(98, Math.round(((event.clientY - rect.top) / rect.height) * 100)));
+    const label = `Pinned Athlete (${x}%, ${y}%)`;
+    const targetPlayer: DetectedPlayer = {
+      id: "manual-pinned-player",
+      label,
+      jerseyNumber: "",
+      position: "Selected Athlete",
+      team: "Focus Subject",
+      confidence: 100,
+      description: `Target athlete clicked by user directly on frame at (${x}% horizontal, ${y}% vertical)`,
+      standoutTrait: `Pinned at (${x}%, ${y}%) for targeted analysis`,
+    };
+    setManualTarget({ x, y, label });
+    setPlayers([targetPlayer]);
+    setSelectedPlayerIds([targetPlayer.id]);
+    setStatus(`Target locked at (${x}%, ${y}%). Click 'ANALYZE SELECTED' to run AI analysis solely on this athlete.`);
   };
 
   const togglePlayer = (playerId: string) => {
@@ -533,9 +598,66 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
     <div className="page-shell subpage-shell">
       <section className="subpage-heading">
         <div><p className="eyebrow"><span /> {role.toUpperCase()} WORKSPACE · {sport.toUpperCase()}</p><h1>{role === "Club" ? "ROSTER" : role === "Scout" ? "SCOUTING" : "PERFORMANCE"}<br /><em>PROFILE.</em></h1></div>
-        <div className="profile-identity"><img src={athletes[0].image} alt={name} /><div><span>VERIFIED {role === "Club" ? "CLUB" : role === "Scout" ? "SCOUT" : "ATHLETE"}</span><strong>{name}</strong><small>{sport} · {role === "Player" ? "Point Guard" : role === "Club" ? "Academy operations" : "Talent pipeline"}</small></div><ScoreRing score={94} /></div>
+        <div className="profile-identity">
+          <img src={athletes[0].image} alt={name} />
+          <div>
+            <span>VERIFIED {role === "Club" ? "CLUB" : role === "Scout" ? "SCOUT" : "ATHLETE"}</span>
+            <strong>{name}</strong>
+            <small>{sport} · {role === "Player" ? "Point Guard" : role === "Club" ? "Academy operations" : "Talent pipeline"}</small>
+            <div className="follow-counter-bar">
+              <span className="follow-counter-item" onClick={() => setShowFollowModal("followers")}>
+                <strong>{followers.length}</strong> Followers
+              </span>
+              <span className="follow-counter-item" onClick={() => setShowFollowModal("following")}>
+                <strong>{following.length}</strong> Following
+              </span>
+            </div>
+          </div>
+          <ScoreRing score={94} />
+        </div>
       </section>
 
+      {/* Followers / Following Modal */}
+      {showFollowModal && (
+        <div className="modal-backdrop" onClick={() => setShowFollowModal(null)}>
+          <div className="search-modal-shell" onClick={(e) => e.stopPropagation()}>
+            <div className="panel-title">
+              <div><span className="section-kicker">NETWORK</span><h2>{showFollowModal === "followers" ? "FOLLOWERS" : "FOLLOWING"}</h2></div>
+              <button className="icon-button" onClick={() => setShowFollowModal(null)}><Icon name="close" size={16} /></button>
+            </div>
+            <div className="search-results-list" style={{ marginTop: 16 }}>
+              {(showFollowModal === "followers" ? followers : following).map((user, i) => (
+                <div key={i} className="search-result-row">
+                  <img src={athletes[i % athletes.length].image} alt={user} />
+                  <div>
+                    <strong>{user}</strong>
+                    <small>Verified Network Member</small>
+                  </div>
+                  <span className="verified-stamp"><Icon name="shield" size={12} /> CONNECTED</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile tab navigation */}
+      <div className="profile-tabs">
+        <button className={activeTab === "analysis" ? "active" : ""} onClick={() => setActiveTab("analysis")}>
+          <Icon name="play" size={14} /> VIDEO ANALYSIS
+        </button>
+        {role === "Club" && (
+          <button className={activeTab === "teams" ? "active" : ""} onClick={() => setActiveTab("teams")}>
+            <Icon name="shield" size={14} /> MY TEAMS
+          </button>
+        )}
+        <button className={activeTab === "privacy" ? "active" : ""} onClick={() => setActiveTab("privacy")}>
+          <Icon name="shield" size={14} /> PRIVACY SETTINGS
+        </button>
+      </div>
+
+      {/* Analysis Tab */}
+      {activeTab === "analysis" && <>
       <div className="profile-grid">
         <section className="upload-card">
           <div className="panel-title"><div><span className="section-kicker">NEW ANALYSIS</span><h2>VIDEO INPUT</h2></div><span className="secure-label"><Icon name="shield" size={13} /> GEMINI · DIRECT API</span></div>
@@ -550,14 +672,62 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
             <small>{videoFile ? `${model} · ${(videoFile.size / (1024 * 1024)).toFixed(1)} MB` : "MP4, MOV, or WebM · Maximum 2 GB · keyframes extracted on-device"}</small>
             <span className="browse-button">{videoFile ? "REPLACE VIDEO" : "BROWSE FILES"}</span>
           </label>
-          {videoUrl && <video className="analysis-video-preview" src={videoUrl} controls playsInline preload="metadata" aria-label="Uploaded performance video preview" />}
-          {videoFile && <div className="processing-status"><span><b>{busy ? "ANALYSIS IN PROGRESS" : status || "VIDEO READY"}</b><small>{frames.length ? `${frames.length} keyframes prepared locally` : "The full video stays in this browser; selected keyframes are sent to Google Gemini when you run analysis."}</small></span><strong>{busy ? "WORKING" : frames.length ? "READY" : "LOCAL"}</strong><i><em style={{ width: busy ? "68%" : frames.length ? "100%" : "18%" }} /></i></div>}
+          {videoUrl && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className={`feed-filter-btn ${selectMode === "auto" ? "active" : ""}`}
+                  onClick={() => setSelectMode("auto")}
+                >
+                  <Icon name="search" size={13} /> AI AUTO-SCAN PLAYERS
+                </button>
+                <button
+                  type="button"
+                  className={`feed-filter-btn ${selectMode === "manual" ? "active" : ""}`}
+                  onClick={() => setSelectMode("manual")}
+                >
+                  🎯 CLICK VIDEO TO SELECT PLAYER
+                </button>
+              </div>
+
+              {selectMode === "manual" && (
+                <div className="manual-mode-banner">
+                  <span><strong>MANUAL TARGET ACTIVE:</strong> Click directly on the athlete on the video to target them.</span>
+                  {manualTarget && (
+                    <button className="text-button" onClick={() => { setManualTarget(null); setPlayers([]); setSelectedPlayerIds([]); }}>
+                      CLEAR PIN
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <div
+                className="video-interactive-container"
+                onClick={handleVideoClick}
+                style={{ cursor: selectMode === "manual" ? "crosshair" : "default" }}
+              >
+                <video className="analysis-video-preview" src={videoUrl} controls playsInline preload="metadata" aria-label="Uploaded performance video preview" />
+                {manualTarget && (
+                  <div className="manual-target-crosshair" style={{ left: `${manualTarget.x}%`, top: `${manualTarget.y}%` }}>
+                    <span className="manual-target-tag">{manualTarget.label}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {videoFile && <div className="processing-status"><span><b>{busy ? "ANALYSIS IN PROGRESS" : status || "VIDEO READY"}</b><small>{frames.length ? `${frames.length} keyframes prepared locally` : "The full video stays in this browser; selected keyframes are sent to Google Gemini when you run analysis."}</small></span><strong>{busy ? `${loadingProgress}%` : frames.length ? "READY" : "LOCAL"}</strong><i><em style={{ width: `${busy ? loadingProgress : frames.length ? 100 : 18}%`, transition: "width 0.4s ease-out" }} /></i></div>}
+
           {error && <div className="analysis-error" role="alert">{error}{!apiKey && <button className="text-button" onClick={onOpenSettings}>OPEN AI VISION SETTINGS</button>}</div>}
           {players.length > 0 && <div className="detected-player-list">
             <div className="panel-title"><div><span className="section-kicker">PLAYER SCAN</span><h2>SELECT ATHLETES</h2></div><button className="text-button" disabled={busy} onClick={() => setSelectedPlayerIds(players.map((player) => player.id))}>SELECT ALL</button></div>
             {players.map((player) => <label className="detected-player" key={player.id}>
               <input type="checkbox" checked={selectedPlayerIds.includes(player.id)} disabled={busy} onChange={() => togglePlayer(player.id)} />
-              <span><strong>{player.label}</strong><small>{player.position}{player.team ? ` · ${player.team}` : ""} · {player.confidence}% confidence</small><small>{player.description || player.standoutTrait}</small></span>
+              <span>
+                <strong>{player.label}</strong>
+                <small>{player.position}{player.team ? ` · ${player.team}` : ""} · <span className={`confidence-badge ${player.confidence >= 80 ? "high" : player.confidence >= 60 ? "mid" : "low"}`}>{player.confidence}% confidence</span></small>
+                <small>{player.description || player.standoutTrait}</small>
+              </span>
             </label>)}
           </div>}
           {status && <p className="analysis-status" role="status">{status}</p>}
@@ -638,11 +808,958 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
           <button className="outline-button report-export" disabled={!demoMode && !reports.length}>EXPORT VERIFIED PDF <Icon name="arrow" size={15} /></button>
         </div>
       </section>
+      </>}
+
+      {/* Club Teams Tab */}
+      {activeTab === "teams" && role === "Club" && <ClubTeamsPanel sport={sport} name={name} />}
+
+      {/* Privacy Settings Tab */}
+      {activeTab === "privacy" && <PrivacyPanel />}
+    </div>
+  );
+}
+
+
+
+// ──────────────────────────────────────────────────────────────
+// Club Teams Panel — per-team video + analysis sections
+// ──────────────────────────────────────────────────────────────
+
+type TeamEntry = {
+  id: string;
+  name: string;
+  category: string; // e.g. "U-18", "Senior", "Women's"
+  rating: number;
+  videos: string[];
+  strongPoints: string;
+  weakPoints: string;
+};
+
+function ClubTeamsPanel({ sport, name }: { sport: string; name: string }) {
+  const [teams, setTeams] = useState<TeamEntry[]>(() => {
+    try { return JSON.parse(localStorage.getItem("scot_club_teams") ?? "[]") as TeamEntry[]; }
+    catch { return []; }
+  });
+  const [addingTeam, setAddingTeam] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newCategory, setNewCategory] = useState("Senior");
+
+  const saveTeams = (updated: TeamEntry[]) => {
+    setTeams(updated);
+    try { localStorage.setItem("scot_club_teams", JSON.stringify(updated)); } catch {}
+  };
+
+  const addTeam = () => {
+    if (!newName.trim()) return;
+    const team: TeamEntry = {
+      id: `team-${Date.now()}`,
+      name: newName.trim(),
+      category: newCategory,
+      rating: 0,
+      videos: [],
+      strongPoints: "",
+      weakPoints: "",
+    };
+    saveTeams([...teams, team]);
+    setNewName("");
+    setAddingTeam(false);
+  };
+
+  const updateTeam = (id: string, patch: Partial<TeamEntry>) => {
+    saveTeams(teams.map((t) => t.id === id ? { ...t, ...patch } : t));
+  };
+
+  const removeTeam = (id: string) => saveTeams(teams.filter((t) => t.id !== id));
+
+  return (
+    <div className="club-teams-panel">
+      <div className="panel-title">
+        <div><span className="section-kicker">CLUB MANAGEMENT</span><h2>MY TEAMS</h2></div>
+        <button className="primary-button" onClick={() => setAddingTeam(true)}>
+          + ADD TEAM
+        </button>
+      </div>
+      <p className="setting-description">
+        Create a section for each team your club manages. Upload match footage and let Scot AI generate a full lineup assessment for every squad.
+      </p>
+
+      {addingTeam && (
+        <div className="team-add-form">
+          <label className="field-label">TEAM NAME<input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={`${name} — Senior`} /></label>
+          <label className="field-label">CATEGORY
+            <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
+              {["Senior", "U-23", "U-21", "U-18", "U-16", "U-14", "Women's", "Reserve"].map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </label>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button className="primary-button" onClick={addTeam}>CREATE TEAM</button>
+            <button className="outline-button" onClick={() => setAddingTeam(false)}>CANCEL</button>
+          </div>
+        </div>
+      )}
+
+      {teams.length === 0 && !addingTeam && (
+        <div className="empty-state" style={{ padding: "48px 16px" }}>
+          <Icon name="shield" size={28} />
+          <strong>NO TEAMS YET</strong>
+          <p>Click "Add Team" to create your first squad section. Each team gets its own video analysis workspace and AI-generated lineup report.</p>
+        </div>
+      )}
+
+      {teams.map((team) => (
+        <div key={team.id} className="team-card">
+          <div className="team-card-header">
+            <div>
+              <span className="section-kicker">{sport.toUpperCase()} · {team.category.toUpperCase()}</span>
+              <h3>{team.name}</h3>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div className="team-rating-display">
+                <ScoreRing score={team.rating} />
+                <span>TEAM RATING</span>
+              </div>
+              <button className="icon-button" onClick={() => removeTeam(team.id)} aria-label="Remove team" style={{ color: "var(--muted)" }}>
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+          </div>
+
+          <div className="team-card-body">
+            {/* Team rating slider */}
+            <div className="range-setting">
+              <div><strong>OVERALL TEAM RATING</strong><span>AI assessment or manual override</span></div>
+              <b>{team.rating} / 100</b>
+              <input type="range" min="0" max="100" value={team.rating}
+                onChange={(e) => updateTeam(team.id, { rating: Number(e.target.value) })} />
+              <small><span>0</span><span>100</span></small>
+            </div>
+
+            {/* Strong / Weak points */}
+            <div className="team-analysis-grid">
+              <div className="team-strength-box">
+                <span className="section-kicker" style={{ color: "var(--gold)" }}>✦ STRONG POINTS — LINEUP</span>
+                <textarea
+                  value={team.strongPoints}
+                  onChange={(e) => updateTeam(team.id, { strongPoints: e.target.value })}
+                  placeholder="e.g. High press system, strong aerial duels, quick counter-attack transitions..."
+                  rows={4}
+                />
+              </div>
+              <div className="team-weakness-box">
+                <span className="section-kicker" style={{ color: "#e05858" }}>✦ WEAK POINTS — LINEUP</span>
+                <textarea
+                  value={team.weakPoints}
+                  onChange={(e) => updateTeam(team.id, { weakPoints: e.target.value })}
+                  placeholder="e.g. Vulnerable on set pieces, low pressing recovery speed, limited depth at fullback..."
+                  rows={4}
+                />
+              </div>
+            </div>
+
+            {/* Video upload area */}
+            <div className="team-video-section">
+              <div className="panel-title" style={{ marginBottom: 12 }}>
+                <div><span className="section-kicker">MATCH FOOTAGE</span><h4>TEAM VIDEOS</h4></div>
+                <span className="secure-label"><Icon name="shield" size={13} /> GEMINI READY</span>
+              </div>
+              <label className="dropzone team-dropzone">
+                <input type="file" accept="video/*" multiple onChange={(e) => {
+                  const names = Array.from(e.target.files ?? []).map((f) => f.name);
+                  updateTeam(team.id, { videos: [...team.videos, ...names] });
+                }} />
+                <Icon name="arrow" size={20} />
+                <strong>DROP MATCH FOOTAGE</strong>
+                <small>Upload videos to enable AI lineup analysis for {team.name}</small>
+              </label>
+              {team.videos.length > 0 && (
+                <div className="team-video-list">
+                  {team.videos.map((v, i) => (
+                    <div key={i} className="team-video-item">
+                      <Icon name="play" size={14} />
+                      <span>{v}</span>
+                      <button className="icon-button" onClick={() => updateTeam(team.id, { videos: team.videos.filter((_, j) => j !== i) })} style={{ marginLeft: "auto", color: "var(--muted)" }}>
+                        <Icon name="close" size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// Privacy Panel — control which fields are visible publicly
+// ──────────────────────────────────────────────────────────────
+
+const PRIVACY_FIELDS = [
+  { key: "city", label: "City / Town", description: "Hide your specific city from public profiles" },
+  { key: "country", label: "Country", description: "Hide your country from public view" },
+  { key: "sport", label: "Primary Sport", description: "Hide your sport from other users" },
+  { key: "metrics", label: "Performance Metrics", description: "Hide your scores and ratings from other users" },
+  { key: "analysisReports", label: "Analysis Reports", description: "Keep your AI scouting reports private" },
+  { key: "matchClips", label: "Match Clips & Videos", description: "Prevent others from seeing your uploaded clips" },
+  { key: "teamAffiliation", label: "Team / Club Affiliation", description: "Hide which team or club you belong to" },
+  { key: "joinDate", label: "Join Date", description: "Hide when you joined SCOT" },
+];
+
+function PrivacyPanel() {
+  const [privateFields, setPrivateFields] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("scot_private_fields") ?? "[]") as string[]; }
+    catch { return []; }
+  });
+  const [saved, setSaved] = useState(false);
+
+  const toggle = (key: string) => {
+    setPrivateFields((prev) => prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]);
+    setSaved(false);
+  };
+
+  const savePrivacy = () => {
+    try { localStorage.setItem("scot_private_fields", JSON.stringify(privateFields)); }
+    catch {}
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  return (
+    <div className="privacy-panel">
+      <div className="panel-title">
+        <div><span className="section-kicker">DATA PRIVACY</span><h2>PRIVACY SETTINGS</h2></div>
+        <span className="verified-stamp"><Icon name="shield" size={13} /> YOUR DATA</span>
+      </div>
+      <p className="setting-description">
+        Choose which parts of your profile are visible to other users (scouts, clubs, other players) on the dashboard.
+        Private data is hidden from all public profile views — only you can see it when signed in.
+      </p>
+
+      <div className="privacy-notice">
+        <Icon name="shield" size={18} />
+        <div>
+          <strong>PRIVACY LOCK ACTIVE</strong>
+          <span>Fields marked as private are fully hidden from dashboard profile views and public search results. Your data is never sold or shared externally.</span>
+        </div>
+      </div>
+
+      <div className="privacy-fields-list">
+        {PRIVACY_FIELDS.map(({ key, label, description }) => (
+          <div key={key} className="setting-row privacy-row">
+            <div>
+              <strong>{label}</strong>
+              <span>{description}</span>
+            </div>
+            <button
+              className={`toggle ${privateFields.includes(key) ? "active" : ""}`}
+              onClick={() => toggle(key)}
+              aria-label={`Toggle privacy for ${label}`}
+            >
+              <i />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="privacy-summary">
+        <Icon name="shield" size={15} />
+        <span>
+          {privateFields.length === 0
+            ? "All profile data is publicly visible. Toggle fields above to protect your privacy."
+            : `${privateFields.length} field${privateFields.length === 1 ? "" : "s"} set to private: ${privateFields.join(", ")}.`}
+        </span>
+      </div>
+
+      <button className="primary-button save-settings" onClick={savePrivacy}>
+        {saved ? "PRIVACY SETTINGS SAVED ✓" : "SAVE PRIVACY SETTINGS"} <Icon name="arrow" size={15} />
+      </button>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// Directory Profiles — Athletes, Clubs, Scouts for Search & Modal
+// ──────────────────────────────────────────────────────────────
+
+export type DirectoryProfile = {
+  id: string;
+  rank: number;
+  name: string;
+  meta: string;
+  town: string;
+  country: string;
+  flag: string;
+  score: number;
+  trend: string;
+  image: string;
+  role: "Player" | "Club" | "Scout";
+  sport: string;
+  followers: number;
+  following: number;
+  bio: string;
+  strongPoints?: string[];
+  weakPoints?: string[];
+};
+
+export const directoryProfiles: DirectoryProfile[] = [
+  {
+    id: "profile-1",
+    rank: 1,
+    name: "Omar Khalil",
+    meta: "Point Guard · 21",
+    town: "Alexandria",
+    country: "EG",
+    flag: "🇪🇬",
+    score: 94,
+    trend: "+2.4",
+    image: "https://images.unsplash.com/photo-1772480476707-cc5170235189?auto=format&fit=crop&w=160&h=160&q=80",
+    role: "Player",
+    sport: "Basketball",
+    followers: 1420,
+    following: 112,
+    bio: "Elite transition playmaker and floor general with 78.4cm verified vertical jump and high deceleration control.",
+    strongPoints: ["Explosive vertical jump", "Rapid court vision", "Perimeter defensive spacing"],
+    weakPoints: ["Off-dribble mid-range in transition", "Defensive recovery on back screens"],
+  },
+  {
+    id: "profile-2",
+    rank: 2,
+    name: "Mateo Ruiz",
+    meta: "Shooting Guard · 23",
+    town: "Madrid",
+    country: "ES",
+    flag: "🇪🇸",
+    score: 91,
+    trend: "+1.8",
+    image: "https://images.unsplash.com/photo-1759694390162-bf13852b2650?auto=format&fit=crop&w=160&h=160&q=80",
+    role: "Player",
+    sport: "Basketball",
+    followers: 980,
+    following: 84,
+    bio: "Perimeter marksman with smooth high-release mechanics and consistent catch-and-shoot rhythm under contest.",
+    strongPoints: ["Catch-and-shoot release", "Off-ball movement timing", "Transition wing lane running"],
+    weakPoints: ["Contested rim finishing", "Lateral slide recovery against shifty guards"],
+  },
+  {
+    id: "profile-3",
+    rank: 3,
+    name: "Adam Hassan",
+    meta: "Small Forward · 20",
+    town: "Cairo",
+    country: "EG",
+    flag: "🇪🇬",
+    score: 89,
+    trend: "+3.1",
+    image: "https://images.unsplash.com/photo-1762025858816-bb383940763a?auto=format&fit=crop&w=160&h=160&q=80",
+    role: "Player",
+    sport: "Basketball",
+    followers: 1150,
+    following: 130,
+    bio: "Two-way wing athlete with exceptional length and rim pressure, averaging +3.1 monthly trend.",
+    strongPoints: ["Length and defensive deflections", "Slashing rim attacks", "High motor rebounding"],
+    weakPoints: ["Corner 3-point consistency", "Free throw percentage under fatigue"],
+  },
+  {
+    id: "profile-4",
+    rank: 4,
+    name: "Leo Bennett",
+    meta: "Point Guard · 22",
+    town: "London",
+    country: "GB",
+    flag: "🇬🇧",
+    score: 87,
+    trend: "+0.9",
+    image: "https://images.unsplash.com/photo-1762025721967-76b6280f8e04?auto=format&fit=crop&w=160&h=160&q=80",
+    role: "Player",
+    sport: "Basketball",
+    followers: 860,
+    following: 95,
+    bio: "Tempo orchestrator with tight pick-and-roll pocket passing and poise against aggressive traps.",
+    strongPoints: ["Pick-and-roll navigation", "Low turnover ratio", "Change-of-pace handles"],
+    weakPoints: ["Top-end open floor sprint", "Contesting taller combo guards"],
+  },
+  {
+    id: "profile-5",
+    rank: 1,
+    name: "Al Ahly SC Academy",
+    meta: "Premier League Youth · Cairo",
+    town: "Cairo",
+    country: "EG",
+    flag: "🇪🇬",
+    score: 97,
+    trend: "+3.8",
+    image: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=160&h=160&q=80",
+    role: "Club",
+    sport: "Soccer",
+    followers: 32400,
+    following: 48,
+    bio: "Historic football academy developing top international talent across U-16, U-18, and senior squads.",
+    strongPoints: ["High counter-pressing structure", "Aerial duel win rate in both boxes", "Rapid vertical transitions"],
+    weakPoints: ["Set-piece second-ball organization", "Depth at defensive midfield"],
+  },
+  {
+    id: "profile-6",
+    rank: 2,
+    name: "Real Madrid Cantera",
+    meta: "La Fábrica Academy · Madrid",
+    town: "Madrid",
+    country: "ES",
+    flag: "🇪🇸",
+    score: 98,
+    trend: "+2.9",
+    image: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=160&h=160&q=80",
+    role: "Club",
+    sport: "Soccer",
+    followers: 84200,
+    following: 62,
+    bio: "World-class talent incubator focused on elite technical execution, tactical awareness, and competitive mentality.",
+    strongPoints: ["Positional fluid attacking", "Biomechanical movement symmetry", "Speed of play in final third"],
+    weakPoints: ["Defensive rest defense vs direct long balls", "Rotational squad balance"],
+  },
+  {
+    id: "profile-7",
+    rank: 1,
+    name: "EMEA Talent Scouts Ltd",
+    meta: "Licensed Scout Network · London",
+    town: "London",
+    country: "GB",
+    flag: "🇬🇧",
+    score: 95,
+    trend: "+4.1",
+    image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&h=160&q=80",
+    role: "Scout",
+    sport: "Soccer",
+    followers: 12800,
+    following: 340,
+    bio: "Accredited talent identification syndicate scouting premier youth tournaments across Africa and Europe.",
+    strongPoints: ["Predictive career trajectory modeling", "High frame-rate biomechanical video auditing", "Direct club executive network"],
+    weakPoints: ["Regional reach in South America", "Turnaround on tier-3 regional leagues"],
+  },
+];
+
+// ──────────────────────────────────────────────────────────────
+// Public Profile Modal — respecting user privacy preferences
+// ──────────────────────────────────────────────────────────────
+
+function PublicProfileModal({
+  profile,
+  onClose,
+  isFollowing,
+  onToggleFollow,
+}: {
+  profile: DirectoryProfile;
+  onClose: () => void;
+  isFollowing: boolean;
+  onToggleFollow: (name: string) => void;
+}) {
+  const privateFields: string[] = (() => {
+    try { return JSON.parse(localStorage.getItem("scot_private_fields") ?? "[]"); }
+    catch { return []; }
+  })();
+
+  const isPrivate = (field: string) => privateFields.includes(field);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="profile-modal-shell" onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <button className="icon-button" onClick={onClose} aria-label="Close modal">
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+
+        <div className="profile-modal-header">
+          <img src={profile.image} alt={profile.name} />
+          <div className="profile-modal-info">
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span className="section-kicker">VERIFIED {profile.role.toUpperCase()}</span>
+              <button
+                className={`follow-button ${isFollowing ? "following" : ""}`}
+                onClick={() => onToggleFollow(profile.name)}
+              >
+                {isFollowing ? "✓ FOLLOWING" : "+ FOLLOW"}
+              </button>
+            </div>
+            <h2>{profile.name}</h2>
+            <p>{profile.meta}</p>
+            <div className="follow-counter-bar">
+              <span className="follow-counter-item">
+                <strong>{profile.followers + (isFollowing ? 1 : 0)}</strong> Followers
+              </span>
+              <span className="follow-counter-item">
+                <strong>{profile.following}</strong> Following
+              </span>
+            </div>
+          </div>
+          <ScoreRing score={isPrivate("metrics") ? 0 : profile.score} />
+        </div>
+
+        {/* Location & Sport Attributes respecting Privacy */}
+        <div className="profile-stats-grid">
+          <div className="profile-stat-box">
+            <span>CITY / LOCATION</span>
+            {isPrivate("city") ? (
+              <span className="private-masked-badge"><Icon name="shield" size={10} /> 🔒 HIDDEN</span>
+            ) : (
+              <strong>{profile.town}</strong>
+            )}
+          </div>
+          <div className="profile-stat-box">
+            <span>COUNTRY</span>
+            {isPrivate("country") ? (
+              <span className="private-masked-badge"><Icon name="shield" size={10} /> 🔒 HIDDEN</span>
+            ) : (
+              <strong>{profile.flag} {profile.country}</strong>
+            )}
+          </div>
+          <div className="profile-stat-box">
+            <span>SPORT</span>
+            {isPrivate("sport") ? (
+              <span className="private-masked-badge"><Icon name="shield" size={10} /> 🔒 HIDDEN</span>
+            ) : (
+              <strong>{profile.sport}</strong>
+            )}
+          </div>
+        </div>
+
+        {/* Performance Score Section */}
+        <div style={{ marginTop: 20 }}>
+          <div className="panel-title">
+            <div><span className="section-kicker">ASSESSMENT SIGNAL</span><h3>PERFORMANCE BENCHMARK</h3></div>
+            <span className="updated"><i /> VERIFIED SCOT METRIC</span>
+          </div>
+
+          {isPrivate("metrics") ? (
+            <div className="empty-state" style={{ padding: "20px 10px", marginTop: 10 }}>
+              <span className="private-masked-badge"><Icon name="shield" size={12} /> 🔒 METRICS SET TO PRIVATE BY PROFILE OWNER</span>
+              <p style={{ marginTop: 6, fontSize: 11, color: "var(--muted)" }}>This user has enabled profile privacy protection.</p>
+            </div>
+          ) : (
+            <div className="baseline-list" style={{ marginTop: 10 }}>
+              <div><span>Scot Rating</span><strong>{profile.score}/100</strong><b className="safe">Top 3%</b></div>
+              <div><span>Trend Rate</span><strong>{profile.trend}</strong><b className="safe">Positive</b></div>
+              <div><span>Biomechanical Rank</span><strong>#{profile.rank}</strong><b>Regional</b></div>
+            </div>
+          )}
+        </div>
+
+        {/* Scouting & Footage Notes */}
+        <div style={{ marginTop: 24 }}>
+          <div className="panel-title">
+            <div><span className="section-kicker">OVERVIEW & SCOUTING</span><h3>TRAJECTORY</h3></div>
+          </div>
+          <p style={{ fontSize: 12, lineHeight: 1.6, color: "#cbd5e1", marginTop: 8 }}>
+            {profile.bio}
+          </p>
+
+          {isPrivate("analysisReports") ? (
+            <div className="empty-state" style={{ padding: "16px 10px", marginTop: 10 }}>
+              <span className="private-masked-badge"><Icon name="shield" size={12} /> 🔒 AI REPORTS SET TO PRIVATE</span>
+            </div>
+          ) : (
+            <div className="team-analysis-grid" style={{ marginTop: 14 }}>
+              <div className="team-strength-box">
+                <span className="section-kicker" style={{ color: "var(--gold)" }}>✦ KEY STRENGTHS</span>
+                <p style={{ fontSize: 11, margin: 0, color: "var(--white)", lineHeight: 1.5 }}>
+                  {profile.strongPoints?.join(" · ") || "Elite burst acceleration, exceptional court vision, quick release mechanics."}
+                </p>
+              </div>
+              <div className="team-weakness-box">
+                <span className="section-kicker" style={{ color: "#e05858" }}>✦ DEVELOPMENT AREAS</span>
+                <p style={{ fontSize: 11, margin: 0, color: "var(--white)", lineHeight: 1.5 }}>
+                  {profile.weakPoints?.join(" · ") || "Off-hand handle under heavy press, high-fatigue defensive recovery."}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// Discovery Search Modal — Filterable by role, sport, & keyword
+// ──────────────────────────────────────────────────────────────
+
+function SearchModal({
+  isOpen,
+  onClose,
+  profiles,
+  onSelectProfile,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  profiles: DirectoryProfile[];
+  onSelectProfile: (profile: DirectoryProfile) => void;
+}) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"All" | "Player" | "Club" | "Scout">("All");
+  const [sportFilter, setSportFilter] = useState("All");
+
+  if (!isOpen) return null;
+
+  const filtered = profiles.filter((p) => {
+    const matchesSearch = !searchTerm.trim() ||
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.town.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.sport.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === "All" || p.role === roleFilter;
+    const matchesSport = sportFilter === "All" || p.sport === sportFilter;
+    return matchesSearch && matchesRole && matchesSport;
+  });
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="search-modal-shell" onClick={(e) => e.stopPropagation()}>
+        <div className="panel-title">
+          <div><span className="section-kicker">DISCOVERY ENGINE</span><h2>FIND CLUBS & PLAYERS</h2></div>
+          <button className="icon-button" onClick={onClose}><Icon name="close" size={16} /></button>
+        </div>
+
+        <div className="search-input-box">
+          <Icon name="search" size={18} />
+          <input
+            autoFocus
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by name, club, sport, or city..."
+          />
+          {searchTerm && (
+            <button className="text-button" onClick={() => setSearchTerm("")}>CLEAR</button>
+          )}
+        </div>
+
+        {/* Filter Pills */}
+        <div className="filter-pills-row">
+          {(["All", "Player", "Club", "Scout"] as const).map((r) => (
+            <button
+              key={r}
+              className={`filter-pill ${roleFilter === r ? "active" : ""}`}
+              onClick={() => setRoleFilter(r)}
+            >
+              {r === "All" ? "ALL ROLES" : r === "Player" ? "ATHLETES" : `${r.toUpperCase()}S`}
+            </button>
+          ))}
+          <select
+            className="filter-pill"
+            style={{ background: "var(--panel-raised)", color: "var(--white)", border: "1px solid var(--line)" }}
+            value={sportFilter}
+            onChange={(e) => setSportFilter(e.target.value)}
+          >
+            <option value="All">ALL SPORTS</option>
+            {sports.map((s) => <option key={s} value={s}>{s.toUpperCase()}</option>)}
+          </select>
+        </div>
+
+        {/* Results List */}
+        <div className="search-results-list">
+          {filtered.length === 0 ? (
+            <div className="empty-state" style={{ padding: "30px 10px" }}>
+              <Icon name="search" size={24} />
+              <strong>NO PROFILES MATCH</strong>
+              <p>Try refining your search keyword or relaxing filter options.</p>
+            </div>
+          ) : (
+            filtered.map((p) => (
+              <div key={p.id} className="search-result-row" onClick={() => onSelectProfile(p)}>
+                <img src={p.image} alt={p.name} />
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <strong>{p.name}</strong>
+                    <span className="role-badge" style={{ display: "inline-block" }}>{p.role.toUpperCase()}</span>
+                  </div>
+                  <small>{p.sport} · {p.town}, {p.country} · Rating {p.score}/100</small>
+                </div>
+                <button className="outline-button" style={{ minHeight: 28, padding: "0 10px", fontSize: 9 }}>
+                  VIEW <Icon name="arrow" size={11} />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// Home Feed View — Filterable Posts Feed
+// ──────────────────────────────────────────────────────────────
+
+export type FeedPost = {
+  id: string;
+  authorName: string;
+  authorRole: "Player" | "Club" | "Scout";
+  authorImage: string;
+  sport: string;
+  timestamp: string;
+  content: string;
+  mediaUrl?: string;
+  likes: number;
+  isLiked?: boolean;
+  commentsCount: number;
+};
+
+const INITIAL_POSTS: FeedPost[] = [
+  {
+    id: "post-1",
+    authorName: "Al Ahly SC Academy",
+    authorRole: "Club",
+    authorImage: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=160&h=160&q=80",
+    sport: "Soccer",
+    timestamp: "18m ago",
+    content: "Official lineup assessment for our U-18 squad completed ahead of the Cairo youth cup. Scot AI registered a 97 squad rating with top-tier counter-press transition metrics!",
+    mediaUrl: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=800&q=80",
+    likes: 42,
+    commentsCount: 9,
+  },
+  {
+    id: "post-2",
+    authorName: "Omar Khalil",
+    authorRole: "Player",
+    authorImage: "https://images.unsplash.com/photo-1772480476707-cc5170235189?auto=format&fit=crop&w=160&h=160&q=80",
+    sport: "Basketball",
+    timestamp: "1h ago",
+    content: "Vertical takeoff workout today in Alexandria. Hit 78.4 cm with 0.83 sec hang time. Verified directly with Scot AI Vision Engine keyframe analysis!",
+    mediaUrl: "https://images.unsplash.com/photo-1762025884013-8a42741468e2?auto=format&fit=crop&w=800&q=80",
+    likes: 67,
+    commentsCount: 14,
+  },
+  {
+    id: "post-3",
+    authorName: "EMEA Talent Scouts Ltd",
+    authorRole: "Scout",
+    authorImage: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&h=160&q=80",
+    sport: "Soccer",
+    timestamp: "3h ago",
+    content: "Scouting bulletin: Evaluating high-pace wingers and point guards in North Africa & Southern Europe. Video submissions reviewed daily on Scot network.",
+    likes: 31,
+    commentsCount: 5,
+  },
+  {
+    id: "post-4",
+    authorName: "Real Madrid Cantera",
+    authorRole: "Club",
+    authorImage: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=160&h=160&q=80",
+    sport: "Soccer",
+    timestamp: "5h ago",
+    content: "Youth biomechanical audit in Madrid: Precision movement symmetry and sprint acceleration tracking using edge computer vision. The future of talent scouting is here.",
+    likes: 89,
+    commentsCount: 22,
+  },
+  {
+    id: "post-5",
+    authorName: "Mateo Ruiz",
+    authorRole: "Player",
+    authorImage: "https://images.unsplash.com/photo-1759694390162-bf13852b2650?auto=format&fit=crop&w=160&h=160&q=80",
+    sport: "Basketball",
+    timestamp: "8h ago",
+    content: "Catch-and-shoot mechanics breakdown from morning drills. Release angle dialed in at 48° with zero wasted motion.",
+    likes: 29,
+    commentsCount: 4,
+  },
+];
+
+function FeedView({
+  sport,
+  onSelectProfile,
+  currentUserName,
+  currentUserRole,
+  followingList,
+}: {
+  sport: string;
+  onSelectProfile: (profile: DirectoryProfile) => void;
+  currentUserName: string;
+  currentUserRole: string;
+  followingList: string[];
+}) {
+  const [filter, setFilter] = useState<"all" | "following" | "followers" | "clubs" | "scouts" | "sport">("all");
+  const [posts, setPosts] = useState<FeedPost[]>(() => {
+    try {
+      const stored = localStorage.getItem("scot_feed_posts");
+      return stored ? (JSON.parse(stored) as FeedPost[]) : INITIAL_POSTS;
+    } catch {
+      return INITIAL_POSTS;
+    }
+  });
+  const [newContent, setNewContent] = useState("");
+  const [newSport, setNewSport] = useState(sport);
+
+  const savePosts = (updated: FeedPost[]) => {
+    setPosts(updated);
+    try { localStorage.setItem("scot_feed_posts", JSON.stringify(updated)); } catch {}
+  };
+
+  const handleCreatePost = () => {
+    if (!newContent.trim()) return;
+    const post: FeedPost = {
+      id: `post-${Date.now()}`,
+      authorName: currentUserName || "Verified Athlete",
+      authorRole: currentUserRole === "Club" ? "Club" : currentUserRole === "Scout" ? "Scout" : "Player",
+      authorImage: "https://images.unsplash.com/photo-1772480476707-cc5170235189?auto=format&fit=crop&w=160&h=160&q=80",
+      sport: newSport,
+      timestamp: "Just now",
+      content: newContent.trim(),
+      likes: 0,
+      commentsCount: 0,
+    };
+    savePosts([post, ...posts]);
+    setNewContent("");
+  };
+
+  const toggleLike = (id: string) => {
+    savePosts(
+      posts.map((p) => {
+        if (p.id !== id) return p;
+        const isLiked = !p.isLiked;
+        return {
+          ...p,
+          isLiked,
+          likes: isLiked ? p.likes + 1 : Math.max(0, p.likes - 1),
+        };
+      })
+    );
+  };
+
+  const followersList = ["Coach Henderson", "Alexandre Ramos", "Real Betis Youth", "Scout Network EMEA"];
+
+  const filteredPosts = posts.filter((p) => {
+    if (filter === "all") return true;
+    if (filter === "following") return followingList.includes(p.authorName);
+    if (filter === "followers") return followersList.includes(p.authorName);
+    if (filter === "clubs") return p.authorRole === "Club";
+    if (filter === "scouts") return p.authorRole === "Scout";
+    if (filter === "sport") return p.sport === sport;
+    return true;
+  });
+
+  return (
+    <div className="feed-shell">
+      <div className="panel-title">
+        <div><span className="section-kicker">ATHLETIC COMMUNITY</span><h2>SCOT NETWORK FEED</h2></div>
+        <span className="updated"><i /> REAL-TIME PULSE</span>
+      </div>
+
+      {/* Feed Filters */}
+      <div className="feed-filters-nav">
+        {[
+          { key: "all", label: "ALL POSTS" },
+          { key: "following", label: `FOLLOWING (${followingList.length})` },
+          { key: "followers", label: `FOLLOWERS (${followersList.length})` },
+          { key: "clubs", label: "CLUBS" },
+          { key: "scouts", label: "SCOUTS" },
+          { key: "sport", label: `RELATED SPORTS (${sport.toUpperCase()})` },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            className={`feed-filter-btn ${filter === key ? "active" : ""}`}
+            onClick={() => setFilter(key as any)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Create Post Card */}
+      <div className="create-post-card">
+        <span className="section-kicker">SHARE PERFORMANCE FOOTAGE OR UPDATE</span>
+        <textarea
+          rows={3}
+          value={newContent}
+          onChange={(e) => setNewContent(e.target.value)}
+          placeholder={`Share match highlights, AI scouting results, or team announcements in ${sport}...`}
+        />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 9, color: "var(--muted)", fontWeight: 700 }}>SPORT:</span>
+            <select
+              style={{ background: "#0a0a0c", color: "var(--white)", border: "1px solid var(--line)", padding: "4px 8px", fontSize: 10 }}
+              value={newSport}
+              onChange={(e) => setNewSport(e.target.value)}
+            >
+              {sports.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <button className="primary-button" onClick={handleCreatePost} disabled={!newContent.trim()}>
+            PUBLISH POST <Icon name="arrow" size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Posts List */}
+      {filteredPosts.length === 0 ? (
+        <div className="empty-state" style={{ padding: "48px 16px" }}>
+          <Icon name="bolt" size={28} />
+          <strong>NO POSTS FOUND IN THIS CATEGORY</strong>
+          <p>Try switching filter tabs or be the first to publish a performance update!</p>
+        </div>
+      ) : (
+        filteredPosts.map((post) => (
+          <article key={post.id} className="post-card">
+            <div className="post-header">
+              <img
+                src={post.authorImage}
+                alt={post.authorName}
+                onClick={() => {
+                  const match = directoryProfiles.find((d) => d.name === post.authorName);
+                  if (match) onSelectProfile(match);
+                }}
+              />
+              <div className="post-header-info">
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <strong
+                    onClick={() => {
+                      const match = directoryProfiles.find((d) => d.name === post.authorName);
+                      if (match) onSelectProfile(match);
+                    }}
+                  >
+                    {post.authorName}
+                  </strong>
+                  <span className="role-badge" style={{ display: "inline-block" }}>{post.authorRole.toUpperCase()}</span>
+                </div>
+                <small>{post.sport} · {post.timestamp}</small>
+              </div>
+              <button
+                className="outline-button"
+                style={{ minHeight: 28, padding: "0 10px", fontSize: 9 }}
+                onClick={() => {
+                  const match = directoryProfiles.find((d) => d.name === post.authorName);
+                  if (match) onSelectProfile(match);
+                }}
+              >
+                VIEW PROFILE
+              </button>
+            </div>
+
+            <p className="post-content">{post.content}</p>
+
+            {post.mediaUrl && (
+              <img src={post.mediaUrl} alt="Match footage" className="post-media-preview" />
+            )}
+
+            <div className="post-footer-actions">
+              <button
+                className={`post-action-btn ${post.isLiked ? "liked" : ""}`}
+                onClick={() => toggleLike(post.id)}
+              >
+                <Icon name="bolt" size={13} /> {post.likes} {post.isLiked ? "LIKED" : "RESPECTS"}
+              </button>
+              <span style={{ color: "var(--muted)", fontSize: 10 }}>
+                {post.commentsCount} Comments
+              </span>
+            </div>
+          </article>
+        ))
+      )}
     </div>
   );
 }
 
 function SettingsView({
+
   theme, setTheme, model, setModel, sport, setSport, role, setRole, name, email, onSaveName,
   apiKey, onSaveApiKey, modelSaveError,
   country, setCountry, city, setCity, timeZone, setTimeZone,
@@ -862,7 +1979,9 @@ function App() {
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState("");
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("scoutai_gemini_key")?.trim() ?? "");
-  const [view, setView] = useState("Dashboard");
+  const [view, setView] = useState("Home");
+  const [searchOpen, setSearchOpen] = useState(false);
+
   const [theme, setTheme] = useState("Dark");
   const [model, setModel] = useState(() => {
     const savedModel = localStorage.getItem("scoutai_primary_model");
@@ -879,6 +1998,21 @@ function App() {
   const [timeZone, setTimeZone] = useState("Africa/Cairo");
   const [menuOpen, setMenuOpen] = useState(false);
   const [demoMode, setDemoMode] = useState(() => localStorage.getItem("scot_demo_mode") !== "false");
+  const [viewingProfile, setViewingProfile] = useState<DirectoryProfile | null>(null);
+  const [followingList, setFollowingList] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("scot_following") ?? '["Ziad El-Sayed", "Malak Nabil", "FC Barcelona Academy"]'); }
+    catch { return ["Ziad El-Sayed", "Malak Nabil"]; }
+  });
+
+  const handleToggleFollow = (targetName: string) => {
+    setFollowingList((prev) => {
+      const next = prev.includes(targetName)
+        ? prev.filter((n) => n !== targetName)
+        : [...prev, targetName];
+      try { localStorage.setItem("scot_following", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   const toggleDemoMode = (forcedState?: boolean) => {
     setDemoMode((prev) => {
@@ -1247,8 +2381,28 @@ function App() {
             <span>DEMO INFO: <strong>{demoMode ? "ON" : "OFF"}</strong></span>
           </button>
         </div>
-        <nav className={menuOpen ? "is-open" : ""}>{["Dashboard", "Profile", "Settings"].map((item) => <button key={item} className={view === item ? "active" : ""} onClick={() => { setView(item); setMenuOpen(false); }}>{item}</button>)}<button onClick={() => { setView("Dashboard"); setMenuOpen(false); setTimeout(() => document.getElementById("leaderboard")?.scrollIntoView(), 0); }}>Leaderboards</button></nav>
+        <nav className={menuOpen ? "is-open" : ""}>
+          {["Home", "Dashboard", "Profile", "Settings"].map((item) => (
+            <button
+              key={item}
+              className={view === item ? "active" : ""}
+              onClick={() => { setView(item); setMenuOpen(false); }}
+            >
+              {item}
+            </button>
+          ))}
+          <button onClick={() => { setView("Dashboard"); setMenuOpen(false); setTimeout(() => document.getElementById("leaderboard")?.scrollIntoView(), 0); }}>Leaderboards</button>
+        </nav>
         <div className="header-actions">
+          <button
+            type="button"
+            className="outline-button"
+            style={{ minHeight: 34, padding: "0 12px", gap: 6, fontSize: 9 }}
+            onClick={() => setSearchOpen(true)}
+            title="Search clubs and players"
+          >
+            <Icon name="search" size={13} /> SEARCH
+          </button>
           <span className="role-badge"><i /> {!authReady ? "CONNECTING" : authenticated ? `${role.toUpperCase()} SESSION` : "PUBLIC VIEW"}</span>
           {authenticated
             ? <><button className="primary-button" onClick={() => setView("Profile")}>{userName.toUpperCase()} <Icon name="arrow" size={15} /></button><button className="text-button" onClick={() => void handleSignOut()}>SIGN OUT</button></>
@@ -1257,6 +2411,17 @@ function App() {
         </div>
       </header>
       {authError && <div className="analysis-error" role="alert">{authError}</div>}
+
+      {/* HOME FEED VIEW */}
+      {view === "Home" && (
+        <FeedView
+          sport={sport}
+          onSelectProfile={setViewingProfile}
+          currentUserName={userName}
+          currentUserRole={role}
+          followingList={followingList}
+        />
+      )}
 
       {view === "Dashboard" && <section className="sport-strip" aria-label="Select a sport">
         <span>SPORT SCHEMA</span>
@@ -1272,6 +2437,14 @@ function App() {
         <section className="control-deck">
           <div className="scope-switch"><span>COMPETITION SCOPE</span><div>{["Town / City Level", "Country / National Level"].map((item) => <button key={item} className={scope === item ? "active" : ""} onClick={() => setScope(item)}>{item}</button>)}</div></div>
           <div className="filter-group">
+            <button
+              type="button"
+              className="outline-button"
+              style={{ minHeight: 42, padding: "0 14px", gap: 8, fontSize: 9 }}
+              onClick={() => setSearchOpen(true)}
+            >
+              <Icon name="search" size={14} /> FILTER & SEARCH
+            </button>
             <label><span>SEARCH ATHLETE</span><div className="input-wrap"><Icon name="search" size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name or team..." /></div></label>
             <label><span>REGION</span><div className="select-wrap"><Icon name="location" size={16} /><select value={region} onChange={(event) => setRegion(event.target.value)}><option>All regions</option><option>Alexandria</option><option>Cairo</option><option>Madrid</option><option>London</option></select><Icon name="chevron" size={15} /></div></label>
           </div>
@@ -1288,13 +2461,43 @@ function App() {
             <div className="table-scroll">
               <table>
                 <thead><tr><th>RANK / PLAYER</th><th>TOWN / CITY</th><th>COUNTRY</th><th>{activeMetrics[0].label.toUpperCase()}</th><th>SPORT RATING</th></tr></thead>
-                <tbody>{visibleAthletes.map((athlete) => <tr key={athlete.name}>
-                  <td><span className={`rank rank-${athlete.rank}`}>{String(athlete.rank).padStart(2, "0")}</span><img src={athlete.image} alt="" /><div><strong>{athlete.name}</strong><small>{athlete.meta}</small></div></td>
-                  <td><strong>{athlete.town}</strong><small>LOCAL RANK #{athlete.rank}</small></td>
-                  <td><strong>{athlete.flag} {athlete.country}</strong><small>VERIFIED</small></td>
-                  <td><strong className="metric">{primaryMetric(athlete.rank)}</strong><small>{activeMetrics[0].label.toUpperCase()}</small></td>
-                  <td><ScoreRing score={athlete.score} /><span className="trend"><Icon name="trend" size={13} /> {athlete.trend}</span></td>
-                </tr>)}</tbody>
+                <tbody>{visibleAthletes.map((athlete) => {
+                  const profileMatch = directoryProfiles.find((d) => d.name === athlete.name) || {
+                    id: `athlete-${athlete.rank}`,
+                    rank: athlete.rank,
+                    name: athlete.name,
+                    meta: athlete.meta,
+                    town: athlete.town,
+                    country: athlete.country,
+                    flag: athlete.flag,
+                    score: athlete.score,
+                    trend: athlete.trend,
+                    image: athlete.image,
+                    role: "Player" as const,
+                    sport,
+                    followers: 1240,
+                    following: 86,
+                    bio: "Verified Scot athlete with biomechanical score benchmarked live.",
+                  };
+                  return (
+                    <tr
+                      key={athlete.name}
+                      onClick={() => setViewingProfile(profileMatch)}
+                      style={{ cursor: "pointer" }}
+                      title="Click to view public profile"
+                    >
+                      <td>
+                        <span className={`rank rank-${athlete.rank}`}>{String(athlete.rank).padStart(2, "0")}</span>
+                        <img src={athlete.image} alt="" />
+                        <div><strong>{athlete.name}</strong><small>{athlete.meta}</small></div>
+                      </td>
+                      <td><strong>{athlete.town}</strong><small>LOCAL RANK #{athlete.rank}</small></td>
+                      <td><strong>{athlete.flag} {athlete.country}</strong><small>VERIFIED</small></td>
+                      <td><strong className="metric">{primaryMetric(athlete.rank)}</strong><small>{activeMetrics[0].label.toUpperCase()}</small></td>
+                      <td><ScoreRing score={athlete.score} /><span className="trend"><Icon name="trend" size={13} /> {athlete.trend}</span></td>
+                    </tr>
+                  );
+                })}</tbody>
               </table>
               {!demoMode ? (
                 <div className="empty-state demo-empty-notice">
@@ -1307,7 +2510,7 @@ function App() {
                 <div className="empty-state">NO ATHLETES MATCH THIS SIGNAL.</div>
               ) : null}
             </div>
-            <div className="table-footer"><span>Showing {visibleAthletes.length} of {demoMode ? "2,148" : "0"} ranked athletes</span><button className="text-button">EXPLORE FULL RANKINGS <Icon name="arrow" size={15} /></button></div>
+            <div className="table-footer"><span>Showing {visibleAthletes.length} of {demoMode ? "2,148" : "0"} ranked athletes</span><button className="text-button" onClick={() => setSearchOpen(true)}>EXPLORE FULL RANKINGS & PROFILES <Icon name="arrow" size={15} /></button></div>
           </section>
           <RolePanel role={role} setRole={setRole} onOpenProfile={() => setView("Profile")} demoMode={demoMode} userName={userName} onToggleDemo={toggleDemoMode} />
         </div>
@@ -1361,6 +2564,25 @@ function App() {
         onOAuth={handleOAuth}
         onAuthenticated={completeAuth}
       />}
+      {viewingProfile && (
+        <PublicProfileModal
+          profile={viewingProfile}
+          onClose={() => setViewingProfile(null)}
+          isFollowing={followingList.includes(viewingProfile.name)}
+          onToggleFollow={handleToggleFollow}
+        />
+      )}
+      {searchOpen && (
+        <SearchModal
+          isOpen={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          profiles={directoryProfiles}
+          onSelectProfile={(p) => {
+            setSearchOpen(false);
+            setViewingProfile(p);
+          }}
+        />
+      )}
     </main>
   );
 }
