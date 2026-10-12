@@ -81,7 +81,18 @@ app.get(
         }
       }
     }
-    return c.json({ profile: { ...data, preferences: publicPrefs } });
+
+    // Explicitly redact top-level columns if flagged private
+    const sanitizedProfile = {
+      ...data,
+      city: privateFields.includes("city") ? "[HIDDEN]" : data.city,
+      country: privateFields.includes("country") ? "[HIDDEN]" : data.country,
+      sport: privateFields.includes("sport") ? "[HIDDEN]" : data.sport,
+      created_at: privateFields.includes("joinDate") ? null : data.created_at,
+      preferences: publicPrefs,
+    };
+
+    return c.json({ profile: sanitizedProfile });
   },
 );
 
@@ -91,17 +102,22 @@ app.get(
   withSupabase({ auth: "user" }),
   async (c: any) => {
     const { supabase } = c.var.supabaseContext;
-    const q = c.req.query("q") ?? "";
-    const role = c.req.query("role") ?? "";
-    const sport = c.req.query("sport") ?? "";
-    const limit = Math.min(parseInt(c.req.query("limit") ?? "20", 10), 50);
+    const q = (c.req.query("q") ?? "").trim().slice(0, 100);
+    const role = (c.req.query("role") ?? "").trim().slice(0, 50);
+    const sport = (c.req.query("sport") ?? "").trim().slice(0, 50);
+    const rawLimit = parseInt(c.req.query("limit") ?? "20", 10);
+    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 20 : rawLimit), 50);
 
     let query = supabase
       .from("profiles")
       .select("id, full_name, role, sport, country, city, created_at")
       .limit(limit);
 
-    if (q) query = query.ilike("full_name", `%${q}%`);
+    if (q) {
+      // Escape PostgREST wildcard characters to prevent pattern injection
+      const sanitizedQ = q.replace(/[%_]/g, "\\$&");
+      query = query.ilike("full_name", `%${sanitizedQ}%`);
+    }
     if (role) query = query.eq("role", role);
     if (sport) query = query.eq("sport", sport);
 
