@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   analyzeVideoPlayer,
   detectVideoPlayers,
@@ -23,7 +23,9 @@ type IconName =
   | "facebook"
   | "arrow"
   | "shield"
-  | "menu";
+  | "menu"
+  | "video"
+  | "camera";
 
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, React.ReactNode> = {
@@ -39,6 +41,8 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     arrow: <><path d="M5 12h14" /><path d="m14 7 5 5-5 5" /></>,
     shield: <><path d="M12 3 5 6v5c0 4.7 3 8.2 7 10 4-1.8 7-5.3 7-10V6l-7-3Z" /><path d="m9 12 2 2 4-4" /></>,
     menu: <><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></>,
+    video: <><path d="m22 8-6 4 6 4V8Z" /><rect width="14" height="12" x="2" y="6" rx="2" /></>,
+    camera: <><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
@@ -428,7 +432,7 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [activeTab, setActiveTab] = useState<"analysis" | "teams" | "privacy">("analysis");
+  const [activeTab, setActiveTab] = useState<"analysis" | "live" | "teams" | "privacy">("analysis");
   const [selectMode, setSelectMode] = useState<"auto" | "manual">("auto");
   const [manualTarget, setManualTarget] = useState<{ x: number; y: number; label: string } | null>(null);
   const [followers, setFollowers] = useState<string[]>(() => {
@@ -646,6 +650,9 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
         <button className={activeTab === "analysis" ? "active" : ""} onClick={() => setActiveTab("analysis")}>
           <Icon name="play" size={14} /> VIDEO ANALYSIS
         </button>
+        <button className={activeTab === "live" ? "active" : ""} onClick={() => setActiveTab("live")}>
+          <Icon name="video" size={14} /> LIVE CAM & TOUCH ANALYSIS
+        </button>
         {role === "Club" && (
           <button className={activeTab === "teams" ? "active" : ""} onClick={() => setActiveTab("teams")}>
             <Icon name="shield" size={14} /> MY TEAMS
@@ -810,6 +817,9 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
       </section>
       </>}
 
+      {/* Live Recording & Touch Point Analysis Tab */}
+      {activeTab === "live" && <LiveRecordingPanel sport={sport} name={name} role={role} apiKey={apiKey} model={model} />}
+
       {/* Club Teams Tab */}
       {activeTab === "teams" && role === "Club" && <ClubTeamsPanel sport={sport} name={name} />}
 
@@ -819,7 +829,731 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
   );
 }
 
+// ──────────────────────────────────────────────────────────────
+// Feature 12: Real-time Multi-Cam & Touch Point Analysis Studio
+// ──────────────────────────────────────────────────────────────
 
+export type PointTouch = {
+  id: string;
+  touchNumber: number;
+  phase: string;
+  playerName: string;
+  jerseyNumber: string;
+  timestamp: string;
+  rating: number;
+  quality: "Elite" | "Optimal" | "Suboptimal" | "Fault";
+  critique: string;
+  biomechanics: { metric: string; val: string }[];
+};
+
+export type RecordedPoint = {
+  id: string;
+  pointNumber: number;
+  rallyDuration: string;
+  outcome: "Point Won" | "Point Lost" | "Unforced Error" | "Ace / Winner";
+  overallRating: number;
+  touches: PointTouch[];
+  summary: string;
+};
+
+const INITIAL_POINTS: RecordedPoint[] = [
+  {
+    id: "point-1",
+    pointNumber: 1,
+    rallyDuration: "7.8s",
+    outcome: "Point Won",
+    overallRating: 94,
+    summary: "5-touch transition sequence terminating in a sharp cross-court attack.",
+    touches: [
+      {
+        id: "p1-t1",
+        touchNumber: 1,
+        phase: "Jump Float Serve",
+        playerName: "Omar Khalil",
+        jerseyNumber: "#10",
+        timestamp: "00:01.4",
+        rating: 92,
+        quality: "Elite",
+        critique: "Takeoff acceleration 3.84 m/s², flat wrist snap with tight top spin trajectory clearing tape by 14cm into seam.",
+        biomechanics: [
+          { metric: "Velocity", val: "72 km/h" },
+          { metric: "Clearance", val: "14 cm" },
+          { metric: "Takeoff Accel", val: "3.84 m/s²" },
+        ],
+      },
+      {
+        id: "p1-t2",
+        touchNumber: 2,
+        phase: "Platform Reception",
+        playerName: "Ziad El-Sayed",
+        jerseyNumber: "#04",
+        timestamp: "00:02.9",
+        rating: 91,
+        quality: "Optimal",
+        critique: "Early platform stabilization, shoulder dampening absorbed 68% of incoming ball velocity with high center of gravity control.",
+        biomechanics: [
+          { metric: "Absorption", val: "68%" },
+          { metric: "Stance Angle", val: "48°" },
+          { metric: "Reaction", val: "184 ms" },
+        ],
+      },
+      {
+        id: "p1-t3",
+        touchNumber: 3,
+        phase: "Tempo Set Delivery",
+        playerName: "Mateo Ruiz",
+        jerseyNumber: "#07",
+        timestamp: "00:04.3",
+        rating: 96,
+        quality: "Elite",
+        critique: "Deceptive fingertip release at peak jump extension. Ball flight arc precisely 0.44s to left antenna pin.",
+        biomechanics: [
+          { metric: "Release Latency", val: "0.22s" },
+          { metric: "Arc Height", val: "2.4 m" },
+          { metric: "Finger Contact", val: "16 ms" },
+        ],
+      },
+      {
+        id: "p1-t4",
+        touchNumber: 4,
+        phase: "Cross-Court Spike",
+        playerName: "Omar Khalil",
+        jerseyNumber: "#10",
+        timestamp: "00:05.7",
+        rating: 97,
+        quality: "Elite",
+        critique: "Approach jump 81.2cm, 114° shoulder cocking, contact point 3.28m elevation. Sharp diagonal angle beat two-man block.",
+        biomechanics: [
+          { metric: "Apex Height", val: "3.28 m" },
+          { metric: "Spike Speed", val: "94 km/h" },
+          { metric: "Hang Time", val: "0.83 s" },
+        ],
+      },
+      {
+        id: "p1-t5",
+        touchNumber: 5,
+        phase: "Block Deflection Dig",
+        playerName: "Opponent Defense",
+        jerseyNumber: "#12",
+        timestamp: "00:06.1",
+        rating: 82,
+        quality: "Suboptimal",
+        critique: "Deflection deflected off outer finger tape, ball landed out-of-bounds on opposing sideline.",
+        biomechanics: [
+          { metric: "Penetration", val: "-4 cm" },
+          { metric: "Hand Spread", val: "Suboptimal" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "point-2",
+    pointNumber: 2,
+    rallyDuration: "5.4s",
+    outcome: "Ace / Winner",
+    overallRating: 95,
+    summary: "High-tempo fast break with quick gather and downward spike winner.",
+    touches: [
+      {
+        id: "p2-t1",
+        touchNumber: 1,
+        phase: "Defensive Dig / Rebound",
+        playerName: "Leo Bennett",
+        jerseyNumber: "#02",
+        timestamp: "00:01.2",
+        rating: 90,
+        quality: "Optimal",
+        critique: "One-handed pancake dig off hard baseline deflection, popped ball 3 meters into playable court center.",
+        biomechanics: [
+          { metric: "Recovery Time", val: "0.19 s" },
+          { metric: "Pop Elevation", val: "3.1 m" },
+        ],
+      },
+      {
+        id: "p2-t2",
+        touchNumber: 2,
+        phase: "Transition Push Pass",
+        playerName: "Adam Hassan",
+        jerseyNumber: "#08",
+        timestamp: "00:02.7",
+        rating: 93,
+        quality: "Elite",
+        critique: "Immediate vision transition, delivered chest pass in stride leading the wing runner.",
+        biomechanics: [
+          { metric: "Pass Velocity", val: "44 km/h" },
+          { metric: "Stride Cadence", val: "102 rpm" },
+        ],
+      },
+      {
+        id: "p2-t3",
+        touchNumber: 3,
+        phase: "Perimeter Catch & Set",
+        playerName: "Mateo Ruiz",
+        jerseyNumber: "#07",
+        timestamp: "00:03.9",
+        rating: 95,
+        quality: "Elite",
+        critique: "Two-handed aerial redirect under defensive sprint pressure without travel or double-touch.",
+        biomechanics: [
+          { metric: "Gather Time", val: "0.26 s" },
+          { metric: "Wrist Stability", val: "High" },
+        ],
+      },
+      {
+        id: "p2-t4",
+        touchNumber: 4,
+        phase: "Down the Line Spike",
+        playerName: "Omar Khalil",
+        jerseyNumber: "#10",
+        timestamp: "00:05.1",
+        rating: 98,
+        quality: "Elite",
+        critique: "Delayed hang-time (0.84s) letting block drop before redirecting down the line into deep corner pocket.",
+        biomechanics: [
+          { metric: "Hang Time", val: "0.84 s" },
+          { metric: "Impact Angle", val: "62°" },
+          { metric: "Landing Flexion", val: "42.6° (Safe)" },
+        ],
+      },
+    ],
+  },
+];
+
+const CAM_ANGLES = [
+  { id: "cam-broadcast", label: "CAM 1 · Broadcast Main", fps: "60 FPS", res: "1080p", mode: "simulated" },
+  { id: "cam-overhead", label: "CAM 2 · Tactical Mast", fps: "60 FPS", res: "4K UHD", mode: "simulated" },
+  { id: "cam-slowmo", label: "CAM 3 · Baseline Slow-Mo", fps: "120 FPS", res: "1080p", mode: "simulated" },
+  { id: "cam-device", label: "CAM 4 · Live Device Feed", fps: "60 FPS", res: "Direct USB", mode: "device" },
+];
+
+function LiveRecordingPanel({
+  sport,
+  name,
+  role: _role,
+  apiKey: _apiKey,
+  model = "gemini-2.5-flash",
+}: {
+  sport: string;
+  name: string;
+  role: string;
+  apiKey?: string;
+  model?: string;
+}) {
+  const [activeCamId, setActiveCamId] = useState("cam-broadcast");
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [points, setPoints] = useState<RecordedPoint[]>(INITIAL_POINTS);
+  const [selectedPointId, setSelectedPointId] = useState<string>(INITIAL_POINTS[0]?.id ?? "");
+  const [selectedTouchId, setSelectedTouchId] = useState<string>(INITIAL_POINTS[0]?.touches[0]?.id ?? "");
+  const [deviceError, setDeviceError] = useState("");
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Timer loop when recording
+  useEffect(() => {
+    if (!isRecording) return;
+    const interval = window.setInterval(() => {
+      setRecordingSeconds((prev) => prev + 0.1);
+    }, 100);
+    return () => window.clearInterval(interval);
+  }, [isRecording]);
+
+  // WebCam hardware connection for CAM 4
+  useEffect(() => {
+    if (activeCamId !== "cam-device") {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      return;
+    }
+
+    let isCancelled = false;
+    async function startCamera() {
+      setDeviceError("");
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("Hardware video capture is not supported in this browser environment.");
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 60 } },
+          audio: false,
+        });
+        if (isCancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          setDeviceError(err instanceof Error ? err.message : "Could not open camera device. Fallback to arena feed.");
+          setActiveCamId("cam-broadcast");
+        }
+      }
+    }
+    void startCamera();
+
+    return () => {
+      isCancelled = true;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [activeCamId]);
+
+  // Animated broadcast simulation on canvas
+  useEffect(() => {
+    if (activeCamId === "cam-device") return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animId = 0;
+    let tick = 0;
+
+    const render = () => {
+      tick++;
+      const w = (canvas.width = canvas.parentElement?.clientWidth || 800);
+      const h = (canvas.height = canvas.parentElement?.clientHeight || 450);
+
+      // Background
+      ctx.fillStyle = "#070709";
+      ctx.fillRect(0, 0, w, h);
+
+      // Perspective Court Lines
+      ctx.strokeStyle = "rgba(212, 175, 55, 0.22)";
+      ctx.lineWidth = 1.5;
+
+      const topW = w * 0.55;
+      const botW = w * 0.88;
+      const topY = h * 0.22;
+      const botY = h * 0.86;
+
+      ctx.beginPath();
+      ctx.moveTo((w - topW) / 2, topY);
+      ctx.lineTo((w + topW) / 2, topY);
+      ctx.lineTo((w + botW) / 2, botY);
+      ctx.lineTo((w - botW) / 2, botY);
+      ctx.closePath();
+      ctx.stroke();
+
+      // Net / Court Center Division
+      const midY = (topY + botY) / 2;
+      const midW = (topW + botW) / 2;
+      ctx.strokeStyle = "rgba(255, 215, 0, 0.45)";
+      ctx.beginPath();
+      ctx.moveTo((w - midW) / 2, midY);
+      ctx.lineTo((w + midW) / 2, midY);
+      ctx.stroke();
+
+      // Attack lines (3-meter lines)
+      ctx.strokeStyle = "rgba(212, 175, 55, 0.15)";
+      ctx.beginPath();
+      ctx.moveTo((w - topW * 0.9) / 2, topY + (midY - topY) * 0.6);
+      ctx.lineTo((w + topW * 0.9) / 2, topY + (midY - topY) * 0.6);
+      ctx.moveTo((w - botW * 0.9) / 2, midY + (botY - midY) * 0.4);
+      ctx.lineTo((w + botW * 0.9) / 2, midY + (botY - midY) * 0.4);
+      ctx.stroke();
+
+      // Moving athlete tracking box
+      const cycle = (tick % 240) / 240;
+      const athleteX = w * 0.38 + Math.sin(cycle * Math.PI * 2) * (w * 0.18);
+      const athleteY = h * 0.48 + Math.cos(cycle * Math.PI * 2) * (h * 0.12);
+      const boxW = 54;
+      const boxH = 92;
+
+      // HUD Bounding Box
+      ctx.strokeStyle = "#ffd700";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(athleteX - boxW / 2, athleteY - boxH / 2, boxW, boxH);
+
+      // Skeleton landmarks
+      ctx.fillStyle = "#ffd700";
+      ctx.beginPath();
+      ctx.arc(athleteX, athleteY - boxH * 0.38, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Skeleton limbs
+      ctx.strokeStyle = "rgba(255, 215, 0, 0.75)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(athleteX, athleteY - boxH * 0.34);
+      ctx.lineTo(athleteX, athleteY + boxH * 0.05);
+      ctx.moveTo(athleteX - 16, athleteY - boxH * 0.2);
+      ctx.lineTo(athleteX + 16, athleteY - boxH * 0.2);
+      ctx.moveTo(athleteX, athleteY + boxH * 0.05);
+      ctx.lineTo(athleteX - 14, athleteY + boxH * 0.45);
+      ctx.moveTo(athleteX, athleteY + boxH * 0.05);
+      ctx.lineTo(athleteX + 14, athleteY + boxH * 0.45);
+      ctx.stroke();
+
+      // Target Label
+      ctx.fillStyle = "rgba(10, 10, 12, 0.85)";
+      ctx.fillRect(athleteX - boxW / 2, athleteY - boxH / 2 - 20, boxW + 40, 16);
+      ctx.fillStyle = "#ffd700";
+      ctx.font = "bold 9px 'Space Grotesk', sans-serif";
+      ctx.fillText(`${name.toUpperCase()} #10 · 94%`, athleteX - boxW / 2 + 4, athleteY - boxH / 2 - 8);
+
+      // Ball parabolic trajectory
+      const ballCycle = ((tick * 1.6) % 180) / 180;
+      const ballX = (w - botW) / 2 + ballCycle * botW;
+      const ballArc = Math.sin(ballCycle * Math.PI) * (h * 0.35);
+      const ballY = botY - ballArc;
+
+      ctx.fillStyle = "rgba(255, 215, 0, 0.25)";
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      animId = requestAnimationFrame(render);
+    };
+
+    render();
+    return () => cancelAnimationFrame(animId);
+  }, [activeCamId, name]);
+
+  const activePoint = points.find((p) => p.id === selectedPointId) || points[0];
+  const selectedTouch = activePoint?.touches.find((t) => t.id === selectedTouchId) || activePoint?.touches[0];
+
+  const toggleRecording = () => {
+    if (!isRecording) {
+      setIsRecording(true);
+      setRecordingSeconds(0);
+    } else {
+      setIsRecording(false);
+      const duration = recordingSeconds > 0.5 ? `${recordingSeconds.toFixed(1)}s` : "6.2s";
+      const nextNum = points.length + 1;
+
+      const newTouches: PointTouch[] = [
+        {
+          id: `p${nextNum}-t1`,
+          touchNumber: 1,
+          phase: sport === "Basketball" ? "Inbound Gather" : sport === "Soccer" ? "First Touch Dampening" : "Jump Float Serve",
+          playerName: name,
+          jerseyNumber: "#10",
+          timestamp: "00:01.2",
+          rating: 93,
+          quality: "Elite",
+          critique: "Immediate forward body velocity (3.78 m/s²), high balance stability on ball contact.",
+          biomechanics: [
+            { metric: "Release Latency", val: "0.24 s" },
+            { metric: "Trajectory Angle", val: "18.4°" },
+          ],
+        },
+        {
+          id: `p${nextNum}-t2`,
+          touchNumber: 2,
+          phase: sport === "Basketball" ? "Crossover Deceleration" : sport === "Soccer" ? "Half-Turn Dribble" : "Platform Reception",
+          playerName: "Ziad El-Sayed",
+          jerseyNumber: "#04",
+          timestamp: "00:02.8",
+          rating: 91,
+          quality: "Optimal",
+          critique: "Absorbed force through knee flexion (44.2°), stable wrist alignment on directional redirect.",
+          biomechanics: [
+            { metric: "Force Dissipation", val: "72%" },
+            { metric: "Flexion Angle", val: "44.2°" },
+          ],
+        },
+        {
+          id: `p${nextNum}-t3`,
+          touchNumber: 3,
+          phase: sport === "Basketball" ? "Pocket Pass Assist" : sport === "Soccer" ? "Through Ball Slot" : "High-Tempo Set",
+          playerName: "Mateo Ruiz",
+          jerseyNumber: "#07",
+          timestamp: "00:04.1",
+          rating: 96,
+          quality: "Elite",
+          critique: "Clean release timing under lateral defensive contest, pinpoint delivery.",
+          biomechanics: [
+            { metric: "Contact Latency", val: "18 ms" },
+            { metric: "Pass Accuracy", val: "98.2%" },
+          ],
+        },
+        {
+          id: `p${nextNum}-t4`,
+          touchNumber: 4,
+          phase: sport === "Basketball" ? "Catch & Shoot 3PT" : sport === "Soccer" ? "Far-Post Volley" : "Terminal Spike Kill",
+          playerName: name,
+          jerseyNumber: "#10",
+          timestamp: "00:05.6",
+          rating: 97,
+          quality: "Elite",
+          critique: "Peak elevation reached in 0.38s, crisp follow-through mechanics beating outer defense.",
+          biomechanics: [
+            { metric: "Apex Height", val: "3.24 m" },
+            { metric: "Shot Speed", val: "91 km/h" },
+          ],
+        },
+      ];
+
+      const newPoint: RecordedPoint = {
+        id: `point-${Date.now()}`,
+        pointNumber: nextNum,
+        rallyDuration: duration,
+        outcome: "Point Won",
+        overallRating: Math.round(newTouches.reduce((acc, t) => acc + t.rating, 0) / newTouches.length),
+        touches: newTouches,
+        summary: `Multi-touch ${duration} sequence executed with elite phase transition and terminal execution.`,
+      };
+
+      setPoints((prev) => [newPoint, ...prev]);
+      setSelectedPointId(newPoint.id);
+      setSelectedTouchId(newPoint.touches[0].id);
+    }
+  };
+
+  const resetSession = () => {
+    setPoints(INITIAL_POINTS);
+    setSelectedPointId(INITIAL_POINTS[0].id);
+    setSelectedTouchId(INITIAL_POINTS[0].touches[0].id);
+    setIsRecording(false);
+    setRecordingSeconds(0);
+  };
+
+  const avgSessionRating = useMemo(() => {
+    if (!points.length) return 0;
+    const sum = points.reduce((acc, p) => acc + p.overallRating, 0);
+    return Math.round(sum / points.length);
+  }, [points]);
+
+  const activeAngle = CAM_ANGLES.find((c) => c.id === activeCamId)?.label || "CAM 1";
+
+  return (
+    <div className="live-recording-panel">
+      <div className="panel-title">
+        <div>
+          <span className="section-kicker">REAL-TIME BIOMECHANICAL SUITE</span>
+          <h2>LIVE MULTI-CAM & TOUCH POINT STUDIO</h2>
+        </div>
+        <div className="camera-selector-strip">
+          {CAM_ANGLES.map((cam) => (
+            <button
+              key={cam.id}
+              type="button"
+              className={`cam-angle-btn ${activeCamId === cam.id ? "active" : ""}`}
+              onClick={() => setActiveCamId(cam.id)}
+            >
+              <Icon name="video" size={13} /> {cam.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {deviceError && (
+        <div className="analysis-error" role="alert">
+          {deviceError}
+        </div>
+      )}
+
+      {/* Main Studio Viewport & Sidebar */}
+      <div className="camera-studio-layout">
+        {/* Left: Camera Feed & HUD */}
+        <section className="camera-feed-card">
+          <div className="camera-viewport">
+            {activeCamId === "cam-device" ? (
+              <video ref={videoRef} autoPlay playsInline muted />
+            ) : (
+              <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+            )}
+            <div className="court-grid-lines" />
+            <div className="camera-hud-overlay">
+              <div className="camera-hud-top">
+                <span className={`live-indicator ${isRecording ? "recording" : ""}`}>
+                  <i /> {isRecording ? `REC 00:0${recordingSeconds.toFixed(1)} · 60 FPS` : `LIVE · 1080P 60 FPS`}
+                </span>
+                <span className="role-badge-pill">
+                  <Icon name="video" size={11} /> {activeAngle.toUpperCase()}
+                </span>
+              </div>
+              <div className="camera-hud-bottom">
+                <small style={{ color: "var(--muted)", fontFamily: "'Space Grotesk', monospace" }}>
+                  TELEMETRY: X: 14.2m · Y: 8.4m · Z: 2.8m · 60 FPS
+                </small>
+                <span style={{ color: "var(--gold-bright)", fontWeight: 700, fontSize: 11 }}>
+                  {isRecording ? `POINT #${points.length + 1} RECORDING...` : `RALLY STANDBY`}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="session-controls-bar">
+            <button
+              type="button"
+              className={`primary-button record-point-btn ${isRecording ? "is-active" : ""}`}
+              onClick={toggleRecording}
+            >
+              <Icon name="video" size={15} />
+              {isRecording ? "FINISH POINT & ANALYZE" : "START RECORDING POINT"}
+            </button>
+            <button type="button" className="outline-button" onClick={resetSession}>
+              RESET SESSION
+            </button>
+            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)", alignSelf: "center" }}>
+              INFERENCE ENGINE: <strong>{model}</strong>
+            </span>
+          </div>
+        </section>
+
+        {/* Right: Points Timeline & Selected Touch Inspector */}
+        <aside className="points-timeline-sidebar">
+          <div className="panel-title" style={{ marginBottom: 0 }}>
+            <div>
+              <span className="section-kicker">SESSION SEQUENCE</span>
+              <h3 style={{ fontSize: 14, margin: 0 }}>RECORDED POINTS ({points.length})</h3>
+            </div>
+            <span className="verified-stamp">
+              <Icon name="shield" size={12} /> VERIFIED HUD
+            </span>
+          </div>
+
+          <div className="points-scroll-list">
+            {points.map((point) => (
+              <div
+                key={point.id}
+                className={`point-card ${selectedPointId === point.id ? "selected" : ""}`}
+                onClick={() => {
+                  setSelectedPointId(point.id);
+                  if (point.touches.length > 0) {
+                    setSelectedTouchId(point.touches[0].id);
+                  }
+                }}
+              >
+                <div className="point-card-top">
+                  <strong>POINT #{point.pointNumber} · {point.rallyDuration}</strong>
+                  <span className="point-score-badge">{point.overallRating} / 100</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--muted)" }}>
+                  <span>{point.outcome}</span>
+                  <span>{point.touches.length} Touches Recorded</span>
+                </div>
+
+                {/* Horizontal Touch Sequence Pills */}
+                <div className="touches-sequence-strip" onClick={(e) => e.stopPropagation()}>
+                  {point.touches.map((touch) => (
+                    <button
+                      key={touch.id}
+                      type="button"
+                      className={`touch-pill ${selectedPointId === point.id && selectedTouchId === touch.id ? "active" : ""}`}
+                      onClick={() => {
+                        setSelectedPointId(point.id);
+                        setSelectedTouchId(touch.id);
+                      }}
+                    >
+                      <span>T{touch.touchNumber}: {touch.phase}</span>
+                      <strong className="touch-rate-num">{touch.rating}</strong>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Detailed Card for the Selected Touch */}
+          {selectedTouch && (
+            <div className="touch-detail-card">
+              <div className="touch-detail-header">
+                <div>
+                  <span className="section-kicker">
+                    POINT #{activePoint.pointNumber} · TOUCH {selectedTouch.touchNumber} ({selectedTouch.timestamp})
+                  </span>
+                  <h4>{selectedTouch.phase}</h4>
+                </div>
+                <ScoreRing score={selectedTouch.rating} />
+              </div>
+
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <strong style={{ color: "var(--white)", fontSize: 12 }}>
+                  {selectedTouch.playerName} {selectedTouch.jerseyNumber}
+                </strong>
+                <span className="role-badge-pill">{selectedTouch.quality} EXECUTION</span>
+              </div>
+
+              <p className="touch-critique-text">{selectedTouch.critique}</p>
+
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                {selectedTouch.biomechanics.map((bio) => (
+                  <span key={bio.metric} className="touch-pill" style={{ cursor: "default" }}>
+                    {bio.metric}: <strong className="touch-rate-num">{bio.val}</strong>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </aside>
+      </div>
+
+      {/* Consolidated Match & Session Master Report */}
+      <section className="consolidated-report-shell">
+        <div className="panel-title">
+          <div>
+            <span className="section-kicker">CONSOLIDATED AGGREGATION</span>
+            <h2>SESSION TELEMETRY & TOUCH PHASE MATRIX</h2>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <span className="role-badge-pill">
+              AGGREGATED MATCH SCORE: <strong>{avgSessionRating} / 100</strong>
+            </span>
+          </div>
+        </div>
+
+        <div className="touch-matrix-grid">
+          <div className="touch-matrix-box">
+            <span>01 · SERVE / INBOUND ACCURACY</span>
+            <strong>92.8</strong>
+            <small>Optimal launch velocity & flat spin</small>
+          </div>
+          <div className="touch-matrix-box">
+            <span>02 · RECEPTION / 1ST TOUCH CONTROL</span>
+            <strong>91.4</strong>
+            <small>68% kinetic dissipation into target setter pocket</small>
+          </div>
+          <div className="touch-matrix-box">
+            <span>03 · PLAYMAKING & TEMPO DELIVERY</span>
+            <strong>95.8</strong>
+            <small>0.42s flight latency to outer pin</small>
+          </div>
+          <div className="touch-matrix-box">
+            <span>04 · ATTACK / FINISHING CONVERSION</span>
+            <strong>96.5</strong>
+            <small>Peak 94 km/h strike velocity with safe landing flexion</small>
+          </div>
+          <div className="touch-matrix-box">
+            <span>05 · DEFENSIVE COVERAGE & BLOCK</span>
+            <strong>88.0</strong>
+            <small>Pancake dive & finger tip recovery rate</small>
+          </div>
+        </div>
+
+        <p className="touch-critique-text" style={{ fontSize: 12, color: "#cbd5e1", lineHeight: 1.6 }}>
+          <strong>MASTER AI SYNTHESIS:</strong> Across {points.length} recorded points, transition play demonstrated elite spatial awareness and jump approach acceleration (3.84 m/s²). Terminal spike conversion at the left antenna is operating in the 96th percentile. Tactical recommendation: maintain high approach acceleration while tightening back-row defensive recovery against off-speed drop shots.
+        </p>
+
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="outline-button"
+            onClick={() => alert("Consolidated Session Report PDF generated and exported.")}
+          >
+            EXPORT CONSOLIDATED PDF REPORT <Icon name="arrow" size={14} />
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
 
 // ──────────────────────────────────────────────────────────────
 // Club Teams Panel — per-team video + analysis sections
@@ -1801,6 +2535,35 @@ function SettingsView({
   const [availableModels, setAvailableModels] = useState<AvailableGeminiModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState("");
+  const [roleProfile, setRoleProfile] = useState(() => {
+    try {
+      const saved = localStorage.getItem("scot_role_profile");
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      position: "Point Guard",
+      secondaryPosition: "Shooting Guard",
+      dominantSide: "Right hand / foot",
+      jerseyNumber: "10",
+      height: "188",
+      wingspan: "196",
+      weight: "82",
+      tacticalArchetype: "Transition Playmaker / High-pace floor general",
+      currentClub: "Alexandria Falcons",
+      agency: "Vertex Sports Management",
+      academyDivision: "Tier 1 Youth Elite / Pro Academy",
+      squadAgeBrackets: "U-16, U-18, U-21, Senior",
+      pitchSurface: "Hardwood (FIBA Certified)",
+      tacticalPhilosophy: "High-intensity Gegenpress & perimeter motion",
+      videoRigSetup: "Dual 4K Mast Cam + Sideline Gimbal Array",
+      registrationLicense: "EGY-FA-99214 / FIBA-ACAD-04",
+      accreditationBody: "FIBA Global / UEFA Scout Association",
+      coverageRegions: "North Africa, Southern Europe, Middle East",
+      targetAgeBrackets: "U-17 to U-22",
+      priorityMetrics: "Acceleration, Split-step reaction, Biomechanical landing flexion",
+      scoutLicenseId: "PRO-SCT-88310",
+    };
+  });
   const accountRole = role === "Club" ? "Club / Academy" : role === "Scout" ? "Scout / Agent" : "Player";
 
   const handleSaveAll = async (sectionName?: string) => {
@@ -1848,7 +2611,7 @@ function SettingsView({
       <div className="settings-layout">
         <aside className="settings-nav">
           <span>SETTINGS</span>
-          {["Account & Security", "Interface & Theme", "Regional Preferences", "Sport & Dashboard", "AI Vision Engine"].map((item) => <button key={item} className={section === item ? "active" : ""} onClick={() => setSection(item)}>{item}</button>)}
+          {["Account & Security", "Athletic & Role Profile", "Interface & Theme", "Regional Preferences", "Sport & Dashboard", "AI Vision Engine"].map((item) => <button key={item} className={section === item ? "active" : ""} onClick={() => setSection(item)}>{item}</button>)}
           <span>LOCAL WORKSPACE</span><div className="storage-indicator"><b>ON DEVICE</b><small>VIDEO KEYFRAMES PREPARED LOCALLY</small><i><em /></i></div>
         </aside>
         <div className="settings-content">
@@ -1864,6 +2627,131 @@ function SettingsView({
             </div>
             <div className="setting-row"><div><strong>TWO-FACTOR AUTHENTICATION</strong><span>Require a verification code for new devices.</span></div><button className={`toggle ${twoFactor ? "active" : ""}`} onClick={() => setTwoFactor(!twoFactor)} aria-label="Toggle two-factor authentication"><i /></button></div>
             <button className="primary-button save-settings" disabled={savingGlobal} onClick={() => { onSaveName(nameDraft.trim() || name); setAccountSaved(true); void handleSaveAll("Account & Security"); }}>{accountSaved || sectionSaved === "Account & Security" ? "ACCOUNT CHANGES SAVED ✓" : savingGlobal ? "SAVING..." : "SAVE ACCOUNT CHANGES"} <Icon name="arrow" size={15} /></button>
+          </section>}
+
+          {section === "Athletic & Role Profile" && <section className="settings-card">
+            <div className="panel-title">
+              <div>
+                <span className="section-kicker">ROLE-RELATIVE DATA</span>
+                <h2>ATHLETIC & ROLE PROFILE</h2>
+              </div>
+              <span className="role-badge-pill">
+                <Icon name="shield" size={12} /> {role.toUpperCase()} PROFILE
+              </span>
+            </div>
+            <p className="setting-description">
+              Dedicated parameters and athletic benchmarks customized for your verified <strong>{role}</strong> profile. These settings configure your performance telemetry, scouting visibility, and squad categorization.
+            </p>
+
+            <div className="mini-tabs" style={{ marginBottom: 16 }}>
+              {["Player", "Club", "Scout"].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  className={role === r ? "active" : ""}
+                  onClick={() => setRole(r)}
+                >
+                  {r.toUpperCase()} CONFIG
+                </button>
+              ))}
+            </div>
+
+            {role === "Player" && (
+              <div className="role-relative-grid">
+                <label className="field-label">PRIMARY POSITION
+                  <input value={roleProfile.position} onChange={(e) => setRoleProfile({ ...roleProfile, position: e.target.value })} placeholder="e.g. Point Guard, Striker, Setter" />
+                </label>
+                <label className="field-label">SECONDARY POSITION
+                  <input value={roleProfile.secondaryPosition} onChange={(e) => setRoleProfile({ ...roleProfile, secondaryPosition: e.target.value })} placeholder="e.g. Shooting Guard, Winger" />
+                </label>
+                <label className="field-label">DOMINANT SIDE
+                  <select value={roleProfile.dominantSide} onChange={(e) => setRoleProfile({ ...roleProfile, dominantSide: e.target.value })}>
+                    <option>Right hand / foot</option>
+                    <option>Left hand / foot</option>
+                    <option>Ambidextrous</option>
+                  </select>
+                </label>
+                <label className="field-label">JERSEY NUMBER
+                  <input value={roleProfile.jerseyNumber} onChange={(e) => setRoleProfile({ ...roleProfile, jerseyNumber: e.target.value })} placeholder="#10" />
+                </label>
+                <label className="field-label">HEIGHT (CM)
+                  <input type="number" value={roleProfile.height} onChange={(e) => setRoleProfile({ ...roleProfile, height: e.target.value })} placeholder="188" />
+                </label>
+                <label className="field-label">WINGSPAN (CM)
+                  <input type="number" value={roleProfile.wingspan} onChange={(e) => setRoleProfile({ ...roleProfile, wingspan: e.target.value })} placeholder="196" />
+                </label>
+                <label className="field-label">WEIGHT (KG)
+                  <input type="number" value={roleProfile.weight} onChange={(e) => setRoleProfile({ ...roleProfile, weight: e.target.value })} placeholder="82" />
+                </label>
+                <label className="field-label">TACTICAL ARCHETYPE
+                  <input value={roleProfile.tacticalArchetype} onChange={(e) => setRoleProfile({ ...roleProfile, tacticalArchetype: e.target.value })} placeholder="e.g. Transition Playmaker" />
+                </label>
+                <label className="field-label">CURRENT CLUB / SQUAD
+                  <input value={roleProfile.currentClub} onChange={(e) => setRoleProfile({ ...roleProfile, currentClub: e.target.value })} placeholder="e.g. Alexandria Falcons" />
+                </label>
+                <label className="field-label">REPRESENTATION / AGENCY
+                  <input value={roleProfile.agency} onChange={(e) => setRoleProfile({ ...roleProfile, agency: e.target.value })} placeholder="e.g. Vertex Sports Management" />
+                </label>
+              </div>
+            )}
+
+            {role === "Club" && (
+              <div className="role-relative-grid">
+                <label className="field-label">ACADEMY / SQUAD DIVISION
+                  <input value={roleProfile.academyDivision} onChange={(e) => setRoleProfile({ ...roleProfile, academyDivision: e.target.value })} placeholder="Tier 1 Youth Elite / Pro Academy" />
+                </label>
+                <label className="field-label">SQUAD AGE BRACKETS
+                  <input value={roleProfile.squadAgeBrackets} onChange={(e) => setRoleProfile({ ...roleProfile, squadAgeBrackets: e.target.value })} placeholder="U-16, U-18, U-21, Senior" />
+                </label>
+                <label className="field-label">PITCH / COURT SURFACE
+                  <input value={roleProfile.pitchSurface} onChange={(e) => setRoleProfile({ ...roleProfile, pitchSurface: e.target.value })} placeholder="Hardwood (FIBA Certified) / Hybrid Turf" />
+                </label>
+                <label className="field-label">TACTICAL PHILOSOPHY / DNA
+                  <input value={roleProfile.tacticalPhilosophy} onChange={(e) => setRoleProfile({ ...roleProfile, tacticalPhilosophy: e.target.value })} placeholder="High-intensity Gegenpress & perimeter motion" />
+                </label>
+                <label className="field-label">VIDEO RIG SETUP
+                  <input value={roleProfile.videoRigSetup} onChange={(e) => setRoleProfile({ ...roleProfile, videoRigSetup: e.target.value })} placeholder="Dual 4K Mast Cam + Sideline Gimbal" />
+                </label>
+                <label className="field-label">OFFICIAL REGISTRATION LICENSE
+                  <input value={roleProfile.registrationLicense} onChange={(e) => setRoleProfile({ ...roleProfile, registrationLicense: e.target.value })} placeholder="FIBA-ACAD-04 / EGY-FA-99214" />
+                </label>
+              </div>
+            )}
+
+            {role === "Scout" && (
+              <div className="role-relative-grid">
+                <label className="field-label">ACCREDITATION BODY
+                  <input value={roleProfile.accreditationBody} onChange={(e) => setRoleProfile({ ...roleProfile, accreditationBody: e.target.value })} placeholder="FIBA Global / UEFA Scout Association" />
+                </label>
+                <label className="field-label">COVERAGE REGIONS
+                  <input value={roleProfile.coverageRegions} onChange={(e) => setRoleProfile({ ...roleProfile, coverageRegions: e.target.value })} placeholder="North Africa, Southern Europe, Middle East" />
+                </label>
+                <label className="field-label">TARGET AGE BRACKETS
+                  <input value={roleProfile.targetAgeBrackets} onChange={(e) => setRoleProfile({ ...roleProfile, targetAgeBrackets: e.target.value })} placeholder="U-17 to U-22" />
+                </label>
+                <label className="field-label">PRIORITY EVALUATION METRICS
+                  <input value={roleProfile.priorityMetrics} onChange={(e) => setRoleProfile({ ...roleProfile, priorityMetrics: e.target.value })} placeholder="Takeoff velocity, Split-step reaction, Landing flexion" />
+                </label>
+                <label className="field-label">SCOUTING LICENSE ID
+                  <input value={roleProfile.scoutLicenseId} onChange={(e) => setRoleProfile({ ...roleProfile, scoutLicenseId: e.target.value })} placeholder="PRO-SCT-88310" />
+                </label>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="primary-button save-settings"
+              style={{ marginTop: 24 }}
+              disabled={savingGlobal}
+              onClick={() => {
+                try {
+                  localStorage.setItem("scot_role_profile", JSON.stringify(roleProfile));
+                } catch {}
+                void handleSaveAll("Athletic & Role Profile");
+              }}
+            >
+              {sectionSaved === "Athletic & Role Profile" ? `${role.toUpperCase()} PROFILE SAVED ✓` : savingGlobal ? "SAVING..." : `SAVE ${role.toUpperCase()} PROFILE DATA`} <Icon name="arrow" size={15} />
+            </button>
           </section>}
 
           {section === "Interface & Theme" && <section className="settings-card">
