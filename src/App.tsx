@@ -147,6 +147,8 @@ type AuthPayload = {
   password: string;
   country: string;
   city: string;
+  specialCode?: string;
+  isAccredited?: boolean;
 };
 type AuthProfileDraft = Omit<AuthPayload, "password" | "email">;
 type AuthProvider = "google" | "facebook";
@@ -176,6 +178,8 @@ function authProfileDraft(value: unknown): Partial<AuthProfileDraft> {
     name: typeof value.name === "string" ? value.name : undefined,
     country: typeof value.country === "string" ? value.country : undefined,
     city: typeof value.city === "string" ? value.city : undefined,
+    specialCode: typeof value.specialCode === "string" ? value.specialCode : undefined,
+    isAccredited: typeof value.isAccredited === "boolean" ? value.isAccredited : undefined,
   };
 }
 
@@ -187,6 +191,9 @@ function profileRole(value: unknown): string {
 function preferenceString(value: unknown, fallback: string): string {
   return typeof value === "string" ? value : fallback;
 }
+
+export const VALID_CLUB_CODES = ["SCOT-CLUB-VIP", "FIFA-ACAD-2026", "ELITE-CLUB-77"];
+export const VALID_SCOUT_CODES = ["SCOT-PRO-SCOUT", "UEFA-SCT-88", "FIBA-TALENT-99"];
 
 function AuthModal({
   onClose,
@@ -201,15 +208,43 @@ function AuthModal({
 }) {
   const [role, setRole] = useState("Player");
   const [mode, setMode] = useState<AuthMode>("Register");
+  const [step, setStep] = useState<"form" | "verify-email">("form");
   const [name, setName] = useState("");
   const [sport, setSelectedSport] = useState("Basketball");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [country, setCountry] = useState("Egypt");
   const [city, setCity] = useState("");
+  const [specialCode, setSpecialCode] = useState("");
+  const [emailCode, setEmailCode] = useState("");
+  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [timeLeft, setTimeLeft] = useState(180); // 3 minutes = 180 seconds
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  const isSpecialCodeVerified = useMemo(() => {
+    const clean = specialCode.trim().toUpperCase();
+    if (!clean) return false;
+    if (role === "Club / Academy") return VALID_CLUB_CODES.includes(clean);
+    if (role === "Scout / Agent") return VALID_SCOUT_CODES.includes(clean);
+    return false;
+  }, [specialCode, role]);
+
+  // 3-minute Countdown Timer
+  useEffect(() => {
+    if (step !== "verify-email" || timeLeft <= 0) return;
+    const interval = window.setInterval(() => {
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [step, timeLeft]);
+
+  const formatTimer = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
 
   const profileDraft = (): AuthProfileDraft => ({
     mode,
@@ -218,6 +253,8 @@ function AuthModal({
     name: name.trim() || (role.startsWith("Club") ? "Alexandria Falcons" : role.startsWith("Scout") ? "Independent Scout" : "Omar Khalil"),
     country,
     city: city.trim(),
+    specialCode: isSpecialCodeVerified ? specialCode.trim().toUpperCase() : undefined,
+    isAccredited: isSpecialCodeVerified,
   });
 
   const submitEmail = async () => {
@@ -235,16 +272,71 @@ function AuthModal({
       setError("Enter your name or organization name to create your profile.");
       return;
     }
+
+    if (mode === "Register") {
+      // Launch 3-minute email verification step
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      setGeneratedOtp(code);
+      setTimeLeft(180);
+      setEmailCode("");
+      setStep("verify-email");
+      setNotice(`A 6-digit confirmation code was sent to ${email}. You have 3 minutes to verify.`);
+      return;
+    }
+
+    // Direct sign in
     setBusy(true);
     try {
       const requiresConfirmation = await onEmailAuth({ ...profileDraft(), email: email.trim(), password });
       if (requiresConfirmation) {
-        setNotice("Account created. Check your email to confirm your address, then sign in.");
+        setNotice("Check your email to confirm your address, then sign in.");
       } else {
         onAuthenticated(mode);
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Supabase authentication failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleResendOtp = () => {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(code);
+    setTimeLeft(180);
+    setEmailCode("");
+    setError("");
+    setNotice(`New 6-digit confirmation code dispatched to ${email}. Timer reset to 3 minutes.`);
+    setTimeout(() => setNotice(""), 4000);
+  };
+
+  const handleConfirmVerification = async () => {
+    setError("");
+    if (timeLeft <= 0) {
+      setError("This code expired after 3 minutes. Click 'RESEND CODE' to generate a fresh verification code.");
+      return;
+    }
+    if (emailCode.trim() !== generatedOtp) {
+      setError("Incorrect 6-digit code. Please check and try again.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      if (isSpecialCodeVerified) {
+        localStorage.setItem("scot_accredited_code", specialCode.trim().toUpperCase());
+        localStorage.setItem("scot_is_accredited", "true");
+      }
+      await onEmailAuth({
+        ...profileDraft(),
+        email: email.trim(),
+        password,
+        specialCode: isSpecialCodeVerified ? specialCode.trim().toUpperCase() : undefined,
+        isAccredited: isSpecialCodeVerified,
+      });
+      onAuthenticated(mode);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Profile registration failed.");
     } finally {
       setBusy(false);
     }
@@ -268,60 +360,198 @@ function AuthModal({
         <button className="icon-button close-button" onClick={onClose} aria-label="Close sign in dialog"><Icon name="close" /></button>
         <div className="modal-brand"><Logo /></div>
         <div className="auth-heading">
-          <div><p className="eyebrow">BUILD YOUR PERFORMANCE IDENTITY</p><h2 id="auth-title">{mode === "Register" ? "JOIN THE NETWORK." : "WELCOME BACK."}</h2><p className="modal-copy">One account. Local analysis. Global opportunity.</p></div>
-          <div className="mode-switch">{(["Register", "Sign in"] as const).map((item) => <button key={item} className={mode === item ? "active" : ""} onClick={() => setMode(item)}>{item}</button>)}</div>
-        </div>
-        <div className="social-row">
-          <button type="button" disabled={busy || !isSupabaseConfigured} onClick={() => signInWithProvider("google")}><Icon name="google" /> Continue with Google</button>
-          <button type="button" disabled={busy || !isSupabaseConfigured} onClick={() => signInWithProvider("facebook")}><Icon name="facebook" /> Continue with Facebook</button>
-        </div>
-        {!isSupabaseConfigured && <p className="analysis-error" role="alert">Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your local environment.</p>}
-        <div className="divider"><span>{mode === "Register" ? "OR REGISTER WITH EMAIL" : "OR SIGN IN WITH EMAIL"}</span></div>
-        {mode === "Register" ? <>
-          <span className="form-section-label">01 · SELECT YOUR ROLE</span>
-          <div className="role-cards">
-            {[
-              ["Player", "Build your performance profile"],
-              ["Club / Academy", "Manage talent and benchmarks"],
-              ["Scout / Agent", "Discover verified athletes"],
-            ].map(([name, copy]) => <button key={name} className={role === name ? "active" : ""} onClick={() => setRole(name)}><span className="radio-dot"><i /></span><strong>{name}</strong><small>{copy}</small></button>)}
+          <div>
+            <p className="eyebrow">BUILD YOUR PERFORMANCE IDENTITY</p>
+            <h2 id="auth-title">{step === "verify-email" ? "CONFIRM EMAIL." : mode === "Register" ? "JOIN THE NETWORK." : "WELCOME BACK."}</h2>
+            <p className="modal-copy">One account. Local analysis. Global opportunity.</p>
           </div>
-          <span className="form-section-label">02 · {role.toUpperCase()} DETAILS</span>
-        </> : <label className="field-label">WORKSPACE ROLE<select value={role} onChange={(event) => setRole(event.target.value)}><option>Player</option><option>Club / Academy</option><option>Scout / Agent</option></select></label>}
-        <div className="registration-grid">
-          {mode === "Register" && <label className="field-label">{role === "Club / Academy" ? "CLUB / ACADEMY NAME" : "FULL NAME"}<input value={name} onChange={(event) => setName(event.target.value)} placeholder={role === "Club / Academy" ? "Alexandria Falcons" : "Your full name"} /></label>}
-          {mode === "Register" && role === "Scout / Agent" && <label className="field-label">AFFILIATION<select><option>Club Scout</option><option>Independent Agent</option><option>University Recruiter</option></select></label>}
-          <label className="field-label">EMAIL ADDRESS<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" /></label>
-          <label className="field-label">PASSWORD<input type="password" autoComplete={mode === "Register" ? "new-password" : "current-password"} required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8+ characters" /></label>
-          {mode === "Register" && role === "Player" && <>
-            <label className="field-label">COUNTRY<select value={country} onChange={(event) => setCountry(event.target.value)}><option>Egypt</option><option>Spain</option><option>United Kingdom</option><option>United States</option></select></label>
-            <label className="field-label">CITY / TOWN<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Alexandria" /></label>
-            <label className="field-label">PRIMARY SPORT<select value={sport} onChange={(event) => setSelectedSport(event.target.value)}>{sports.map((item) => <option key={item}>{item}</option>)}</select></label>
-            <label className="field-label">DATE OF BIRTH<input type="date" /></label>
-            <label className="field-label">HEIGHT / WEIGHT<div className="split-fields"><input type="number" placeholder="Height cm" /><input type="number" placeholder="Weight kg" /></div></label>
-            <label className="field-label">WINGSPAN<input type="number" placeholder="Wingspan cm" /></label>
-            <label className="field-label">DOMINANT SIDE<select><option>Right hand / foot</option><option>Left hand / foot</option><option>Ambidextrous</option></select></label>
-            <label className="field-label">PERFORMANCE TARGET<input placeholder="e.g. 80 cm vertical" /></label>
-          </>}
-          {mode === "Register" && role === "Club / Academy" && <>
-            <label className="field-label">COUNTRY / REGION<select value={country} onChange={(event) => setCountry(event.target.value)}><option>Egypt</option><option>Spain</option><option>United Kingdom</option><option>United States</option></select></label>
-            <label className="field-label">CITY / TOWN<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Alexandria" /></label>
-            <label className="field-label">COMPETITION LEVEL<select><option>Youth Academy U-18</option><option>Regional League</option><option>Professional</option></select></label>
-            <label className="field-label">SPORTS MANAGED<input placeholder="Basketball, Volleyball..." /></label>
-            <label className="field-label wide-field">INITIAL ROSTER IMPORT<span className="mini-drop">DROP CSV ROSTER OR BROWSE</span></label>
-            <label className="field-label wide-field">PERFORMANCE BENCHMARK<input placeholder="e.g. Minimum 65 cm vertical jump" /></label>
-          </>}
-          {mode === "Register" && role === "Scout / Agent" && <>
-            <label className="field-label">LICENSE / ID NUMBER<input placeholder="Professional ID" /></label>
-            <label className="field-label">TARGET REGIONS<input placeholder="Egypt, Spain, UK" /></label>
-            <label className="field-label">SPORTS FOCUS<input placeholder="Basketball, Track..." /></label>
-            <label className="field-label">AGE GROUP<select><option>U-18</option><option>18–23</option><option>Open</option></select></label>
-            <label className="field-label wide-field">RATING ALERTS<input placeholder="Alert me when rating exceeds 90 in Alexandria" /></label>
-          </>}
+          {step === "form" && (
+            <div className="mode-switch">{(["Register", "Sign in"] as const).map((item) => <button key={item} className={mode === item ? "active" : ""} onClick={() => setMode(item)}>{item}</button>)}</div>
+          )}
         </div>
-        {error && <p className="analysis-error" role="alert">{error}</p>}
-        {notice && <p className="model-list-status" role="status">{notice}</p>}
-        <button className="primary-button auth-submit" disabled={busy || !isSupabaseConfigured} onClick={submitEmail}>{busy ? "CONNECTING…" : mode === "Register" ? `CREATE ${role.toUpperCase()} PROFILE` : "SIGN IN TO SCOT"} <Icon name="arrow" /></button>
+
+        {step === "verify-email" ? (
+          <div className="verification-code-card">
+            <div className="verification-timer-banner">
+              <div>
+                <span style={{ fontSize: 9, color: "var(--muted)", letterSpacing: "0.1em", display: "block" }}>
+                  EXPIRES IN (MAX 3 MIN)
+                </span>
+                <span className={`verification-timer-clock ${timeLeft <= 30 && timeLeft > 0 ? "warning" : timeLeft === 0 ? "expired" : ""}`}>
+                  <Icon name="bolt" size={16} /> {formatTimer(timeLeft)}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="code-hint-pill"
+                onClick={() => setEmailCode(generatedOtp)}
+                title="Click to automatically fill the code"
+              >
+                ⚡ FILL OTP: {generatedOtp}
+              </button>
+              <div
+                className={`timer-progress-track ${timeLeft === 0 ? "expired" : ""}`}
+                style={{ width: `${(timeLeft / 180) * 100}%` }}
+              />
+            </div>
+
+            <p style={{ fontSize: 12, color: "#cbd5e1", margin: 0 }}>
+              Enter the 6-digit verification code sent to <strong>{email}</strong> within 3 minutes to confirm your identity.
+            </p>
+
+            <input
+              type="text"
+              className="otp-input-field"
+              maxLength={6}
+              value={emailCode}
+              onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, ""))}
+              placeholder="• • • • • •"
+              disabled={timeLeft === 0}
+              autoFocus
+            />
+
+            {isSpecialCodeVerified && (
+              <div className="special-code-box verified" style={{ margin: 0 }}>
+                <span className="accredited-badge">
+                  <Icon name="shield" size={12} /> SPECIAL CODE LINKED: {specialCode.toUpperCase()} ({role === "Club / Academy" ? "OFFICIALLY ACCREDITED CLUB" : "LICENSED PRO SCOUTER"})
+                </span>
+              </div>
+            )}
+
+            {timeLeft === 0 && (
+              <p className="analysis-error" role="alert">
+                ⚠️ This verification code has expired after 3 minutes. Request a new code below.
+              </p>
+            )}
+
+            {error && <p className="analysis-error" role="alert">{error}</p>}
+            {notice && <p className="model-list-status" role="status">{notice}</p>}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+              <button
+                type="button"
+                className="primary-button auth-submit"
+                disabled={busy || timeLeft === 0 || emailCode.length < 6}
+                onClick={handleConfirmVerification}
+              >
+                {busy ? "VERIFYING…" : "CONFIRM CODE & ENTER WORKSPACE"} <Icon name="arrow" size={15} />
+              </button>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={handleResendOtp}
+                >
+                  ↻ RESEND CODE (RESET 3 MIN)
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => { setStep("form"); setError(""); }}
+                >
+                  ← EDIT REGISTRATION DETAILS
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="social-row">
+              <button type="button" disabled={busy || !isSupabaseConfigured} onClick={() => signInWithProvider("google")}><Icon name="google" /> Continue with Google</button>
+              <button type="button" disabled={busy || !isSupabaseConfigured} onClick={() => signInWithProvider("facebook")}><Icon name="facebook" /> Continue with Facebook</button>
+            </div>
+            {!isSupabaseConfigured && <p className="analysis-error" role="alert">Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your local environment.</p>}
+            <div className="divider"><span>{mode === "Register" ? "OR REGISTER WITH EMAIL" : "OR SIGN IN WITH EMAIL"}</span></div>
+            {mode === "Register" ? <>
+              <span className="form-section-label">01 · SELECT YOUR ROLE</span>
+              <div className="role-cards">
+                {[
+                  ["Player", "Build your performance profile"],
+                  ["Club / Academy", "Manage talent and benchmarks"],
+                  ["Scout / Agent", "Discover verified athletes"],
+                ].map(([name, copy]) => <button key={name} className={role === name ? "active" : ""} onClick={() => setRole(name)}><span className="radio-dot"><i /></span><strong>{name}</strong><small>{copy}</small></button>)}
+              </div>
+              <span className="form-section-label">02 · {role.toUpperCase()} DETAILS</span>
+            </> : <label className="field-label">WORKSPACE ROLE<select value={role} onChange={(event) => setRole(event.target.value)}><option>Player</option><option>Club / Academy</option><option>Scout / Agent</option></select></label>}
+            <div className="registration-grid">
+              {mode === "Register" && <label className="field-label">{role === "Club / Academy" ? "CLUB / ACADEMY NAME" : "FULL NAME"}<input value={name} onChange={(event) => setName(event.target.value)} placeholder={role === "Club / Academy" ? "Alexandria Falcons" : "Your full name"} /></label>}
+              {mode === "Register" && role === "Scout / Agent" && <label className="field-label">AFFILIATION<select><option>Club Scout</option><option>Independent Agent</option><option>University Recruiter</option></select></label>}
+              <label className="field-label">EMAIL ADDRESS<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" /></label>
+              <label className="field-label">PASSWORD<input type="password" autoComplete={mode === "Register" ? "new-password" : "current-password"} required value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8+ characters" /></label>
+              {mode === "Register" && role === "Player" && <>
+                <label className="field-label">COUNTRY<select value={country} onChange={(event) => setCountry(event.target.value)}><option>Egypt</option><option>Spain</option><option>United Kingdom</option><option>United States</option></select></label>
+                <label className="field-label">CITY / TOWN<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Alexandria" /></label>
+                <label className="field-label">PRIMARY SPORT<select value={sport} onChange={(event) => setSelectedSport(event.target.value)}>{sports.map((item) => <option key={item}>{item}</option>)}</select></label>
+                <label className="field-label">DATE OF BIRTH<input type="date" /></label>
+                <label className="field-label">HEIGHT / WEIGHT<div className="split-fields"><input type="number" placeholder="Height cm" /><input type="number" placeholder="Weight kg" /></div></label>
+                <label className="field-label">WINGSPAN<input type="number" placeholder="Wingspan cm" /></label>
+                <label className="field-label">DOMINANT SIDE<select><option>Right hand / foot</option><option>Left hand / foot</option><option>Ambidextrous</option></select></label>
+                <label className="field-label">PERFORMANCE TARGET<input placeholder="e.g. 80 cm vertical" /></label>
+              </>}
+              {mode === "Register" && role === "Club / Academy" && <>
+                <label className="field-label">COUNTRY / REGION<select value={country} onChange={(event) => setCountry(event.target.value)}><option>Egypt</option><option>Spain</option><option>United Kingdom</option><option>United States</option></select></label>
+                <label className="field-label">CITY / TOWN<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Alexandria" /></label>
+                <label className="field-label">COMPETITION LEVEL<select><option>Youth Academy U-18</option><option>Regional League</option><option>Professional</option></select></label>
+                <label className="field-label">SPORTS MANAGED<input placeholder="Basketball, Volleyball..." /></label>
+                <label className="field-label wide-field">INITIAL ROSTER IMPORT<span className="mini-drop">DROP CSV ROSTER OR BROWSE</span></label>
+                <label className="field-label wide-field">PERFORMANCE BENCHMARK<input placeholder="e.g. Minimum 65 cm vertical jump" /></label>
+                <div className={`special-code-box wide-field ${isSpecialCodeVerified ? "verified" : ""}`}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label className="field-label" style={{ margin: 0 }}>SPECIAL CLUB ACCREDITATION CODE (OPTIONAL)</label>
+                    {isSpecialCodeVerified && <span className="accredited-badge"><Icon name="shield" size={11} /> VERIFIED CLUB</span>}
+                  </div>
+                  <input
+                    value={specialCode}
+                    onChange={(e) => setSpecialCode(e.target.value)}
+                    placeholder="e.g. SCOT-CLUB-VIP or FIFA-ACAD-2026"
+                    style={{ textTransform: "uppercase" }}
+                  />
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    <small style={{ color: "var(--muted)", fontSize: 10 }}>OFFICIAL CLUB CODES:</small>
+                    {VALID_CLUB_CODES.map((c) => (
+                      <button key={c} type="button" className="code-suggestion-chip" onClick={() => setSpecialCode(c)}>
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>}
+              {mode === "Register" && role === "Scout / Agent" && <>
+                <label className="field-label">LICENSE / ID NUMBER<input placeholder="Professional ID" /></label>
+                <label className="field-label">TARGET REGIONS<input placeholder="Egypt, Spain, UK" /></label>
+                <label className="field-label">SPORTS FOCUS<input placeholder="Basketball, Track..." /></label>
+                <label className="field-label">AGE GROUP<select><option>U-18</option><option>18–23</option><option>Open</option></select></label>
+                <label className="field-label wide-field">RATING ALERTS<input placeholder="Alert me when rating exceeds 90 in Alexandria" /></label>
+                <div className={`special-code-box wide-field ${isSpecialCodeVerified ? "verified" : ""}`}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label className="field-label" style={{ margin: 0 }}>SPECIAL SCOUT ACCREDITATION CODE (OPTIONAL)</label>
+                    {isSpecialCodeVerified && <span className="accredited-badge"><Icon name="shield" size={11} /> LICENSED PRO SCOUT</span>}
+                  </div>
+                  <input
+                    value={specialCode}
+                    onChange={(e) => setSpecialCode(e.target.value)}
+                    placeholder="e.g. SCOT-PRO-SCOUT or UEFA-SCT-88"
+                    style={{ textTransform: "uppercase" }}
+                  />
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    <small style={{ color: "var(--muted)", fontSize: 10 }}>OFFICIAL SCOUT CODES:</small>
+                    {VALID_SCOUT_CODES.map((c) => (
+                      <button key={c} type="button" className="code-suggestion-chip" onClick={() => setSpecialCode(c)}>
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>}
+            </div>
+            {error && <p className="analysis-error" role="alert">{error}</p>}
+            {notice && <p className="model-list-status" role="status">{notice}</p>}
+            <button className="primary-button auth-submit" disabled={busy || !isSupabaseConfigured} onClick={submitEmail}>
+              {busy ? "CONNECTING…" : mode === "Register" ? `VERIFY EMAIL & CREATE ${role.toUpperCase()} PROFILE` : "SIGN IN TO SCOT"} <Icon name="arrow" />
+            </button>
+          </>
+        )}
+
         <p className="legal"><Icon name="shield" size={14} /> Your data is encrypted and never sold.</p>
       </section>
     </div>
@@ -2562,9 +2792,20 @@ function SettingsView({
       targetAgeBrackets: "U-17 to U-22",
       priorityMetrics: "Acceleration, Split-step reaction, Biomechanical landing flexion",
       scoutLicenseId: "PRO-SCT-88310",
+      specialCode: localStorage.getItem("scot_accredited_code") || "",
     };
   });
   const accountRole = role === "Club" ? "Club / Academy" : role === "Scout" ? "Scout / Agent" : "Player";
+
+  const isClubAccredited = useMemo(() => {
+    const code = (roleProfile.specialCode || "").trim().toUpperCase();
+    return VALID_CLUB_CODES.includes(code);
+  }, [roleProfile.specialCode]);
+
+  const isScoutAccredited = useMemo(() => {
+    const code = (roleProfile.specialCode || "").trim().toUpperCase();
+    return VALID_SCOUT_CODES.includes(code);
+  }, [roleProfile.specialCode]);
 
   const handleSaveAll = async (sectionName?: string) => {
     setSavingGlobal(true);
@@ -2618,7 +2859,7 @@ function SettingsView({
           {section === "Account & Security" && <section className="settings-card">
             <div className="panel-title"><div><span className="section-kicker">IDENTITY</span><h2>ACCOUNT & SECURITY</h2></div><span className="verified-stamp"><Icon name="shield" size={13} /> VERIFIED</span></div>
             <p className="setting-description">Manage your profile identity, account role, and access protection.</p>
-            <div className="account-profile"><img src={athletes[0].image} alt={name} /><div><strong>{name}</strong><span>{accountRole} account · SC-28491</span></div><button className="outline-button">CHANGE PHOTO</button></div>
+            <div className="account-profile"><img src={athletes[0].image} alt={name} /><div><strong>{name}</strong><span>{accountRole} account · SC-28491</span>{(isClubAccredited || isScoutAccredited) && <span className="accredited-badge" style={{ marginTop: 4, display: "inline-flex" }}><Icon name="shield" size={10} /> ACCREDITED & VERIFIED</span>}</div><button className="outline-button">CHANGE PHOTO</button></div>
             <div className="settings-form-grid">
               <label className="field-label">FULL NAME<input value={nameDraft} onChange={(event) => { setNameDraft(event.target.value); setAccountSaved(false); }} /></label>
               <label className="field-label">EMAIL ADDRESS<input value={email} readOnly /></label>
@@ -2715,6 +2956,26 @@ function SettingsView({
                 <label className="field-label">OFFICIAL REGISTRATION LICENSE
                   <input value={roleProfile.registrationLicense} onChange={(e) => setRoleProfile({ ...roleProfile, registrationLicense: e.target.value })} placeholder="FIBA-ACAD-04 / EGY-FA-99214" />
                 </label>
+                <div className={`special-code-box ${isClubAccredited ? "verified" : ""}`} style={{ gridColumn: "1 / -1", marginTop: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label className="field-label" style={{ margin: 0 }}>SPECIAL CLUB ACCREDITATION CODE (VERIFICATION)</label>
+                    {isClubAccredited && <span className="accredited-badge"><Icon name="shield" size={11} /> VERIFIED CLUB</span>}
+                  </div>
+                  <input
+                    value={roleProfile.specialCode}
+                    onChange={(e) => setRoleProfile({ ...roleProfile, specialCode: e.target.value })}
+                    placeholder="e.g. SCOT-CLUB-VIP or FIFA-ACAD-2026"
+                    style={{ textTransform: "uppercase" }}
+                  />
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    <small style={{ color: "var(--muted)", fontSize: 10 }}>OFFICIAL CLUB CODES:</small>
+                    {VALID_CLUB_CODES.map((c) => (
+                      <button key={c} type="button" className="code-suggestion-chip" onClick={() => setRoleProfile({ ...roleProfile, specialCode: c })}>
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -2735,6 +2996,26 @@ function SettingsView({
                 <label className="field-label">SCOUTING LICENSE ID
                   <input value={roleProfile.scoutLicenseId} onChange={(e) => setRoleProfile({ ...roleProfile, scoutLicenseId: e.target.value })} placeholder="PRO-SCT-88310" />
                 </label>
+                <div className={`special-code-box ${isScoutAccredited ? "verified" : ""}`} style={{ gridColumn: "1 / -1", marginTop: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label className="field-label" style={{ margin: 0 }}>SPECIAL SCOUT ACCREDITATION CODE (VERIFICATION)</label>
+                    {isScoutAccredited && <span className="accredited-badge"><Icon name="shield" size={11} /> LICENSED PRO SCOUT</span>}
+                  </div>
+                  <input
+                    value={roleProfile.specialCode}
+                    onChange={(e) => setRoleProfile({ ...roleProfile, specialCode: e.target.value })}
+                    placeholder="e.g. SCOT-PRO-SCOUT or UEFA-SCT-88"
+                    style={{ textTransform: "uppercase" }}
+                  />
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    <small style={{ color: "var(--muted)", fontSize: 10 }}>OFFICIAL SCOUT CODES:</small>
+                    {VALID_SCOUT_CODES.map((c) => (
+                      <button key={c} type="button" className="code-suggestion-chip" onClick={() => setRoleProfile({ ...roleProfile, specialCode: c })}>
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -2746,6 +3027,13 @@ function SettingsView({
               onClick={() => {
                 try {
                   localStorage.setItem("scot_role_profile", JSON.stringify(roleProfile));
+                  if (role === "Club" && isClubAccredited) {
+                    localStorage.setItem("scot_accredited_code", roleProfile.specialCode.trim().toUpperCase());
+                    localStorage.setItem("scot_is_accredited", "true");
+                  } else if (role === "Scout" && isScoutAccredited) {
+                    localStorage.setItem("scot_accredited_code", roleProfile.specialCode.trim().toUpperCase());
+                    localStorage.setItem("scot_is_accredited", "true");
+                  }
                 } catch {}
                 void handleSaveAll("Athletic & Role Profile");
               }}
