@@ -41,28 +41,26 @@ export type VideoAnalysisReport = {
 export type AvailableGeminiModel = { id: string; displayName: string };
 
 // Priority-ordered fallback chain — mirrors prototype/app.js STABLE_GEMINI_MODELS
+// TTS-only models are intentionally excluded — they don't support image/video input
 const GEMINI_MODELS = [
-  "gemini-2.5-flash",          // Fast, high-intelligence multimodal Flash
-  "gemini-2.0-flash",          // Standard multimodal workhorse
-  "gemini-1.5-flash",          // Universally supported reliable fallback
-  "gemini-3.1-pro-preview",    // Latest recommended preview model
-  "gemini-3.1-flash-tts",      // Gemini 3.1 Flash TTS
-  "gemini-lite-latest",        // Gemini Lite Latest (replaces 3.1 flash lite preview)
-  "gemini-3.8-flash-tts",      // Gemini 3.8 Flash TTS
-  "gemini-3.8-flash-lite-tts", // Gemini 3.8 Flash-Lite TTS
-  "gemini-3.8-flsah-tts",      // Direct alias fallback
-  "gemma-4-31b",               // Gemma 4 31B Open Model
-  "gemma-4-31b-it",            // Gemma 4 31B Instruction-Tuned
-  "gemini-2.5-flash-lite",     // Lightweight high-throughput fallback
-  "gemini-2.0-flash-lite",     // Fast fallback
-  "gemini-1.5-pro",            // High-intelligence Pro fallback
+  "gemini-2.5-flash",       // Fast, high-intelligence multimodal Flash
+  "gemini-2.0-flash",       // Standard multimodal workhorse
+  "gemini-1.5-flash",       // Universally supported reliable fallback
+  "gemini-3.1-pro-preview", // Latest recommended preview model
+  "gemma-4-31b",            // Gemma 4 31B Open Model
+  "gemma-4-31b-it",         // Gemma 4 31B Instruction-Tuned
+  "gemini-2.5-flash-lite",  // Lightweight high-throughput fallback
+  "gemini-2.0-flash-lite",  // Fast fallback
+  "gemini-1.5-pro",         // High-intelligence Pro fallback
 ];
+// Models that are TTS-only or otherwise cannot process image/video frames
+const TTS_ONLY_MODEL_PATTERN = /\-tts$|\-tts\-|^gemini-lite-latest/i;
 const MAX_FRAME_EDGE = 1280; // Higher resolution improves jersey number and player detail detection
 
 const MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024;
 const DEPRECATED_MODEL_PATTERN = /gemini-2\.5-pro$|gemini-1\.0/i;
 const CAPACITY_ERROR_PATTERN = /resource has been exhausted|quota|rate.?limit|high demand|overloaded|temporarily unavailable|try again later/i;
-const UNAVAILABLE_MODEL_PATTERN = /model.{0,40}(?:not found|not available|unsupported|deprecated|retired|discontinued)|(?:not found|not available|unsupported|deprecated|retired|discontinued).{0,40}model|not supported for generatecontent/i;
+const UNAVAILABLE_MODEL_PATTERN = /model.{0,40}(?:not found|not available|unsupported|deprecated|retired|discontinued)|(?:not found|not available|unsupported|deprecated|retired|discontinued).{0,40}model|not supported for generatecontent|modality is not enabled|does not support.*image|image.*not supported/i;
 
 const SPORT_METRICS: Record<string, string[]> = {
   Soccer: ["Passing", "Progressive carries", "Shooting", "Defending", "Aerial duels", "Pace", "Positioning"],
@@ -218,11 +216,12 @@ export async function fetchAvailableGeminiModels(apiKey: string): Promise<Availa
       throw new Error("Gemini returned an invalid available-models list.");
     }
 
+    // Filter models supporting generateContent, not deprecated, and not TTS-only (no image support)
     for (const model of body.models) {
       if (!isRecord(model) || typeof model.name !== "string") continue;
       const id = model.name.replace(/^models\//, "");
       const methods = model.supportedGenerationMethods;
-      if (!Array.isArray(methods) || !methods.includes("generateContent") || DEPRECATED_MODEL_PATTERN.test(id)) continue;
+      if (!Array.isArray(methods) || !methods.includes("generateContent") || DEPRECATED_MODEL_PATTERN.test(id) || TTS_ONLY_MODEL_PATTERN.test(id)) continue;
       models.push({
         id,
         displayName: typeof model.displayName === "string" ? model.displayName : id,
