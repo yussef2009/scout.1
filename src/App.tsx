@@ -164,6 +164,7 @@ export type ManualPlayerEntry = {
   team: string;
   pinX?: number;
   pinY?: number;
+  cropFrame?: string;
 };
 
 function Logo({ onClick }: { onClick?: () => void }) {
@@ -691,6 +692,61 @@ function RolePanel({
   );
 }
 
+async function cropFrameFromImage(
+  base64Data: string,
+  xPct: number,
+  yPct: number,
+  cropWidthPct = 20,
+  cropHeightPct = 30
+): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve("");
+          return;
+        }
+
+        const sourceW = img.naturalWidth || img.width;
+        const sourceH = img.naturalHeight || img.height;
+
+        const boxW = Math.max(60, Math.round((cropWidthPct / 100) * sourceW));
+        const boxH = Math.max(80, Math.round((cropHeightPct / 100) * sourceH));
+
+        const centerX = (xPct / 100) * sourceW;
+        const centerY = (yPct / 100) * sourceH;
+
+        let startX = Math.round(centerX - boxW / 2);
+        let startY = Math.round(centerY - boxH / 2);
+
+        if (startX < 0) startX = 0;
+        if (startY < 0) startY = 0;
+        if (startX + boxW > sourceW) startX = Math.max(0, sourceW - boxW);
+        if (startY + boxH > sourceH) startY = Math.max(0, sourceH - boxH);
+
+        canvas.width = 240;
+        canvas.height = 320;
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, startX, startY, boxW, boxH, 0, 0, canvas.width, canvas.height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+        const base64 = dataUrl.replace(/^data:image\/[a-z]+;base64,/, "");
+        resolve(base64);
+      } catch {
+        resolve("");
+      }
+    };
+    img.onerror = () => resolve("");
+    img.src = base64Data.startsWith("data:") ? base64Data : `data:image/jpeg;base64,${base64Data}`;
+  });
+}
+
 function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSettings, onModelChange, demoMode = true }: {
   sport: string; role: string; name: string; model: string; frameCount: number;
   apiKey: string; onOpenSettings: () => void; onModelChange: (model: string) => void;
@@ -720,6 +776,18 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
   const [selectedPinPlayerId, setSelectedPinPlayerId] = useState<string | null>(null);
   const [activeTouchIndex, setActiveTouchIndex] = useState<Record<string, number>>({});
   const videoPlayerRef = useRef<HTMLVideoElement | null>(null);
+
+  // Touch athlete to frame modal state
+  const [touchAthleteModal, setTouchAthleteModal] = useState<{
+    x: number;
+    y: number;
+    crop: string;
+    number: string;
+    name: string;
+    position: string;
+    team: string;
+    isEditingId?: string;
+  } | null>(null);
 
   const [followers, setFollowers] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("scot_followers") ?? '["Coach Henderson", "Alexandre Ramos", "Real Betis Youth", "Scout Network EMEA"]'); }
@@ -754,6 +822,7 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
     setManualTarget(null);
     setManualPlayers([]);
     setReferenceFrame(null);
+    setTouchAthleteModal(null);
     setReports([]);
     setStatus("");
     setError("");
@@ -773,7 +842,7 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
       if (extracted.length > 0 && !referenceFrame) {
         setReferenceFrame(extracted[0]);
       }
-      setStatus(`${extracted.length} keyframes extracted. Select the frame showing all players.`);
+      setStatus(`${extracted.length} keyframes extracted. Touch any player on the reference frame to frame & select him.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Frame extraction failed.");
     } finally {
@@ -797,19 +866,28 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
     setStatus(`Captured frame at ${captured.timestamp.toFixed(1)}s as primary all-player reference.`);
   };
 
-  const addManualPlayer = () => {
+  const addManualPlayer = async () => {
     if (!newPlayerName.trim() && !newPlayerNumber.trim()) {
       setError("Please enter a player name and jersey number.");
       return;
     }
     setError("");
     const id = `manual-p-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const defaultX = Math.min(85, 20 + (manualPlayers.length % 5) * 15);
+    const defaultY = Math.min(85, 40 + Math.floor(manualPlayers.length / 5) * 20);
+    let crop = "";
+    if (referenceFrame) {
+      crop = await cropFrameFromImage(referenceFrame.data, defaultX, defaultY);
+    }
     const addedPlayer: ManualPlayerEntry = {
       id,
       number: newPlayerNumber.trim() || `${manualPlayers.length + 1}`,
       name: newPlayerName.trim() || `Athlete #${newPlayerNumber.trim() || manualPlayers.length + 1}`,
       position: newPlayerPosition.trim() || (SPORT_POSITIONS[sport]?.[0] ?? "Athlete"),
       team: newPlayerTeam.trim() || "Home Team",
+      pinX: defaultX,
+      pinY: defaultY,
+      cropFrame: crop,
     };
     setManualPlayers((prev) => [...prev, addedPlayer]);
     setSelectedPlayerIds((prev) => [...prev, id]);
@@ -817,7 +895,7 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
     setNewPlayerName("");
     setNewPlayerPosition("");
     setNewPlayerTeam("");
-    setStatus(`Added #${addedPlayer.number} ${addedPlayer.name} (${addedPlayer.position}) to roster.`);
+    setStatus(`Added & framed #${addedPlayer.number} ${addedPlayer.name} (${addedPlayer.position}). Selected for AI analysis.`);
   };
 
   const removeManualPlayer = (id: string) => {
@@ -825,33 +903,104 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
     setSelectedPlayerIds((prev) => prev.filter((pid) => pid !== id));
   };
 
-  const prefillSampleRoster = () => {
+  const prefillSampleRoster = async () => {
     const positions = SPORT_POSITIONS[sport] ?? ["Point Guard", "Wing", "Center"];
+    let crop1 = "", crop2 = "", crop3 = "";
+    if (referenceFrame) {
+      crop1 = await cropFrameFromImage(referenceFrame.data, 28, 52);
+      crop2 = await cropFrameFromImage(referenceFrame.data, 50, 48);
+      crop3 = await cropFrameFromImage(referenceFrame.data, 72, 55);
+    }
     const samples: ManualPlayerEntry[] = [
-      { id: `sample-${Date.now()}-1`, number: "10", name, position: positions[0] || "Starter", team: "Home Team" },
-      { id: `sample-${Date.now()}-2`, number: "04", name: "Ziad El-Sayed", position: positions[1] || "Starter", team: "Home Team" },
-      { id: `sample-${Date.now()}-3`, number: "07", name: "Mateo Ruiz", position: positions[2] || "Starter", team: "Away Team" },
+      { id: `sample-${Date.now()}-1`, number: "10", name, position: positions[0] || "Starter", team: "Home Team", pinX: 28, pinY: 52, cropFrame: crop1 },
+      { id: `sample-${Date.now()}-2`, number: "04", name: "Ziad El-Sayed", position: positions[1] || "Starter", team: "Home Team", pinX: 50, pinY: 48, cropFrame: crop2 },
+      { id: `sample-${Date.now()}-3`, number: "07", name: "Mateo Ruiz", position: positions[2] || "Starter", team: "Away Team", pinX: 72, pinY: 55, cropFrame: crop3 },
     ];
     setManualPlayers(samples);
     setSelectedPlayerIds(samples.map((s) => s.id));
-    setStatus(`Pre-filled 3 athletes for ${sport}. You can add more or edit.`);
+    setStatus(`Pre-filled 3 framed athletes for ${sport}. Touch any player on the frame to select or deselect.`);
   };
 
-  const handleReferenceFrameClick = (event: React.MouseEvent<HTMLDivElement>) => {
+  const handleReferenceFrameClick = async (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!referenceFrame) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const x = Math.max(2, Math.min(98, Math.round(((event.clientX - rect.left) / rect.width) * 100)));
-    const y = Math.max(2, Math.min(98, Math.round(((event.clientY - rect.top) / rect.height) * 100)));
+    const x = Math.max(3, Math.min(97, Math.round(((event.clientX - rect.left) / rect.width) * 100)));
+    const y = Math.max(3, Math.min(97, Math.round(((event.clientY - rect.top) / rect.height) * 100)));
 
     if (selectedPinPlayerId) {
+      const crop = await cropFrameFromImage(referenceFrame.data, x, y);
       setManualPlayers((prev) =>
-        prev.map((p) => (p.id === selectedPinPlayerId ? { ...p, pinX: x, pinY: y } : p))
+        prev.map((p) => (p.id === selectedPinPlayerId ? { ...p, pinX: x, pinY: y, cropFrame: crop || p.cropFrame } : p))
       );
       const targetP = manualPlayers.find((p) => p.id === selectedPinPlayerId);
-      setStatus(`Pinned #${targetP?.number} ${targetP?.name} at (${x}%, ${y}%) on all-player reference frame.`);
+      setSelectedPlayerIds((prev) => (prev.includes(selectedPinPlayerId) ? prev : [...prev, selectedPinPlayerId]));
+      setStatus(`Pinned & framed #${targetP?.number || ""} ${targetP?.name || ""} at (${x}%, ${y}%). Selected for AI.`);
       setSelectedPinPlayerId(null);
-    } else {
-      setManualTarget({ x, y, label: `Field Tag (${x}%, ${y}%)` });
+      return;
     }
+
+    // Touch on athlete directly to crop their frame and enter player details
+    const crop = await cropFrameFromImage(referenceFrame.data, x, y);
+    const nextNumber = `${manualPlayers.length + 1}`;
+    const defaultPositions = SPORT_POSITIONS[sport] ?? ["Athlete", "Forward", "Midfielder"];
+    const defaultPos = defaultPositions[Math.min(manualPlayers.length, defaultPositions.length - 1)] || "Athlete";
+
+    setTouchAthleteModal({
+      x,
+      y,
+      crop,
+      number: nextNumber,
+      name: `Athlete #${nextNumber}`,
+      position: defaultPos,
+      team: manualPlayers[0]?.team || "Home Team",
+    });
+  };
+
+  const saveTouchAthlete = (athleteData: {
+    x: number;
+    y: number;
+    crop: string;
+    number: string;
+    name: string;
+    position: string;
+    team: string;
+    isEditingId?: string;
+  }) => {
+    if (athleteData.isEditingId) {
+      setManualPlayers((prev) =>
+        prev.map((p) =>
+          p.id === athleteData.isEditingId
+            ? {
+                ...p,
+                number: athleteData.number.trim() || p.number,
+                name: athleteData.name.trim() || p.name,
+                position: athleteData.position.trim() || p.position,
+                team: athleteData.team.trim() || p.team,
+                pinX: athleteData.x,
+                pinY: athleteData.y,
+                cropFrame: athleteData.crop || p.cropFrame,
+              }
+            : p
+        )
+      );
+      setStatus(`Updated player #${athleteData.number} ${athleteData.name}.`);
+    } else {
+      const id = `manual-p-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const newEntry: ManualPlayerEntry = {
+        id,
+        number: athleteData.number.trim() || `${manualPlayers.length + 1}`,
+        name: athleteData.name.trim() || `Athlete #${athleteData.number.trim() || manualPlayers.length + 1}`,
+        position: athleteData.position.trim() || (SPORT_POSITIONS[sport]?.[0] ?? "Athlete"),
+        team: athleteData.team.trim() || "Home Team",
+        pinX: athleteData.x,
+        pinY: athleteData.y,
+        cropFrame: athleteData.crop,
+      };
+      setManualPlayers((prev) => [...prev, newEntry]);
+      setSelectedPlayerIds((prev) => [...prev, id]);
+      setStatus(`Frame created for #${newEntry.number} ${newEntry.name}. Player selected for AI touch analysis.`);
+    }
+    setTouchAthleteModal(null);
   };
 
   const scanPlayers = async () => {
@@ -862,9 +1011,10 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
     setLoadingProgress(5);
     let activeModel = model;
     const handleModelChange = (nextModel: string) => {
+      const prevModel = activeModel;
       activeModel = nextModel;
       onModelChange(nextModel);
-      setStatus(`The previous model was unavailable or overloaded. Switched to ${nextModel}.`);
+      setStatus(`⚡ Model auto-switched: ${prevModel} → ${nextModel} (overloaded/unavailable). Retrying…`);
     };
     try {
       if (!apiKey) {
@@ -901,9 +1051,10 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
     setLoadingProgress(5);
     let activeModel = model;
     const handleModelChange = (nextModel: string) => {
+      const prevModel = activeModel;
       activeModel = nextModel;
       onModelChange(nextModel);
-      setStatus(`The previous model was unavailable or overloaded. Switched to ${nextModel}.`);
+      setStatus(`⚡ Model auto-switched: ${prevModel} → ${nextModel} (overloaded/unavailable). Retrying…`);
     };
     try {
       if (!apiKey) {
@@ -928,7 +1079,7 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
       if (isManual) {
         const chosen = manualPlayers.filter((p) => selectedPlayerIds.includes(p.id));
         if (!chosen.length) {
-          throw new Error("Please add and select at least one player in the manual roster before analyzing.");
+          throw new Error("Please touch and select at least one player on the reference frame before analyzing.");
         }
         targets = chosen.map((p) => ({
           id: p.id,
@@ -937,8 +1088,9 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
           position: p.position,
           team: p.team,
           confidence: 100,
-          description: `Player #${p.number} (${p.name}) playing as ${p.position} for ${p.team}${p.pinX ? ` positioned at (${p.pinX}%, ${p.pinY}%) on the reference frame` : ""}.`,
-          standoutTrait: `Targeted on all-player reference frame`,
+          description: `Player #${p.number} (${p.name}) playing as ${p.position} for ${p.team}${p.pinX ? ` positioned at (${p.pinX}%, ${p.pinY}%) on the all-player reference frame` : ""}. Configured with dedicated player frame and user inputs.`,
+          standoutTrait: `Targeted player frame with user inputs`,
+          cropFrame: p.cropFrame,
         }));
       } else {
         const selectedPlayers = players.filter((player) => selectedPlayerIds.includes(player.id));
@@ -1207,29 +1359,90 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
                       <div className="active-reference-frame-preview" style={{ marginTop: 10 }}>
                         <div className="ref-frame-header">
                           <span><Icon name="shield" size={12} /> ACTIVE ALL-PLAYERS REFERENCE FRAME ({referenceFrame.timestamp.toFixed(1)}s)</span>
-                          <small>Click on this image to pin athlete positions</small>
+                          <small>Touch any player directly to frame & select him · Tap frame to select/deselect</small>
                         </div>
                         <div
                           className="ref-frame-interactive-box"
                           onClick={handleReferenceFrameClick}
-                          style={{ cursor: selectedPinPlayerId ? "crosshair" : "pointer" }}
+                          style={{ cursor: "crosshair" }}
                         >
                           <img
                             src={`data:image/jpeg;base64,${referenceFrame.data}`}
                             alt="Active all-players reference frame"
                             className="ref-frame-img"
                           />
-                          {manualPlayers.map((p) => p.pinX && p.pinY ? (
-                            <div
-                              key={p.id}
-                              className="manual-player-pin"
-                              style={{ left: `${p.pinX}%`, top: `${p.pinY}%` }}
-                              title={`#${p.number} ${p.name}`}
-                            >
-                              <span className="pin-badge">#{p.number}</span>
-                              <span className="pin-name">{p.name}</span>
-                            </div>
-                          ) : null)}
+
+                          {/* Broadcast-style interactive frames for every player */}
+                          {manualPlayers.map((p) => {
+                            if (p.pinX === undefined || p.pinY === undefined) return null;
+                            const isSelected = selectedPlayerIds.includes(p.id);
+                            return (
+                              <div
+                                key={p.id}
+                                className={`player-touch-frame ${isSelected ? "selected" : "unselected"}`}
+                                style={{ left: `${p.pinX}%`, top: `${p.pinY}%` }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  togglePlayer(p.id);
+                                  setStatus(
+                                    isSelected
+                                      ? `Deselected #${p.number} ${p.name}`
+                                      : `Selected #${p.number} ${p.name} for AI touch analysis.`
+                                  );
+                                }}
+                                title={`Touch to ${isSelected ? "deselect" : "select"} #${p.number} ${p.name}`}
+                              >
+                                {/* Broadcast corner tracking brackets */}
+                                <div className="tracking-bracket-tl" />
+                                <div className="tracking-bracket-tr" />
+                                <div className="tracking-bracket-bl" />
+                                <div className="tracking-bracket-br" />
+
+                                {/* Close-up crop frame thumbnail bubble */}
+                                {p.cropFrame && (
+                                  <div className="touch-frame-thumb-bubble">
+                                    <img src={`data:image/jpeg;base64,${p.cropFrame}`} alt={p.name} />
+                                  </div>
+                                )}
+
+                                {/* Broadcast player tag */}
+                                <div className="touch-frame-badge">
+                                  <div className="touch-frame-title">
+                                    <strong className="badge-num">#{p.number}</strong>
+                                    <span className="badge-name">{p.name}</span>
+                                  </div>
+                                  <div className="touch-frame-meta">
+                                    <span>{p.position}</span> · <span>{p.team}</span>
+                                  </div>
+                                  <div className={`touch-frame-status-tag ${isSelected ? "is-selected" : ""}`}>
+                                    {isSelected ? "✓ SELECTED FOR AI" : "TOUCH TO SELECT"}
+                                  </div>
+                                </div>
+
+                                {/* Quick edit button */}
+                                <button
+                                  type="button"
+                                  className="touch-frame-edit-btn"
+                                  title="Edit details"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTouchAthleteModal({
+                                      x: p.pinX ?? 50,
+                                      y: p.pinY ?? 50,
+                                      crop: p.cropFrame ?? "",
+                                      number: p.number,
+                                      name: p.name,
+                                      position: p.position,
+                                      team: p.team,
+                                      isEditingId: p.id,
+                                    });
+                                  }}
+                                >
+                                  ✎
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -1343,10 +1556,22 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
                                   onChange={() => togglePlayer(player.id)}
                                   disabled={busy}
                                 />
-                                <span className="player-number-pill">#{player.number}</span>
+                                {player.cropFrame ? (
+                                  <img
+                                    src={`data:image/jpeg;base64,${player.cropFrame}`}
+                                    alt={player.name}
+                                    className="roster-chip-crop-thumb"
+                                  />
+                                ) : (
+                                  <span className="player-number-pill">#{player.number}</span>
+                                )}
                                 <div className="player-chip-info">
-                                  <strong>{player.name}</strong>
-                                  <small>{player.position} · {player.team}</small>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <span className="jersey-pill">#{player.number}</span>
+                                    <strong>{player.name}</strong>
+                                    {isChecked && <span className="chip-selected-badge">SELECTED</span>}
+                                  </div>
+                                  <small>{player.position} · {player.team}{player.pinX ? ` · (${player.pinX}%, ${player.pinY}%)` : ""}</small>
                                 </div>
 
                                 {referenceFrame && (
@@ -1360,12 +1585,32 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
                                         setStatus(`Click on the reference frame image above to position #${player.number} ${player.name}.`);
                                       }
                                     }}
-                                    title="Place position on reference frame"
+                                    title="Place or reposition on reference frame"
                                   >
                                     <Icon name="location" size={11} />
-                                    <span>{player.pinX ? `(${player.pinX}%, ${player.pinY}%)` : isPinning ? "CLICK FRAME" : "PIN"}</span>
+                                    <span>{player.pinX ? `FRAME (${player.pinX}%, ${player.pinY}%)` : isPinning ? "TOUCH FRAME" : "FRAME"}</span>
                                   </button>
                                 )}
+
+                                <button
+                                  type="button"
+                                  className="chip-edit-btn"
+                                  onClick={() => {
+                                    setTouchAthleteModal({
+                                      x: player.pinX ?? 50,
+                                      y: player.pinY ?? 50,
+                                      crop: player.cropFrame ?? "",
+                                      number: player.number,
+                                      name: player.name,
+                                      position: player.position,
+                                      team: player.team,
+                                      isEditingId: player.id,
+                                    });
+                                  }}
+                                  title="Edit player info"
+                                >
+                                  ✎
+                                </button>
 
                                 <button
                                   type="button"
@@ -1382,6 +1627,132 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
                       </div>
                     )}
                   </div>
+
+                  {/* Quick Athlete Frame & Input Modal */}
+                  {touchAthleteModal && (
+                    <div className="player-frame-modal-overlay" onClick={() => setTouchAthleteModal(null)}>
+                      <div className="player-frame-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="player-frame-modal-header">
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span className="modal-kicker">
+                              <Icon name="shield" size={14} /> {touchAthleteModal.isEditingId ? "EDIT PLAYER FRAME" : "NEW PLAYER FRAME"}
+                            </span>
+                            <span className="modal-coord-badge">({touchAthleteModal.x}%, {touchAthleteModal.y}%)</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="modal-close-btn"
+                            onClick={() => setTouchAthleteModal(null)}
+                            aria-label="Close"
+                          >
+                            <Icon name="close" size={15} />
+                          </button>
+                        </div>
+
+                        <div className="player-frame-modal-body">
+                          <div className="modal-preview-col">
+                            <div className="modal-crop-preview-box">
+                              {touchAthleteModal.crop ? (
+                                <img
+                                  src={`data:image/jpeg;base64,${touchAthleteModal.crop}`}
+                                  alt="Player crop frame"
+                                  className="modal-crop-img"
+                                />
+                              ) : (
+                                <div className="modal-crop-placeholder">
+                                  <Icon name="user" size={32} />
+                                  <span>Player Crop</span>
+                                </div>
+                              )}
+                              <div className="modal-reticle-overlay">
+                                <span className="corner tl" />
+                                <span className="corner tr" />
+                                <span className="corner bl" />
+                                <span className="corner br" />
+                              </div>
+                            </div>
+                            <small className="modal-preview-tip">
+                              Close-up frame captured at ({touchAthleteModal.x}%, {touchAthleteModal.y}%). Sent to AI with your inputs.
+                            </small>
+                          </div>
+
+                          <form
+                            className="modal-inputs-col"
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              saveTouchAthlete(touchAthleteModal);
+                            }}
+                          >
+                            <div className="modal-field">
+                              <label>JERSEY NUMBER *</label>
+                              <input
+                                type="text"
+                                autoFocus
+                                required
+                                placeholder="e.g. 10"
+                                value={touchAthleteModal.number}
+                                onChange={(e) => setTouchAthleteModal({ ...touchAthleteModal, number: e.target.value })}
+                                maxLength={6}
+                              />
+                            </div>
+
+                            <div className="modal-field">
+                              <label>PLAYER NAME *</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. Lionel Messi / Omar Khalil"
+                                value={touchAthleteModal.name}
+                                onChange={(e) => setTouchAthleteModal({ ...touchAthleteModal, name: e.target.value })}
+                              />
+                            </div>
+
+                            <div className="modal-field">
+                              <label>POSITION</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Point Guard / Striker"
+                                list="modal-sport-positions-datalist"
+                                value={touchAthleteModal.position}
+                                onChange={(e) => setTouchAthleteModal({ ...touchAthleteModal, position: e.target.value })}
+                              />
+                              <datalist id="modal-sport-positions-datalist">
+                                {(SPORT_POSITIONS[sport] ?? []).map((pos) => (
+                                  <option key={pos} value={pos} />
+                                ))}
+                              </datalist>
+                            </div>
+
+                            <div className="modal-field">
+                              <label>TEAM / KIT COLOR</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Home Team (Blue) / Away Team"
+                                value={touchAthleteModal.team}
+                                onChange={(e) => setTouchAthleteModal({ ...touchAthleteModal, team: e.target.value })}
+                              />
+                            </div>
+
+                            <div className="modal-actions-row">
+                              <button
+                                type="button"
+                                className="outline-button"
+                                onClick={() => setTouchAthleteModal(null)}
+                              >
+                                CANCEL
+                              </button>
+                              <button
+                                type="submit"
+                                className="primary-button modal-save-btn"
+                              >
+                                ✓ {touchAthleteModal.isEditingId ? "SAVE CHANGES" : "FRAME & SELECT PLAYER"}
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

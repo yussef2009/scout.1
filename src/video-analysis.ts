@@ -9,6 +9,7 @@ export type DetectedPlayer = {
   confidence: number;
   description: string;
   standoutTrait: string;
+  cropFrame?: string;
 };
 
 export type AnalysisMetric = { name: string; score: number; note: string };
@@ -244,6 +245,7 @@ async function requestGemini(
   let lastError = "Gemini could not complete the request.";
   const preferredModel = preset.trim() || GEMINI_MODELS[0];
   const modelPriority = [...new Set([preferredModel, ...GEMINI_MODELS])];
+
   for (const model of modelPriority) {
     for (let attempt = 0; attempt < 2; attempt++) {
       let response: Response;
@@ -262,48 +264,66 @@ async function requestGemini(
                 ],
               }],
               generationConfig: {
-                temperature: 0.05, // Lower temperature = more deterministic, accurate output
+                temperature: 0.05,
                 maxOutputTokens: 8192,
                 responseMimeType: "application/json",
               },
-
             }),
           },
         );
-      } catch (cause) {
-        const detail = cause instanceof Error ? cause.message : "unknown network error";
-        throw new Error(`Could not connect to Google Gemini: ${detail}`);
+      } catch (networkCause) {
+        // Network-level failure (timeout, DNS, CORS abort, etc.) — don't throw globally;
+        // record the error and let the outer loop try the next fallback model instead.
+        lastError = networkCause instanceof Error ? networkCause.message : "network error";
+        if (attempt === 0) {
+          // Brief pause before retrying same model once
+          await new Promise((resolve) => window.setTimeout(resolve, 1500));
+          continue;
+        }
+        // Second attempt also failed — try next model
+        break;
       }
 
       const body: unknown = await response.json().catch(() => null);
       const errorMessage = getGeminiErrorMessage(body) ?? `Gemini request failed (${response.status}).`;
+
       if (response.ok) {
         const text = getGeminiText(body);
         if (!text) throw new Error("Gemini returned an empty response. Try another clip.");
-        const result = parseModelJson(text);
+        // Notify the UI of the model switch BEFORE parsing (so the UI updates even if parse throws)
         if (model !== preferredModel) onModelChange?.(model);
-        return result;
+        return parseModelJson(text);
       }
+
+      // Hard auth error — no point trying fallbacks
       if (response.status === 401 || response.status === 403 || /api key|key not valid|permission denied/i.test(errorMessage)) {
         throw new Error(`Gemini rejected the API key or its permissions: ${errorMessage}`);
       }
 
-      lastError = `${errorMessage} (${response.status})`;
-      if (CAPACITY_ERROR_PATTERN.test(errorMessage)
-        || [408, 429, 500, 502, 503, 504].includes(response.status)) {
+      lastError = `${errorMessage} (model: ${model}, status: ${response.status})`;
+
+      // Overloaded / rate-limited / server errors — retry once then try next model
+      if (CAPACITY_ERROR_PATTERN.test(errorMessage) || [408, 429, 500, 502, 503, 504].includes(response.status)) {
         if (attempt === 0) {
-          await new Promise((resolve) => window.setTimeout(resolve, 1000));
+          // Exponential-ish backoff: 2 s on first retry
+          await new Promise((resolve) => window.setTimeout(resolve, 2000));
           continue;
         }
+        // Exhausted both attempts for this model — fall through to next model
         break;
       }
+
+      // Model not found / deprecated
       if (response.status === 404 || response.status === 410 || UNAVAILABLE_MODEL_PATTERN.test(errorMessage)) {
         break;
       }
+
+      // Any other hard error — throw immediately
       throw new Error(`Gemini analysis failed: ${lastError}`);
     }
   }
-  throw new Error(`Gemini analysis failed across the available fallback models: ${lastError}`);
+
+  throw new Error(`All Gemini fallback models failed. Last error: ${lastError}`);
 }
 
 function getGeminiErrorMessage(body: unknown): string | undefined {
@@ -457,7 +477,16 @@ export async function analyzeVideoPlayer(
   referenceFrame?: VideoFrame,
 ): Promise<VideoAnalysisReport> {
   const metrics = SPORT_METRICS[sport] ?? ["Movement", "Technique", "Speed", "Control", "Decision making"];
-  const allFrames = referenceFrame ? [referenceFrame, ...frames] : frames;
+  const playerCropFrame: VideoFrame | null = player?.cropFrame
+    ? { data: player.cropFrame, timestamp: referenceFrame?.timestamp ?? 0 }
+    : null;
+
+  const allFrames: VideoFrame[] = [
+    ...(playerCropFrame ? [playerCropFrame] : []),
+    ...(referenceFrame ? [referenceFrame] : []),
+    ...frames,
+  ];
+
   const playerContext = player
     ? `PRIMARY SUBJECT: "${player.label}" — ${player.position} (${player.jerseyNumber ? `Jersey #${player.jerseyNumber}` : "No jersey #"}, Team: ${player.team || "unspecified"}).
 Scan/Input description: ${player.description}.
@@ -467,13 +496,16 @@ IMPORTANT: Focus ALL analysis EXCLUSIVELY on this athlete. Track only their move
 If multiple athletes are present, select the one with the most clearly observable ${sport} actions.
 Avoid attributing actions to any named individual unless clearly identifiable by kit or number.`;
 
+  const cropNote = playerCropFrame
+    ? `\nFRAME 1 IS A DEDICATED CLOSE-UP CROP OF TARGET ATHLETE: #${player?.jerseyNumber ?? ""} ${player?.label ?? ""} (${player?.position ?? ""}, Team: ${player?.team ?? ""}).\n`
+    : "";
   const referenceFrameNote = referenceFrame
-    ? `\nFRAME 1 IS A REFERENCE FRAME showing all players and overall team disposition. The athlete to analyze is ${player?.label ?? "the designated player"} (${player?.jerseyNumber ? `Jersey #${player.jerseyNumber}` : ""}, ${player?.position ?? ""}, ${player?.team ?? ""}). Track them across subsequent action frames.\n`
+    ? `FRAME ${playerCropFrame ? 2 : 1} IS THE ALL-PLAYERS REFERENCE FRAME showing the full court/field. Track this specific target athlete across all subsequent action frames.\n`
     : "";
 
   const prompt = `You are a world-class ${sport} performance scout and biomechanical analyst with 20+ years of experience.
 Analyze this athlete's performance from ${allFrames.length} ordered video keyframes.
-${referenceFrameNote}
+${cropNote}${referenceFrameNote}
 ${playerContext}
 
 SCORING STANDARDS (use the full 0-100 range honestly):
