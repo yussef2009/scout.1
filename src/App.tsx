@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   analyzeVideoPlayer,
+  captureVideoElementFrame,
   detectVideoPlayers,
   extractVideoFrames,
   fetchAvailableGeminiModels,
+  type AnalysisTouchPoint,
   type AvailableGeminiModel,
   type DetectedPlayer,
   type VideoAnalysisReport,
@@ -25,7 +27,11 @@ type IconName =
   | "shield"
   | "menu"
   | "video"
-  | "camera";
+  | "camera"
+  | "home"
+  | "chart"
+  | "user"
+  | "settings";
 
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, React.ReactNode> = {
@@ -43,6 +49,10 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     menu: <><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></>,
     video: <><path d="m22 8-6 4 6 4V8Z" /><rect width="14" height="12" x="2" y="6" rx="2" /></>,
     camera: <><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></>,
+    home: <><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></>,
+    chart: <><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /><line x1="3" y1="20" x2="21" y2="20" /></>,
+    user: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
+    settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
@@ -133,8 +143,42 @@ const athletes = [
   { rank: 4, name: "Leo Bennett", meta: "Point Guard · 22", town: "London", country: "GB", flag: "🇬🇧", hang: 0.74, vertical: 70.6, score: 87, trend: "+0.9", image: "https://images.unsplash.com/photo-1762025721967-76b6280f8e04?auto=format&fit=crop&w=160&h=160&q=80" },
 ];
 
-function Logo() {
-  return <div className="logo"><span className="logo-mark"><Icon name="bolt" size={17} /></span><span>SC<span>O</span>T</span></div>;
+export const SPORT_POSITIONS: Record<string, string[]> = {
+  Basketball: ["Point Guard", "Shooting Guard", "Small Forward", "Power Forward", "Center"],
+  Soccer: ["Striker / Forward", "Winger", "Attacking Midfielder", "Central Midfielder", "Defensive Midfielder", "Fullback", "Center Back", "Goalkeeper"],
+  Volleyball: ["Setter", "Outside Hitter", "Opposite Hitter", "Middle Blocker", "Libero"],
+  Tennis: ["Singles Player", "Doubles Server", "Doubles Receiver"],
+  Boxing: ["Orthodox Fighter", "Southpaw", "Counter-Puncher", "Brawler"],
+  "Track & Field": ["Sprinter (100m/200m)", "Middle Distance", "Long Jumper", "High Jumper", "Hurdler"],
+  Gymnastics: ["All-Around", "Floor Specialist", "Vault Specialist", "Apparatus"],
+  Swimming: ["Freestyle Sprinter", "Backstroke", "Breaststroke", "Butterfly", "Distance"],
+  Cycling: ["Lead Sprinter", "Time Trialist", "Climber", "Rouleur"],
+  Baseball: ["Pitcher", "Catcher", "First Baseman", "Shortstop", "Outfielder", "Designated Hitter"],
+};
+
+export type ManualPlayerEntry = {
+  id: string;
+  number: string;
+  name: string;
+  position: string;
+  team: string;
+  pinX?: number;
+  pinY?: number;
+};
+
+function Logo({ onClick }: { onClick?: () => void }) {
+  return (
+    <button
+      type="button"
+      className="logo logo-btn"
+      onClick={onClick}
+      aria-label="SCOT – Go to Home"
+      title="Go to Home"
+    >
+      <span className="logo-mark"><Icon name="bolt" size={17} /></span>
+      <span>SC<span>O</span>T</span>
+    </button>
+  );
 }
 
 type AuthMode = "Register" | "Sign in";
@@ -665,6 +709,18 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
   const [activeTab, setActiveTab] = useState<"analysis" | "live" | "teams" | "privacy">("analysis");
   const [selectMode, setSelectMode] = useState<"auto" | "manual">("auto");
   const [manualTarget, setManualTarget] = useState<{ x: number; y: number; label: string } | null>(null);
+
+  // Manual Player Setup state
+  const [manualPlayers, setManualPlayers] = useState<ManualPlayerEntry[]>([]);
+  const [referenceFrame, setReferenceFrame] = useState<VideoFrame | null>(null);
+  const [newPlayerNumber, setNewPlayerNumber] = useState("");
+  const [newPlayerName, setNewPlayerName] = useState("");
+  const [newPlayerPosition, setNewPlayerPosition] = useState("");
+  const [newPlayerTeam, setNewPlayerTeam] = useState("");
+  const [selectedPinPlayerId, setSelectedPinPlayerId] = useState<string | null>(null);
+  const [activeTouchIndex, setActiveTouchIndex] = useState<Record<string, number>>({});
+  const videoPlayerRef = useRef<HTMLVideoElement | null>(null);
+
   const [followers, setFollowers] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("scot_followers") ?? '["Coach Henderson", "Alexandre Ramos", "Real Betis Youth", "Scout Network EMEA"]'); }
     catch { return ["Coach Henderson", "Alexandre Ramos"]; }
@@ -696,12 +752,107 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
     setPlayers([]);
     setSelectedPlayerIds([]);
     setManualTarget(null);
+    setManualPlayers([]);
+    setReferenceFrame(null);
     setReports([]);
     setStatus("");
     setError("");
     setLoadingProgress(0);
   };
 
+  const extractCandidateFrames = async () => {
+    if (!videoFile) return;
+    setBusy(true);
+    setError("");
+    setStatus("Extracting candidate keyframes from video…");
+    try {
+      const extracted = await extractVideoFrames(videoFile, (msg) => {
+        setStatus(msg);
+      }, frameCount);
+      setFrames(extracted);
+      if (extracted.length > 0 && !referenceFrame) {
+        setReferenceFrame(extracted[0]);
+      }
+      setStatus(`${extracted.length} keyframes extracted. Select the frame showing all players.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Frame extraction failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const captureCurrentFrameAsReference = () => {
+    const video = videoPlayerRef.current;
+    if (!video) {
+      setError("Video preview is not ready.");
+      return;
+    }
+    const captured = captureVideoElementFrame(video);
+    if (!captured) {
+      setError("Could not capture frame from video. Make sure video is loaded and try again.");
+      return;
+    }
+    setReferenceFrame(captured);
+    setFrames((prev) => [captured, ...prev.filter((f) => Math.abs(f.timestamp - captured.timestamp) > 0.5)]);
+    setStatus(`Captured frame at ${captured.timestamp.toFixed(1)}s as primary all-player reference.`);
+  };
+
+  const addManualPlayer = () => {
+    if (!newPlayerName.trim() && !newPlayerNumber.trim()) {
+      setError("Please enter a player name and jersey number.");
+      return;
+    }
+    setError("");
+    const id = `manual-p-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const addedPlayer: ManualPlayerEntry = {
+      id,
+      number: newPlayerNumber.trim() || `${manualPlayers.length + 1}`,
+      name: newPlayerName.trim() || `Athlete #${newPlayerNumber.trim() || manualPlayers.length + 1}`,
+      position: newPlayerPosition.trim() || (SPORT_POSITIONS[sport]?.[0] ?? "Athlete"),
+      team: newPlayerTeam.trim() || "Home Team",
+    };
+    setManualPlayers((prev) => [...prev, addedPlayer]);
+    setSelectedPlayerIds((prev) => [...prev, id]);
+    setNewPlayerNumber("");
+    setNewPlayerName("");
+    setNewPlayerPosition("");
+    setNewPlayerTeam("");
+    setStatus(`Added #${addedPlayer.number} ${addedPlayer.name} (${addedPlayer.position}) to roster.`);
+  };
+
+  const removeManualPlayer = (id: string) => {
+    setManualPlayers((prev) => prev.filter((p) => p.id !== id));
+    setSelectedPlayerIds((prev) => prev.filter((pid) => pid !== id));
+  };
+
+  const prefillSampleRoster = () => {
+    const positions = SPORT_POSITIONS[sport] ?? ["Point Guard", "Wing", "Center"];
+    const samples: ManualPlayerEntry[] = [
+      { id: `sample-${Date.now()}-1`, number: "10", name, position: positions[0] || "Starter", team: "Home Team" },
+      { id: `sample-${Date.now()}-2`, number: "04", name: "Ziad El-Sayed", position: positions[1] || "Starter", team: "Home Team" },
+      { id: `sample-${Date.now()}-3`, number: "07", name: "Mateo Ruiz", position: positions[2] || "Starter", team: "Away Team" },
+    ];
+    setManualPlayers(samples);
+    setSelectedPlayerIds(samples.map((s) => s.id));
+    setStatus(`Pre-filled 3 athletes for ${sport}. You can add more or edit.`);
+  };
+
+  const handleReferenceFrameClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(2, Math.min(98, Math.round(((event.clientX - rect.left) / rect.width) * 100)));
+    const y = Math.max(2, Math.min(98, Math.round(((event.clientY - rect.top) / rect.height) * 100)));
+
+    if (selectedPinPlayerId) {
+      setManualPlayers((prev) =>
+        prev.map((p) => (p.id === selectedPinPlayerId ? { ...p, pinX: x, pinY: y } : p))
+      );
+      const targetP = manualPlayers.find((p) => p.id === selectedPinPlayerId);
+      setStatus(`Pinned #${targetP?.number} ${targetP?.name} at (${x}%, ${y}%) on all-player reference frame.`);
+      setSelectedPinPlayerId(null);
+    } else {
+      setManualTarget({ x, y, label: `Field Tag (${x}%, ${y}%)` });
+    }
+  };
 
   const scanPlayers = async () => {
     if (!videoFile) return;
@@ -719,7 +870,6 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
       if (!apiKey) {
         throw new Error("Add your Gemini API key in Settings → AI Vision Engine before scanning.");
       }
-      // Frame extraction: 5% → 50%
       let frameIndex = 0;
       const extracted = await extractVideoFrames(videoFile, (msg) => {
         frameIndex++;
@@ -729,7 +879,6 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
       setFrames(extracted);
       setLoadingProgress(55);
       setStatus("Identifying athletes in the selected sport…");
-      // AI detection: 55% → 95%
       setLoadingProgress(65);
       const detected = await detectVideoPlayers(apiKey, sport, extracted, activeModel, handleModelChange);
       setPlayers(detected);
@@ -772,17 +921,48 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
       } else {
         setLoadingProgress(35);
       }
-      const selectedPlayers = players.filter((player) => selectedPlayerIds.includes(player.id));
-      const targets: (DetectedPlayer | undefined)[] = selectedPlayers.length ? selectedPlayers : [undefined];
+
+      const isManual = selectMode === "manual";
+      let targets: (DetectedPlayer | undefined)[] = [];
+
+      if (isManual) {
+        const chosen = manualPlayers.filter((p) => selectedPlayerIds.includes(p.id));
+        if (!chosen.length) {
+          throw new Error("Please add and select at least one player in the manual roster before analyzing.");
+        }
+        targets = chosen.map((p) => ({
+          id: p.id,
+          label: `${p.name} (#${p.number})`,
+          jerseyNumber: p.number,
+          position: p.position,
+          team: p.team,
+          confidence: 100,
+          description: `Player #${p.number} (${p.name}) playing as ${p.position} for ${p.team}${p.pinX ? ` positioned at (${p.pinX}%, ${p.pinY}%) on the reference frame` : ""}.`,
+          standoutTrait: `Targeted on all-player reference frame`,
+        }));
+      } else {
+        const selectedPlayers = players.filter((player) => selectedPlayerIds.includes(player.id));
+        targets = selectedPlayers.length ? selectedPlayers : [undefined];
+      }
+
       const nextReports: { player?: DetectedPlayer; report: VideoAnalysisReport }[] = [];
       const failures: string[] = [];
       const progressPerPlayer = Math.round(60 / targets.length);
+
       for (const [index, player] of targets.entries()) {
         const baseProgress = 35 + index * progressPerPlayer;
         setLoadingProgress(baseProgress + 5);
         setStatus(`Analyzing ${player?.label ?? "the performance"} (${index + 1} of ${targets.length})…`);
         try {
-          const report = await analyzeVideoPlayer(apiKey, sport, analysisFrames, activeModel, player, handleModelChange);
+          const report = await analyzeVideoPlayer(
+            apiKey,
+            sport,
+            analysisFrames,
+            activeModel,
+            player,
+            handleModelChange,
+            isManual && referenceFrame ? referenceFrame : undefined
+          );
           nextReports.push({ player, report });
           setLoadingProgress(baseProgress + progressPerPlayer);
         } catch (cause) {
@@ -792,7 +972,7 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
       if (nextReports.length) setReports(nextReports);
       if (failures.length) throw new Error(failures.join(" "));
       setLoadingProgress(100);
-      setStatus("Video analysis complete.");
+      setStatus("Video analysis & touch tracking complete.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Video analysis failed.");
       setStatus("");
@@ -800,26 +980,6 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
     } finally {
       setBusy(false);
     }
-  };  const handleVideoClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (selectMode !== "manual") return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = Math.max(2, Math.min(98, Math.round(((event.clientX - rect.left) / rect.width) * 100)));
-    const y = Math.max(2, Math.min(98, Math.round(((event.clientY - rect.top) / rect.height) * 100)));
-    const label = `Pinned Athlete (${x}%, ${y}%)`;
-    const targetPlayer: DetectedPlayer = {
-      id: "manual-pinned-player",
-      label,
-      jerseyNumber: "",
-      position: "Selected Athlete",
-      team: "Focus Subject",
-      confidence: 100,
-      description: `Target athlete clicked by user directly on frame at (${x}% horizontal, ${y}% vertical)`,
-      standoutTrait: `Pinned at (${x}%, ${y}%) for targeted analysis`,
-    };
-    setManualTarget({ x, y, label });
-    setPlayers([targetPlayer]);
-    setSelectedPlayerIds([targetPlayer.id]);
-    setStatus(`Target locked at (${x}%, ${y}%). Click 'ANALYZE SELECTED' to run AI analysis solely on this athlete.`);
   };
 
   const togglePlayer = (playerId: string) => {
@@ -910,68 +1070,376 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
             <span className="browse-button">{videoFile ? "REPLACE VIDEO" : "BROWSE FILES"}</span>
           </label>
           {videoUrl && (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+            <div className="video-detection-suite" style={{ marginTop: 12 }}>
+              {/* Option: AI Detection vs Manual Setup */}
+              <div className="detection-mode-picker">
                 <button
                   type="button"
-                  className={`feed-filter-btn ${selectMode === "auto" ? "active" : ""}`}
-                  onClick={() => setSelectMode("auto")}
+                  className={`detection-mode-card ${selectMode === "auto" ? "active" : ""}`}
+                  onClick={() => {
+                    setSelectMode("auto");
+                    setError("");
+                  }}
                 >
-                  <Icon name="search" size={13} /> AI AUTO-SCAN PLAYERS
+                  <div className="mode-card-header">
+                    <Icon name="search" size={15} />
+                    <strong>AI PLAYER DETECTION</strong>
+                    {selectMode === "auto" && <span className="active-pill">ACTIVE</span>}
+                  </div>
+                  <p>AI automatically scans video keyframes to detect athletes, jersey numbers, and kit colors.</p>
                 </button>
+
                 <button
                   type="button"
-                  className={`feed-filter-btn ${selectMode === "manual" ? "active" : ""}`}
-                  onClick={() => setSelectMode("manual")}
+                  className={`detection-mode-card ${selectMode === "manual" ? "active" : ""}`}
+                  onClick={() => {
+                    setSelectMode("manual");
+                    setError("");
+                    if (frames.length === 0 && !busy) void extractCandidateFrames();
+                    if (manualPlayers.length === 0) {
+                      const initId = `manual-init-${Date.now()}`;
+                      setManualPlayers([{
+                        id: initId,
+                        number: "10",
+                        name,
+                        position: SPORT_POSITIONS[sport]?.[0] ?? "Athlete",
+                        team: "Home Team",
+                      }]);
+                      setSelectedPlayerIds([initId]);
+                    }
+                  }}
                 >
-                  🎯 CLICK VIDEO TO SELECT PLAYER
+                  <div className="mode-card-header">
+                    <Icon name="user" size={15} />
+                    <strong>MANUAL IDENTIFICATION</strong>
+                    {selectMode === "manual" && <span className="active-pill">ACTIVE</span>}
+                  </div>
+                  <p>Pick a reference frame showing all players, then enter every player's number, name, position, and team.</p>
                 </button>
               </div>
 
-              {selectMode === "manual" && (
-                <div className="manual-mode-banner">
-                  <span><strong>MANUAL TARGET ACTIVE:</strong> Click directly on the athlete on the video to target them.</span>
-                  {manualTarget && (
-                    <button className="text-button" onClick={() => { setManualTarget(null); setPlayers([]); setSelectedPlayerIds([]); }}>
-                      CLEAR PIN
-                    </button>
-                  )}
+              {/* Video Player Preview */}
+              <div className="video-preview-wrapper" style={{ marginTop: 12 }}>
+                <video
+                  ref={videoPlayerRef}
+                  className="analysis-video-preview"
+                  src={videoUrl}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  aria-label="Uploaded performance video preview"
+                />
+              </div>
+
+              {/* AI Auto-Detection Mode View */}
+              {selectMode === "auto" && (
+                <div className="ai-mode-box" style={{ marginTop: 10 }}>
+                  <div className="detection-sub-banner">
+                    <Icon name="bolt" size={14} />
+                    <span>Click <strong>SCAN PLAYERS</strong> to let AI identify athletes automatically, or switch to Manual above to define custom rosters.</span>
+                  </div>
                 </div>
               )}
 
-              <div
-                className="video-interactive-container"
-                onClick={handleVideoClick}
-                style={{ cursor: selectMode === "manual" ? "crosshair" : "default" }}
-              >
-                <video className="analysis-video-preview" src={videoUrl} controls playsInline preload="metadata" aria-label="Uploaded performance video preview" />
-                {manualTarget && (
-                  <div className="manual-target-crosshair" style={{ left: `${manualTarget.x}%`, top: `${manualTarget.y}%` }}>
-                    <span className="manual-target-tag">{manualTarget.label}</span>
+              {/* Manual Mode View */}
+              {selectMode === "manual" && (
+                <div className="manual-detection-suite" style={{ marginTop: 12 }}>
+                  {/* STEP 1: Select Frame Showing All Players */}
+                  <div className="manual-section-card">
+                    <div className="panel-title" style={{ marginBottom: 6 }}>
+                      <div>
+                        <span className="section-kicker">STEP 1 · REFERENCE FRAME</span>
+                        <h4 style={{ fontSize: 13, margin: 0 }}>SELECT FRAME SHOWING ALL PLAYERS</h4>
+                      </div>
+                      <button
+                        type="button"
+                        className="outline-button"
+                        style={{ minHeight: 30, padding: "0 10px", fontSize: 9 }}
+                        onClick={captureCurrentFrameAsReference}
+                        title="Pause the video at any moment where all athletes are visible, then capture this frame"
+                      >
+                        <Icon name="camera" size={12} /> CAPTURE CURRENT VIDEO FRAME
+                      </button>
+                    </div>
+                    <p style={{ fontSize: 10, color: "var(--muted)", margin: "0 0 10px" }}>
+                      This frame will be sent to the AI along with the video to locate and analyze the selected players.
+                    </p>
+
+                    {/* Frame Carousel */}
+                    {frames.length > 0 ? (
+                      <div className="frames-carousel-strip">
+                        {frames.map((frame, idx) => {
+                          const isSelected = referenceFrame?.timestamp === frame.timestamp;
+                          return (
+                            <button
+                              key={`${frame.timestamp}-${idx}`}
+                              type="button"
+                              className={`frame-thumb-btn ${isSelected ? "selected" : ""}`}
+                              onClick={() => {
+                                setReferenceFrame(frame);
+                                setStatus(`Reference frame set to keyframe #${idx + 1} (${frame.timestamp.toFixed(1)}s).`);
+                              }}
+                            >
+                              <img src={`data:image/jpeg;base64,${frame.data}`} alt={`Keyframe ${idx + 1}`} />
+                              <span className="frame-thumb-badge">
+                                {isSelected ? "★ ALL-PLAYERS" : `${frame.timestamp.toFixed(1)}s`}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        <button
+                          type="button"
+                          className="outline-button"
+                          disabled={busy}
+                          onClick={extractCandidateFrames}
+                        >
+                          <Icon name="video" size={13} /> EXTRACT KEYFRAMES FOR PREVIEW
+                        </button>
+                        <small style={{ color: "var(--muted)", fontSize: 10 }}>Or pause the video player and click Capture Current Frame.</small>
+                      </div>
+                    )}
+
+                    {/* Active Reference Frame Preview */}
+                    {referenceFrame && (
+                      <div className="active-reference-frame-preview" style={{ marginTop: 10 }}>
+                        <div className="ref-frame-header">
+                          <span><Icon name="shield" size={12} /> ACTIVE ALL-PLAYERS REFERENCE FRAME ({referenceFrame.timestamp.toFixed(1)}s)</span>
+                          <small>Click on this image to pin athlete positions</small>
+                        </div>
+                        <div
+                          className="ref-frame-interactive-box"
+                          onClick={handleReferenceFrameClick}
+                          style={{ cursor: selectedPinPlayerId ? "crosshair" : "pointer" }}
+                        >
+                          <img
+                            src={`data:image/jpeg;base64,${referenceFrame.data}`}
+                            alt="Active all-players reference frame"
+                            className="ref-frame-img"
+                          />
+                          {manualPlayers.map((p) => p.pinX && p.pinY ? (
+                            <div
+                              key={p.id}
+                              className="manual-player-pin"
+                              style={{ left: `${p.pinX}%`, top: `${p.pinY}%` }}
+                              title={`#${p.number} ${p.name}`}
+                            >
+                              <span className="pin-badge">#{p.number}</span>
+                              <span className="pin-name">{p.name}</span>
+                            </div>
+                          ) : null)}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+
+                  {/* STEP 2: Input Player Information (Number - Name - Position - Team) */}
+                  <div className="manual-section-card" style={{ marginTop: 12 }}>
+                    <div className="panel-title" style={{ marginBottom: 6 }}>
+                      <div>
+                        <span className="section-kicker">STEP 2 · ATHLETE ROSTER</span>
+                        <h4 style={{ fontSize: 13, margin: 0 }}>INPUT PLAYER INFORMATION</h4>
+                      </div>
+                      <button
+                        type="button"
+                        className="text-button"
+                        style={{ fontSize: 10, color: "var(--gold)" }}
+                        onClick={prefillSampleRoster}
+                      >
+                        ⚡ PRE-FILL STARTING SQUAD
+                      </button>
+                    </div>
+
+                    <form
+                      className="manual-player-inputs-grid"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        addManualPlayer();
+                      }}
+                    >
+                      <div className="manual-field number-field">
+                        <label>NUMBER</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 10"
+                          value={newPlayerNumber}
+                          onChange={(e) => setNewPlayerNumber(e.target.value)}
+                          maxLength={6}
+                        />
+                      </div>
+                      <div className="manual-field name-field">
+                        <label>PLAYER NAME</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Omar Khalil"
+                          value={newPlayerName}
+                          onChange={(e) => setNewPlayerName(e.target.value)}
+                        />
+                      </div>
+                      <div className="manual-field position-field">
+                        <label>POSITION</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Point Guard"
+                          list="sport-positions-datalist"
+                          value={newPlayerPosition}
+                          onChange={(e) => setNewPlayerPosition(e.target.value)}
+                        />
+                        <datalist id="sport-positions-datalist">
+                          {(SPORT_POSITIONS[sport] ?? []).map((pos) => (
+                            <option key={pos} value={pos} />
+                          ))}
+                        </datalist>
+                      </div>
+                      <div className="manual-field team-field">
+                        <label>TEAM / KIT</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Home Team"
+                          value={newPlayerTeam}
+                          onChange={(e) => setNewPlayerTeam(e.target.value)}
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        className="primary-button add-player-btn"
+                        style={{ minHeight: 36, alignSelf: "flex-end" }}
+                      >
+                        + ADD PLAYER
+                      </button>
+                    </form>
+
+                    {/* Roster of Registered Players */}
+                    {manualPlayers.length > 0 && (
+                      <div className="manual-roster-display" style={{ marginTop: 12 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "var(--muted)", letterSpacing: "0.08em" }}>
+                            REGISTERED SQUAD ({manualPlayers.length}) · {selectedPlayerIds.filter(id => manualPlayers.some(p => p.id === id)).length} SELECTED FOR AI TOUCH ANALYSIS
+                          </span>
+                          <button
+                            type="button"
+                            className="text-button"
+                            style={{ fontSize: 10 }}
+                            onClick={() => setSelectedPlayerIds(manualPlayers.map(p => p.id))}
+                          >
+                            SELECT ALL
+                          </button>
+                        </div>
+
+                        <div className="manual-player-chips-list">
+                          {manualPlayers.map((player) => {
+                            const isChecked = selectedPlayerIds.includes(player.id);
+                            const isPinning = selectedPinPlayerId === player.id;
+                            return (
+                              <div
+                                key={player.id}
+                                className={`manual-roster-chip ${isChecked ? "checked" : ""} ${isPinning ? "pinning" : ""}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => togglePlayer(player.id)}
+                                  disabled={busy}
+                                />
+                                <span className="player-number-pill">#{player.number}</span>
+                                <div className="player-chip-info">
+                                  <strong>{player.name}</strong>
+                                  <small>{player.position} · {player.team}</small>
+                                </div>
+
+                                {referenceFrame && (
+                                  <button
+                                    type="button"
+                                    className={`pin-toggle-btn ${player.pinX ? "pinned" : ""}`}
+                                    onClick={() => {
+                                      if (isPinning) setSelectedPinPlayerId(null);
+                                      else {
+                                        setSelectedPinPlayerId(player.id);
+                                        setStatus(`Click on the reference frame image above to position #${player.number} ${player.name}.`);
+                                      }
+                                    }}
+                                    title="Place position on reference frame"
+                                  >
+                                    <Icon name="location" size={11} />
+                                    <span>{player.pinX ? `(${player.pinX}%, ${player.pinY}%)` : isPinning ? "CLICK FRAME" : "PIN"}</span>
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  className="chip-remove-btn"
+                                  onClick={() => removeManualPlayer(player.id)}
+                                  title="Remove athlete"
+                                >
+                                  <Icon name="close" size={12} />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
-          {videoFile && <div className="processing-status"><span><b>{busy ? "ANALYSIS IN PROGRESS" : status || "VIDEO READY"}</b><small>{frames.length ? `${frames.length} keyframes prepared locally` : "The full video stays in this browser; selected keyframes are sent to Google Gemini when you run analysis."}</small></span><strong>{busy ? `${loadingProgress}%` : frames.length ? "READY" : "LOCAL"}</strong><i><em style={{ width: `${busy ? loadingProgress : frames.length ? 100 : 18}%`, transition: "width 0.4s ease-out" }} /></i></div>}
+
+          {videoFile && (
+            <div className="processing-status" style={{ marginTop: 12 }}>
+              <span>
+                <b>{busy ? "ANALYSIS IN PROGRESS" : status || "VIDEO READY"}</b>
+                <small>
+                  {selectMode === "manual"
+                    ? `${manualPlayers.length} manual athlete${manualPlayers.length === 1 ? "" : "s"} · ${referenceFrame ? "Reference frame set" : "Select reference frame"}`
+                    : frames.length ? `${frames.length} keyframes prepared locally` : "The full video stays in this browser; keyframes are analyzed by Gemini."}
+                </small>
+              </span>
+              <strong>{busy ? `${loadingProgress}%` : frames.length ? "READY" : "LOCAL"}</strong>
+              <i><em style={{ width: `${busy ? loadingProgress : frames.length ? 100 : 18}%`, transition: "width 0.4s ease-out" }} /></i>
+            </div>
+          )}
 
           {error && <div className="analysis-error" role="alert">{error}{!apiKey && <button className="text-button" onClick={onOpenSettings}>OPEN AI VISION SETTINGS</button>}</div>}
-          {players.length > 0 && <div className="detected-player-list">
-            <div className="panel-title"><div><span className="section-kicker">PLAYER SCAN</span><h2>SELECT ATHLETES</h2></div><button className="text-button" disabled={busy} onClick={() => setSelectedPlayerIds(players.map((player) => player.id))}>SELECT ALL</button></div>
-            {players.map((player) => <label className="detected-player" key={player.id}>
-              <input type="checkbox" checked={selectedPlayerIds.includes(player.id)} disabled={busy} onChange={() => togglePlayer(player.id)} />
-              <span>
-                <strong>{player.label}</strong>
-                <small>{player.position}{player.team ? ` · ${player.team}` : ""} · <span className={`confidence-badge ${player.confidence >= 80 ? "high" : player.confidence >= 60 ? "mid" : "low"}`}>{player.confidence}% confidence</span></small>
-                <small>{player.description || player.standoutTrait}</small>
-              </span>
-            </label>)}
-          </div>}
+
+          {/* Detected Player List in AI mode */}
+          {selectMode === "auto" && players.length > 0 && (
+            <div className="detected-player-list">
+              <div className="panel-title"><div><span className="section-kicker">PLAYER SCAN</span><h2>SELECT ATHLETES</h2></div><button className="text-button" disabled={busy} onClick={() => setSelectedPlayerIds(players.map((player) => player.id))}>SELECT ALL</button></div>
+              {players.map((player) => (
+                <label className="detected-player" key={player.id}>
+                  <input type="checkbox" checked={selectedPlayerIds.includes(player.id)} disabled={busy} onChange={() => togglePlayer(player.id)} />
+                  <span>
+                    <strong>{player.label}</strong>
+                    <small>{player.position}{player.team ? ` · ${player.team}` : ""} · <span className={`confidence-badge ${player.confidence >= 80 ? "high" : player.confidence >= 60 ? "mid" : "low"}`}>{player.confidence}% confidence</span></small>
+                    <small>{player.description || player.standoutTrait}</small>
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+
           {status && <p className="analysis-status" role="status">{status}</p>}
           <div className="upload-guidance"><div><b>01</b><span>Full body visible</span></div><div><b>02</b><span>Stable camera angle</span></div><div><b>03</b><span>Minimum 30 FPS</span></div></div>
           <div className="analysis-actions">
-            <button className="outline-button" disabled={!videoFile || busy} onClick={scanPlayers}>{busy ? "SCANNING…" : "SCAN PLAYERS"} <Icon name="search" size={15} /></button>
-            <button className="primary-button analyze-button" disabled={!videoFile || busy} onClick={runAnalysis}>{busy ? "ANALYZING…" : selectedPlayerIds.length ? `ANALYZE ${selectedPlayerIds.length} SELECTED` : "ANALYZE PERFORMANCE"} <Icon name="arrow" size={15} /></button>
+            {selectMode === "auto" ? (
+              <button className="outline-button" disabled={!videoFile || busy} onClick={scanPlayers}>
+                {busy ? "SCANNING…" : "SCAN PLAYERS (AI)"} <Icon name="search" size={15} />
+              </button>
+            ) : null}
+            <button
+              className="primary-button analyze-button"
+              disabled={!videoFile || busy}
+              onClick={runAnalysis}
+            >
+              {busy
+                ? "ANALYZING…"
+                : selectMode === "manual"
+                ? `ANALYZE ${selectedPlayerIds.filter(id => manualPlayers.some(p => p.id === id)).length || manualPlayers.length} PLAYERS & TOUCHES`
+                : selectedPlayerIds.length ? `ANALYZE ${selectedPlayerIds.length} SELECTED` : "ANALYZE PERFORMANCE"} <Icon name="arrow" size={15} />
+            </button>
           </div>
         </section>
 
@@ -992,17 +1460,103 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
       </div>
 
       <section className={`output-panel ${reports.length ? "is-ready" : ""}`}>
-        <div className="panel-title"><div><span className="section-kicker">AI VIDEO ANALYSIS</span><h2>{reports.length ? "SCOUTING REPORT" : "ANALYSIS REPORT"}</h2></div></div>
-        {reports.length ? <div className="analysis-reports">{reports.map(({ player, report }) => <article className="analysis-report" key={player?.id ?? "performance"}>
-          <div className="analysis-report-heading"><div><span className="section-kicker">{report.position} · GRADE {report.overallGrade}</span><h3>{player?.label ?? report.playerSummary}</h3><p>{report.oneLiner}</p></div><ScoreRing score={report.overallScore} /></div>
-          <div className="analysis-report-metrics">{report.metrics.map((metric) => <div key={metric.name}><span>{metric.name}</span><strong>{metric.score}<small>/100</small></strong><p>{metric.note}</p></div>)}</div>
-          <div className="analysis-report-columns">
-            <div><h3>OBSERVED STRENGTHS</h3><ul>{report.strengths.map((item) => <li key={item}>{item}</li>)}</ul></div>
-            <div><h3>AREAS TO IMPROVE</h3><ul>{report.areasToImprove.map((item) => <li key={item}>{item}</li>)}</ul></div>
-            <div><h3>RECOMMENDATIONS</h3><ul>{report.recommendations.map((item) => <li key={item}>{item}</li>)}</ul></div>
-          </div>
-          {report.narrative && <p className="analysis-narrative">{report.narrative}</p>}
-        </article>)}</div> : <p className="setting-description">Upload a clip and run analysis to see evidence-based sport metrics and scouting notes here.</p>}
+        <div className="panel-title"><div><span className="section-kicker">AI VIDEO ANALYSIS</span><h2>{reports.length ? "SCOUTING & TOUCH ANALYSIS REPORT" : "ANALYSIS REPORT"}</h2></div></div>
+        {reports.length ? <div className="analysis-reports">{reports.map(({ player, report }) => {
+          const reportKey = player?.id ?? "performance";
+          const activeTouchNum = activeTouchIndex[reportKey] || 1;
+          const activeTouch = report.touchPoints?.find((t) => t.touchNumber === activeTouchNum) || report.touchPoints?.[0];
+
+          return (
+            <article className="analysis-report" key={reportKey}>
+              <div className="analysis-report-heading">
+                <div>
+                  <span className="section-kicker">{report.position} · GRADE {report.overallGrade}{player?.jerseyNumber ? ` · #${player.jerseyNumber}` : ""}{player?.team ? ` · ${player.team}` : ""}</span>
+                  <h3>{player?.label ?? report.playerSummary}</h3>
+                  <p>{report.oneLiner}</p>
+                </div>
+                <ScoreRing score={report.overallScore} />
+              </div>
+
+              <div className="analysis-report-metrics">
+                {report.metrics.map((metric) => (
+                  <div key={metric.name}>
+                    <span>{metric.name}</span>
+                    <strong>{metric.score}<small>/100</small></strong>
+                    <p>{metric.note}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* TOUCH POINT ANALYSIS SECTION FOR THIS PLAYER */}
+              {report.touchPoints && report.touchPoints.length > 0 && (
+                <div className="report-touch-analysis-block" style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+                  <div className="panel-title" style={{ marginBottom: 10 }}>
+                    <div>
+                      <span className="section-kicker">TECHNICAL REPERTOIRE</span>
+                      <h4 style={{ fontSize: 13, margin: 0 }}>TOUCH ANALYSIS & BIOMECHANICAL SEQUENCE ({report.touchPoints.length} TOUCHES)</h4>
+                    </div>
+                    <span className="role-badge-pill">
+                      <Icon name="bolt" size={11} /> {sport.toUpperCase()} TOUCHES
+                    </span>
+                  </div>
+
+                  {/* Horizontal sequence of touch pills */}
+                  <div className="touches-sequence-strip">
+                    {report.touchPoints.map((touch) => (
+                      <button
+                        key={touch.touchNumber}
+                        type="button"
+                        className={`touch-pill ${activeTouch?.touchNumber === touch.touchNumber ? "active" : ""}`}
+                        onClick={() => setActiveTouchIndex((prev) => ({ ...prev, [reportKey]: touch.touchNumber }))}
+                      >
+                        <span>T{touch.touchNumber}: {touch.phase}</span>
+                        <strong className="touch-rate-num">{touch.rating}</strong>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Active Touch Inspector Card */}
+                  {activeTouch && (
+                    <div className="touch-detail-card" style={{ marginTop: 12 }}>
+                      <div className="touch-detail-header">
+                        <div>
+                          <span className="section-kicker">
+                            TOUCH #{activeTouch.touchNumber} ({activeTouch.timestamp})
+                          </span>
+                          <h4>{activeTouch.phase}</h4>
+                        </div>
+                        <ScoreRing score={activeTouch.rating} />
+                      </div>
+
+                      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        <span className="role-badge-pill">{activeTouch.quality} EXECUTION</span>
+                        {player?.jerseyNumber && <span className="jersey-pill">#{player.jerseyNumber}</span>}
+                        {player?.team && <small style={{ color: "var(--muted)", fontSize: 11 }}>{player.team}</small>}
+                      </div>
+
+                      <p className="touch-critique-text">{activeTouch.critique}</p>
+
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                        {activeTouch.biomechanics.map((bio) => (
+                          <span key={bio.metric} className="touch-pill" style={{ cursor: "default" }}>
+                            {bio.metric}: <strong className="touch-rate-num">{bio.val}</strong>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="analysis-report-columns" style={{ marginTop: 20 }}>
+                <div><h3>OBSERVED STRENGTHS</h3><ul>{report.strengths.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                <div><h3>AREAS TO IMPROVE</h3><ul>{report.areasToImprove.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                <div><h3>RECOMMENDATIONS</h3><ul>{report.recommendations.map((item) => <li key={item}>{item}</li>)}</ul></div>
+              </div>
+              {report.narrative && <p className="analysis-narrative">{report.narrative}</p>}
+            </article>
+          );
+        })}</div> : <p className="setting-description">Upload a clip and run analysis to see evidence-based sport metrics, touch points, and scouting notes here.</p>}
       </section>
 
       <section className="media-report-grid">
@@ -3546,7 +4100,7 @@ function App() {
     <main className={theme === "Light" ? "theme-light" : ""} style={{ "--gold": palette.gold, "--gold-bright": palette.bright } as React.CSSProperties}>
       <header className="topbar">
         <div className="topbar-left">
-          <Logo />
+          <Logo onClick={() => { setView("Home"); setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
           <button
             type="button"
             className={`demo-toggle-btn ${demoMode ? "active" : ""}`}
@@ -3557,34 +4111,156 @@ function App() {
             <span>DEMO INFO: <strong>{demoMode ? "ON" : "OFF"}</strong></span>
           </button>
         </div>
-        <nav className={menuOpen ? "is-open" : ""}>
+
+        {/* Desktop + tablet nav */}
+        <nav className="desktop-nav" aria-label="Main navigation">
           {["Home", "Dashboard", "Profile", "Settings"].map((item) => (
             <button
               key={item}
               className={view === item ? "active" : ""}
-              onClick={() => { setView(item); setMenuOpen(false); }}
+              onClick={() => { setView(item); }}
             >
               {item}
             </button>
           ))}
-          <button onClick={() => { setView("Dashboard"); setMenuOpen(false); setTimeout(() => document.getElementById("leaderboard")?.scrollIntoView(), 0); }}>Leaderboards</button>
+          <button onClick={() => { setView("Dashboard"); setTimeout(() => document.getElementById("leaderboard")?.scrollIntoView({ behavior: "smooth" }), 0); }}>Leaderboards</button>
         </nav>
+
         <div className="header-actions">
           <button
             type="button"
-            className="outline-button"
+            className="outline-button desktop-only"
             style={{ minHeight: 34, padding: "0 12px", gap: 6, fontSize: 9 }}
             onClick={() => setSearchOpen(true)}
             title="Search clubs and players"
           >
             <Icon name="search" size={13} /> SEARCH
           </button>
-          <span className="role-badge"><i /> {!authReady ? "CONNECTING" : authenticated ? `${role.toUpperCase()} SESSION` : "PUBLIC VIEW"}</span>
+          <span className="role-badge desktop-only"><i /> {!authReady ? "CONNECTING" : authenticated ? `${role.toUpperCase()} SESSION` : "PUBLIC VIEW"}</span>
           {authenticated
-            ? <><button className="primary-button" onClick={() => setView("Profile")}>{userName.toUpperCase()} <Icon name="arrow" size={15} /></button><button className="text-button" onClick={() => void handleSignOut()}>SIGN OUT</button></>
+            ? <><button className="primary-button" onClick={() => setView("Profile")}>{userName.toUpperCase()} <Icon name="arrow" size={15} /></button><button className="text-button desktop-only" onClick={() => void handleSignOut()}>SIGN OUT</button></>
             : <button className="primary-button" disabled={!authReady} onClick={() => setAuthOpen(true)}>SIGN IN / JOIN <Icon name="arrow" size={15} /></button>}
-          <button className="icon-button mobile-menu" aria-label="Open navigation" onClick={() => setMenuOpen(!menuOpen)}><Icon name="menu" /></button>
+
+          {/* Separated tab in upper right corner on screen shrink / mobile */}
+          <button
+            type="button"
+            className={`mobile-tab-btn ${menuOpen ? "active" : ""}`}
+            aria-label={menuOpen ? "Close navigation tabs" : "Open navigation tabs"}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(!menuOpen)}
+          >
+            <Icon name={menuOpen ? "close" : "menu"} size={16} />
+            <span className="mobile-tab-btn-text">TABS</span>
+          </button>
         </div>
+
+        {/* Mobile dropdown panel pinned to upper right corner */}
+        {menuOpen && (
+          <>
+            <div className="mobile-tab-backdrop" onClick={() => setMenuOpen(false)} />
+            <div className="mobile-tab-panel" role="dialog" aria-label="Main navigation tabs">
+              <div className="mobile-tab-panel-header">
+                <div className="mobile-tab-panel-title">
+                  <Icon name="bolt" size={14} />
+                  <span>MAIN TABS</span>
+                </div>
+                <button
+                  type="button"
+                  className="mobile-tab-panel-close"
+                  onClick={() => setMenuOpen(false)}
+                  aria-label="Close navigation tabs"
+                >
+                  <Icon name="close" size={14} />
+                </button>
+              </div>
+
+              <div className="mobile-tab-links">
+                {[
+                  { id: "Home", name: "Home", icon: "home" as const, desc: "Global feed & talent stream" },
+                  { id: "Dashboard", name: "Dashboard", icon: "chart" as const, desc: "Analytics & sports benchmarks" },
+                  { id: "Profile", name: "Profile", icon: "user" as const, desc: "Your stats, bio & clips" },
+                  { id: "Settings", name: "Settings", icon: "settings" as const, desc: "Club credentials & themes" },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    className={`mobile-tab-link ${view === item.id ? "active" : ""}`}
+                    onClick={() => {
+                      setView(item.id);
+                      setMenuOpen(false);
+                      if (item.id === "Home") window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                  >
+                    <span className="mobile-tab-link-icon">
+                      <Icon name={item.icon} size={16} />
+                    </span>
+                    <div className="mobile-tab-link-info">
+                      <span className="mobile-tab-link-name">{item.name}</span>
+                      <span className="mobile-tab-link-desc">{item.desc}</span>
+                    </div>
+                    {view === item.id && <span className="mobile-tab-active-indicator" />}
+                  </button>
+                ))}
+
+                <button
+                  className="mobile-tab-link"
+                  onClick={() => {
+                    setView("Dashboard");
+                    setMenuOpen(false);
+                    setTimeout(() => document.getElementById("leaderboard")?.scrollIntoView({ behavior: "smooth" }), 100);
+                  }}
+                >
+                  <span className="mobile-tab-link-icon">
+                    <Icon name="bolt" size={16} />
+                  </span>
+                  <div className="mobile-tab-link-info">
+                    <span className="mobile-tab-link-name">Leaderboards</span>
+                    <span className="mobile-tab-link-desc">Verified global ranks</span>
+                  </div>
+                </button>
+              </div>
+
+              <div className="mobile-tab-actions">
+                <button
+                  type="button"
+                  className="mobile-tab-action-btn search"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setSearchOpen(true);
+                  }}
+                >
+                  <Icon name="search" size={14} />
+                  <span>Search Clubs & Athletes</span>
+                </button>
+
+                {authenticated ? (
+                  <button
+                    type="button"
+                    className="mobile-tab-action-btn signout"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void handleSignOut();
+                    }}
+                  >
+                    <Icon name="close" size={14} />
+                    <span>Sign Out ({userName.toUpperCase()})</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="mobile-tab-action-btn signin"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setAuthOpen(true);
+                    }}
+                  >
+                    <Icon name="arrow" size={14} />
+                    <span>Sign In or Join</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </header>
       {authError && <div className="analysis-error" role="alert">{authError}</div>}
 
