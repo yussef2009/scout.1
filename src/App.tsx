@@ -4017,7 +4017,21 @@ function SettingsView({
                   {!availableModels.some((availableModel) => availableModel.id === model) && <option value={model}>{model} · current</option>}
                   {availableModels.length
                     ? availableModels.map((availableModel) => <option key={availableModel.id} value={availableModel.id}>{availableModel.displayName} · {availableModel.id}</option>)
-                    : ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"].map((id) => <option key={id} value={id}>{id} · fallback</option>)}
+                    : [
+                        { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Recommended · Fast Multimodal)" },
+                        { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash (Proven Workhorse)" },
+                        { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash (Universal Fallback)" },
+                        { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview (Latest Recommended)" },
+                        { id: "gemini-3.1-flash-tts", label: "Gemini 3.1 Flash TTS" },
+                        { id: "gemini-lite-latest", label: "Gemini Lite Latest (High Speed)" },
+                        { id: "gemini-3.8-flash-tts", label: "Gemini 3.8 Flash TTS" },
+                        { id: "gemini-3.8-flash-lite-tts", label: "Gemini 3.8 Flash-Lite TTS" },
+                        { id: "gemma-4-31b", label: "Gemma 4 31B Open Model" },
+                        { id: "gemma-4-31b-it", label: "Gemma 4 31B Instruction-Tuned" },
+                        { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite (High Speed)" },
+                        { id: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash-Lite (Fast Fallback)" },
+                        { id: "gemini-1.5-pro", label: "Gemini 1.5 Pro (Deep Analysis)" },
+                      ].map(({ id, label }) => <option key={id} value={id}>{label} · {id}</option>)}
                 </select>
               </label>
               <button className="outline-button" disabled={modelsLoading} onClick={loadAvailableModels}>{modelsLoading ? "LOADING MODELS…" : "REFRESH AVAILABLE MODELS"} <Icon name="arrow" size={15} /></button>

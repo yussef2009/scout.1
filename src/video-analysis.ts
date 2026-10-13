@@ -40,7 +40,23 @@ export type VideoAnalysisReport = {
 
 export type AvailableGeminiModel = { id: string; displayName: string };
 
-const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+// Priority-ordered fallback chain — mirrors prototype/app.js STABLE_GEMINI_MODELS
+const GEMINI_MODELS = [
+  "gemini-2.5-flash",          // Fast, high-intelligence multimodal Flash
+  "gemini-2.0-flash",          // Standard multimodal workhorse
+  "gemini-1.5-flash",          // Universally supported reliable fallback
+  "gemini-3.1-pro-preview",    // Latest recommended preview model
+  "gemini-3.1-flash-tts",      // Gemini 3.1 Flash TTS
+  "gemini-lite-latest",        // Gemini Lite Latest (replaces 3.1 flash lite preview)
+  "gemini-3.8-flash-tts",      // Gemini 3.8 Flash TTS
+  "gemini-3.8-flash-lite-tts", // Gemini 3.8 Flash-Lite TTS
+  "gemini-3.8-flsah-tts",      // Direct alias fallback
+  "gemma-4-31b",               // Gemma 4 31B Open Model
+  "gemma-4-31b-it",            // Gemma 4 31B Instruction-Tuned
+  "gemini-2.5-flash-lite",     // Lightweight high-throughput fallback
+  "gemini-2.0-flash-lite",     // Fast fallback
+  "gemini-1.5-pro",            // High-intelligence Pro fallback
+];
 const MAX_FRAME_EDGE = 1280; // Higher resolution improves jersey number and player detail detection
 
 const MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024;
@@ -222,12 +238,18 @@ export async function fetchAvailableGeminiModels(apiKey: string): Promise<Availa
   if (!models.length) throw new Error("No Gemini models supporting generateContent are available for this API key.");
 
   const uniqueModels = [...new Map(models.map((model) => [model.id, model])).values()];
+  // Scoring mirrors prototype/app.js sort logic
   const preference = (id: string) => {
     if (/gemini-2\.5-flash$/i.test(id)) return 100;
-    if (/gemini-2\.0-flash$/i.test(id)) return 90;
-    if (/gemini-1\.5-flash$/i.test(id)) return 80;
-    if (/flash/i.test(id)) return 70;
-    if (/pro/i.test(id)) return 60;
+    if (/3\.8-flash/i.test(id)) return 98;
+    if (/lite-latest/i.test(id)) return 97;
+    if (/3\.1-flash/i.test(id)) return 96;
+    if (/3\.1-pro/i.test(id)) return 95;
+    if (/gemma-4/i.test(id)) return 92;
+    if (/2\.0-flash$/i.test(id)) return 90;
+    if (/1\.5-flash$/i.test(id)) return 85;
+    if (/flash/i.test(id)) return 80;
+    if (/pro/i.test(id)) return 70;
     return 50;
   };
   return uniqueModels.sort((first, second) =>
