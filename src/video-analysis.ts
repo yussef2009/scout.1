@@ -40,27 +40,71 @@ export type VideoAnalysisReport = {
 
 export type AvailableGeminiModel = { id: string; displayName: string };
 
-// Priority-ordered fallback chain — mirrors prototype/app.js STABLE_GEMINI_MODELS
-// TTS-only models are intentionally excluded — they don't support image/video input
-const GEMINI_MODELS = [
-  "gemini-2.5-flash",       // Fast, high-intelligence multimodal Flash
-  "gemini-2.0-flash",       // Standard multimodal workhorse
-  "gemini-1.5-flash",       // Universally supported reliable fallback
-  "gemini-3.1-pro-preview", // Latest recommended preview model
-  "gemma-4-31b",            // Gemma 4 31B Open Model
-  "gemma-4-31b-it",         // Gemma 4 31B Instruction-Tuned
-  "gemini-2.5-flash-lite",  // Lightweight high-throughput fallback
-  "gemini-2.0-flash-lite",  // Fast fallback
-  "gemini-1.5-pro",         // High-intelligence Pro fallback
-];
-// Models that are TTS-only or otherwise cannot process image/video frames
-const TTS_ONLY_MODEL_PATTERN = /\-tts$|\-tts\-|^gemini-lite-latest/i;
-const MAX_FRAME_EDGE = 1280; // Higher resolution improves jersey number and player detail detection
+export type ModelChangeDetails = {
+  previousModel?: string;
+  reason?: "overloaded" | "unavailable" | "network" | "error" | "success" | string;
+  status?: number;
+  message?: string;
+};
 
+export type ModelChangeCallback = (
+  nextModel: string,
+  details?: ModelChangeDetails,
+) => void;
+
+// Priority-ordered chain of stable, multimodal Gemini models supporting generateContent with image/video
+// Non-vision models (Gemma, TTS-only, Audio-only) are excluded.
+export const GEMINI_MODELS = [
+  "gemini-3.8-flash",       // SOTA Fast multimodal flagship (Recommended)
+  "gemini-2.5-flash",       // Fast, high-intelligence multimodal Flash
+  "gemini-2.5-flash-lite",  // Lightweight high-throughput multimodal
+  "gemini-2.5-pro",         // Deep reasoning multimodal Pro model
+  "gemini-3.1-pro-preview", // Latest preview model
+  "gemini-2.0-flash",       // Proven multimodal workhorse
+  "gemini-2.0-flash-lite",  // Fast lightweight fallback
+  "gemini-1.5-flash",       // Universally supported reliable fallback
+  "gemini-1.5-pro",         // Deep analysis Pro fallback
+];
+
+export const DEFAULT_GEMINI_MODELS: { id: string; label: string }[] = [
+  { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash (Recommended · SOTA Multimodal)" },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Fast Multimodal)" },
+  { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite (High Speed)" },
+  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (Deep Biomechanical Reasoning)" },
+  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview (Latest Preview)" },
+  { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash (Proven Workhorse)" },
+  { id: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash-Lite (Lightweight Fallback)" },
+  { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash (Universal Fallback)" },
+  { id: "gemini-1.5-pro", label: "Gemini 1.5 Pro (Deep Analysis)" },
+];
+
+export function normalizeGeminiModel(name: string): string {
+  const raw = (name || "").trim().toLowerCase().replace(/^models\//, "");
+  const aliasMap: Record<string, string> = {
+    "gemini-3.8-flsah-tts": "gemini-3.8-flash",
+    "gemini-3.8-flash-tts": "gemini-3.8-flash",
+    "gemini-3.8-flash-lite-tts": "gemini-3.8-flash-lite",
+    "gemini-3.1-flash-tts": "gemini-3.1-pro-preview",
+    "gemini-lite-latest": "gemini-2.5-flash-lite",
+    "gemma-4-31b": "gemini-2.5-flash",
+    "gemma-4-31b-it": "gemini-2.5-flash",
+  };
+  return aliasMap[raw] ?? (raw || GEMINI_MODELS[0]);
+}
+
+export function getModelPriorityList(preset: string): string[] {
+  const preferred = normalizeGeminiModel(preset);
+  return [...new Set([preferred, ...GEMINI_MODELS])];
+}
+
+// Models that cannot process image/video frames (TTS, text-only Gemma, embeddings, Imagen)
+const NON_VISION_MODEL_PATTERN = /gemma|\-tts$|\-tts\-|^imagen|^text-|^embedding|^aqa|^learnlm/i;
+const DEPRECATED_MODEL_PATTERN = /gemini-1\.0|gemini-pro$|gemini-pro-vision/i;
+const CAPACITY_ERROR_PATTERN = /resource has been exhausted|quota|rate.?limit|high demand|overloaded|temporarily unavailable|try again later|503|429/i;
+const UNAVAILABLE_MODEL_PATTERN = /model.{0,40}(?:not found|not available|unsupported|deprecated|retired|discontinued)|(?:not found|not available|unsupported|deprecated|retired|discontinued).{0,40}model|not supported for generatecontent|modality is not enabled|does not support.*image|image.*not supported|invalid argument.*model/i;
+
+const MAX_FRAME_EDGE = 1280; // Higher resolution improves jersey number and player detail detection
 const MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024;
-const DEPRECATED_MODEL_PATTERN = /gemini-2\.5-pro$|gemini-1\.0/i;
-const CAPACITY_ERROR_PATTERN = /resource has been exhausted|quota|rate.?limit|high demand|overloaded|temporarily unavailable|try again later/i;
-const UNAVAILABLE_MODEL_PATTERN = /model.{0,40}(?:not found|not available|unsupported|deprecated|retired|discontinued)|(?:not found|not available|unsupported|deprecated|retired|discontinued).{0,40}model|not supported for generatecontent|modality is not enabled|does not support.*image|image.*not supported/i;
 
 const SPORT_METRICS: Record<string, string[]> = {
   Soccer: ["Passing", "Progressive carries", "Shooting", "Defending", "Aerial duels", "Pace", "Positioning"],
@@ -216,12 +260,19 @@ export async function fetchAvailableGeminiModels(apiKey: string): Promise<Availa
       throw new Error("Gemini returned an invalid available-models list.");
     }
 
-    // Filter models supporting generateContent, not deprecated, and not TTS-only (no image support)
+    // Filter models supporting generateContent, not deprecated, and capable of image/video multimodal vision
     for (const model of body.models) {
       if (!isRecord(model) || typeof model.name !== "string") continue;
       const id = model.name.replace(/^models\//, "");
       const methods = model.supportedGenerationMethods;
-      if (!Array.isArray(methods) || !methods.includes("generateContent") || DEPRECATED_MODEL_PATTERN.test(id) || TTS_ONLY_MODEL_PATTERN.test(id)) continue;
+      if (
+        !Array.isArray(methods) ||
+        !methods.includes("generateContent") ||
+        DEPRECATED_MODEL_PATTERN.test(id) ||
+        NON_VISION_MODEL_PATTERN.test(id)
+      ) {
+        continue;
+      }
       models.push({
         id,
         displayName: typeof model.displayName === "string" ? model.displayName : id,
@@ -234,19 +285,22 @@ export async function fetchAvailableGeminiModels(apiKey: string): Promise<Availa
     pageToken = nextPageToken;
   } while (pageToken);
 
-  if (!models.length) throw new Error("No Gemini models supporting generateContent are available for this API key.");
+  if (!models.length) throw new Error("No Gemini models supporting multimodal generateContent are available for this API key.");
 
   const uniqueModels = [...new Map(models.map((model) => [model.id, model])).values()];
-  // Scoring mirrors prototype/app.js sort logic
+  // Scoring prioritizes latest and most capable multimodal models
   const preference = (id: string) => {
-    if (/gemini-2\.5-flash$/i.test(id)) return 100;
-    if (/3\.8-flash/i.test(id)) return 98;
-    if (/lite-latest/i.test(id)) return 97;
-    if (/3\.1-flash/i.test(id)) return 96;
-    if (/3\.1-pro/i.test(id)) return 95;
-    if (/gemma-4/i.test(id)) return 92;
+    if (/gemini-3\.8-flash$/i.test(id)) return 110;
+    if (/gemini-2\.5-flash$/i.test(id)) return 105;
+    if (/3\.8-flash/i.test(id)) return 100;
+    if (/2\.5-flash-lite/i.test(id)) return 97;
+    if (/2\.5-pro/i.test(id)) return 95;
+    if (/3\.1-pro/i.test(id)) return 94;
+    if (/3\.1-flash/i.test(id)) return 93;
     if (/2\.0-flash$/i.test(id)) return 90;
+    if (/2\.0-flash-lite/i.test(id)) return 88;
     if (/1\.5-flash$/i.test(id)) return 85;
+    if (/1\.5-pro/i.test(id)) return 82;
     if (/flash/i.test(id)) return 80;
     if (/pro/i.test(id)) return 70;
     return 50;
@@ -261,21 +315,32 @@ async function requestGemini(
   prompt: string,
   frames: VideoFrame[],
   preset: string,
-  onModelChange?: (model: string) => void,
+  onModelChange?: ModelChangeCallback,
 ): Promise<unknown> {
-  let lastError = "Gemini could not complete the request.";
-  const preferredModel = preset.trim() || GEMINI_MODELS[0];
-  const modelPriority = [...new Set([preferredModel, ...GEMINI_MODELS])];
+  const cleanKey = apiKey.trim();
+  if (!cleanKey) {
+    throw new Error("Enter and save a Gemini API key before requesting video analysis.");
+  }
 
-  for (const model of modelPriority) {
+  const modelPriority = getModelPriorityList(preset);
+  const attemptedModels: string[] = [];
+  let lastError = "Gemini could not complete the request.";
+
+  for (let mIdx = 0; mIdx < modelPriority.length; mIdx++) {
+    const model = modelPriority[mIdx];
+    attemptedModels.push(model);
+
+    // Try up to 2 attempts for transient capacity or network issues
     for (let attempt = 0; attempt < 2; attempt++) {
       let response: Response;
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 40_000);
       try {
         response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+            headers: { "Content-Type": "application/json", "x-goog-api-key": cleanKey },
             body: JSON.stringify({
               contents: [{
                 role: "user",
@@ -290,19 +355,35 @@ async function requestGemini(
                 responseMimeType: "application/json",
               },
             }),
+            signal: controller.signal,
           },
         );
       } catch (networkCause) {
-        // Network-level failure (timeout, DNS, CORS abort, etc.) — don't throw globally;
-        // record the error and let the outer loop try the next fallback model instead.
-        lastError = networkCause instanceof Error ? networkCause.message : "network error";
+        const isAbort = controller.signal.aborted;
+        const netErr = isAbort
+          ? "Request timed out after 40 seconds"
+          : (networkCause instanceof Error ? networkCause.message : "network error");
+        lastError = `${netErr} (model: ${model})`;
+
         if (attempt === 0) {
-          // Brief pause before retrying same model once
+          // Brief pause before retrying once on the same model
           await new Promise((resolve) => window.setTimeout(resolve, 1500));
           continue;
         }
-        // Second attempt also failed — try next model
+
+        // Exhausted attempts on this model — notify auto-switch to next candidate if available
+        const nextModel = modelPriority[mIdx + 1];
+        if (nextModel) {
+          console.warn(`[Gemini Fallback] Model "${model}" network failure (${netErr}). Auto-switching to "${nextModel}"...`);
+          onModelChange?.(nextModel, {
+            previousModel: model,
+            reason: "network",
+            message: netErr,
+          });
+        }
         break;
+      } finally {
+        window.clearTimeout(timeout);
       }
 
       const body: unknown = await response.json().catch(() => null);
@@ -311,40 +392,100 @@ async function requestGemini(
       if (response.ok) {
         const text = getGeminiText(body);
         if (!text) throw new Error("Gemini returned an empty response. Try another clip.");
-        // Notify the UI of the model switch BEFORE parsing (so the UI updates even if parse throws)
-        if (model !== preferredModel) onModelChange?.(model);
+        // Notify if we succeeded on a fallback model rather than the primary
+        if (model !== modelPriority[0]) {
+          onModelChange?.(model, { previousModel: modelPriority[0], reason: "success" });
+        }
         return parseModelJson(text);
       }
 
-      // Hard auth error — no point trying fallbacks
-      if (response.status === 401 || response.status === 403 || /api key|key not valid|permission denied/i.test(errorMessage)) {
+      // Hard auth error — invalid API key or lack of permissions: stop immediately without cycling models
+      const isAuthError =
+        response.status === 401 ||
+        (response.status === 403 && /api key|key not valid|permission denied|unregistered/i.test(errorMessage)) ||
+        (response.status === 400 && /api key.*not valid|invalid api key/i.test(errorMessage));
+
+      if (isAuthError) {
         throw new Error(`Gemini rejected the API key or its permissions: ${errorMessage}`);
       }
 
       lastError = `${errorMessage} (model: ${model}, status: ${response.status})`;
 
-      // Overloaded / rate-limited / server errors — retry once then try next model
-      if (CAPACITY_ERROR_PATTERN.test(errorMessage) || [408, 429, 500, 502, 503, 504].includes(response.status)) {
+      // Dynamic suggestion: if Google recommended a replacement model in the error message, add it next
+      const suggestionMatch = errorMessage.match(/use\s+(?:models\/)?([a-zA-Z0-9.\-_]+)/i);
+      if (suggestionMatch && suggestionMatch[1]) {
+        const suggestedModel = suggestionMatch[1].replace(/^models\//, "");
+        if (!NON_VISION_MODEL_PATTERN.test(suggestedModel) && !modelPriority.includes(suggestedModel)) {
+          console.info(`[Gemini Fallback] Google suggested alternative: "${suggestedModel}". Queuing immediately.`);
+          modelPriority.splice(mIdx + 1, 0, suggestedModel);
+        }
+      }
+
+      // Overloaded / rate-limited / server capacity errors (429, 500, 502, 503, 504)
+      const isCapacityError =
+        CAPACITY_ERROR_PATTERN.test(errorMessage) ||
+        [408, 429, 500, 502, 503, 504].includes(response.status);
+
+      if (isCapacityError) {
         if (attempt === 0) {
-          // Exponential-ish backoff: 2 s on first retry
+          // Exponential backoff: 2s on first retry
           await new Promise((resolve) => window.setTimeout(resolve, 2000));
           continue;
         }
-        // Exhausted both attempts for this model — fall through to next model
+        // Exhausted attempts for this overloaded model — notify UI and move to next fallback
+        const nextModel = modelPriority[mIdx + 1];
+        if (nextModel) {
+          console.warn(`[Gemini Fallback] Model "${model}" is overloaded/quota-limited (${response.status}: ${errorMessage}). Auto-switching to "${nextModel}"...`);
+          onModelChange?.(nextModel, {
+            previousModel: model,
+            reason: "overloaded",
+            status: response.status,
+            message: errorMessage,
+          });
+        }
         break;
       }
 
-      // Model not found / deprecated
-      if (response.status === 404 || response.status === 410 || UNAVAILABLE_MODEL_PATTERN.test(errorMessage)) {
+      // Model unavailable, retired, not found, or unsupported modality (404, 410, or 400 modality mismatch)
+      const isUnavailable =
+        response.status === 404 ||
+        response.status === 410 ||
+        UNAVAILABLE_MODEL_PATTERN.test(errorMessage) ||
+        response.status === 400; // 400 includes invalid model arguments and unsupported modalities
+
+      if (isUnavailable) {
+        const nextModel = modelPriority[mIdx + 1];
+        if (nextModel) {
+          console.warn(`[Gemini Fallback] Model "${model}" is unavailable or unsupported (${response.status}: ${errorMessage}). Auto-switching to "${nextModel}"...`);
+          onModelChange?.(nextModel, {
+            previousModel: model,
+            reason: "unavailable",
+            status: response.status,
+            message: errorMessage,
+          });
+        }
         break;
       }
 
-      // Any other hard error — throw immediately
+      // Any other unexpected error: switch to next candidate in the priority chain rather than failing
+      const nextCandidate = modelPriority[mIdx + 1];
+      if (nextCandidate) {
+        console.warn(`[Gemini Fallback] Model "${model}" error (${response.status}: ${errorMessage}). Switching to "${nextCandidate}"...`);
+        onModelChange?.(nextCandidate, {
+          previousModel: model,
+          reason: "error",
+          status: response.status,
+          message: errorMessage,
+        });
+        break;
+      }
+
+      // No more models to try
       throw new Error(`Gemini analysis failed: ${lastError}`);
     }
   }
 
-  throw new Error(`All Gemini fallback models failed. Last error: ${lastError}`);
+  throw new Error(`All Gemini fallback models failed (attempted: ${attemptedModels.join(", ")}). Last error: ${lastError}`);
 }
 
 function getGeminiErrorMessage(body: unknown): string | undefined {
@@ -376,7 +517,7 @@ export async function detectVideoPlayers(
   sport: string,
   frames: VideoFrame[],
   preset: string,
-  onModelChange?: (model: string) => void,
+  onModelChange?: ModelChangeCallback,
 ): Promise<DetectedPlayer[]> {
   const prompt = `You are an elite sports video analyst with expert-level player recognition skills.
 Carefully examine these ${frames.length} sequential keyframes from a ${sport} video.
@@ -494,7 +635,7 @@ export async function analyzeVideoPlayer(
   frames: VideoFrame[],
   preset: string,
   player?: DetectedPlayer,
-  onModelChange?: (model: string) => void,
+  onModelChange?: ModelChangeCallback,
   referenceFrame?: VideoFrame,
 ): Promise<VideoAnalysisReport> {
   const metrics = SPORT_METRICS[sport] ?? ["Movement", "Technique", "Speed", "Control", "Decision making"];

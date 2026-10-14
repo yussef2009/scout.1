@@ -5,9 +5,13 @@ import {
   detectVideoPlayers,
   extractVideoFrames,
   fetchAvailableGeminiModels,
+  normalizeGeminiModel,
+  DEFAULT_GEMINI_MODELS,
   type AnalysisTouchPoint,
   type AvailableGeminiModel,
   type DetectedPlayer,
+  type ModelChangeCallback,
+  type ModelChangeDetails,
   type VideoAnalysisReport,
   type VideoFrame,
 } from "./video-analysis";
@@ -1010,11 +1014,23 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
     setReports([]);
     setLoadingProgress(5);
     let activeModel = model;
-    const handleModelChange = (nextModel: string) => {
-      const prevModel = activeModel;
+    const handleModelChange = (nextModel: string, details?: ModelChangeDetails) => {
+      const prevModel = details?.previousModel || activeModel;
       activeModel = nextModel;
       onModelChange(nextModel);
-      setStatus(`⚡ Model auto-switched: ${prevModel} → ${nextModel} (overloaded/unavailable). Retrying…`);
+      if (details?.reason === "success") {
+        setStatus(`✓ Connected to ${nextModel}. Completing scan…`);
+      } else {
+        const reasonText =
+          details?.reason === "overloaded"
+            ? "overloaded / rate-limited"
+            : details?.reason === "unavailable"
+            ? "unavailable / deprecated"
+            : details?.reason === "network"
+            ? "network timeout"
+            : "encountered an error";
+        setStatus(`⚡ Auto-switched: ${prevModel} was ${reasonText} → trying ${nextModel}…`);
+      }
     };
     try {
       if (!apiKey) {
@@ -1050,11 +1066,23 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
     setError("");
     setLoadingProgress(5);
     let activeModel = model;
-    const handleModelChange = (nextModel: string) => {
-      const prevModel = activeModel;
+    const handleModelChange = (nextModel: string, details?: ModelChangeDetails) => {
+      const prevModel = details?.previousModel || activeModel;
       activeModel = nextModel;
       onModelChange(nextModel);
-      setStatus(`⚡ Model auto-switched: ${prevModel} → ${nextModel} (overloaded/unavailable). Retrying…`);
+      if (details?.reason === "success") {
+        setStatus(`✓ Connected to ${nextModel}. Completing analysis…`);
+      } else {
+        const reasonText =
+          details?.reason === "overloaded"
+            ? "overloaded / rate-limited"
+            : details?.reason === "unavailable"
+            ? "unavailable / deprecated"
+            : details?.reason === "network"
+            ? "network timeout"
+            : "encountered an error";
+        setStatus(`⚡ Auto-switched: ${prevModel} was ${reasonText} → trying ${nextModel}…`);
+      }
     };
     try {
       if (!apiKey) {
@@ -1209,7 +1237,20 @@ function ProfileView({ sport, role, name, model, frameCount, apiKey, onOpenSetti
       {activeTab === "analysis" && <>
       <div className="profile-grid">
         <section className="upload-card">
-          <div className="panel-title"><div><span className="section-kicker">NEW ANALYSIS</span><h2>VIDEO INPUT</h2></div><span className="secure-label"><Icon name="shield" size={13} /> GEMINI · DIRECT API</span></div>
+          <div className="panel-title">
+            <div><span className="section-kicker">NEW ANALYSIS</span><h2>VIDEO INPUT</h2></div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span
+                className="secure-label"
+                style={{ cursor: "pointer", background: "rgba(224, 174, 82, 0.12)", color: "var(--gold)", borderColor: "rgba(224, 174, 82, 0.3)" }}
+                onClick={onOpenSettings}
+                title="Active AI Vision Model · Click to change in Settings"
+              >
+                <Icon name="bolt" size={13} /> {model}
+              </span>
+              <span className="secure-label"><Icon name="shield" size={13} /> GEMINI · DIRECT API</span>
+            </div>
+          </div>
           <label
             className={`dropzone ${videoFile ? "has-file" : ""}`}
             onDragOver={(event) => event.preventDefault()}
@@ -3769,6 +3810,12 @@ function SettingsView({
     }
   };
 
+  useEffect(() => {
+    if (apiKeyDraft.trim() && availableModels.length === 0 && !modelsLoading && section === "AI Vision Engine") {
+      void loadAvailableModels();
+    }
+  }, [apiKeyDraft, section]);
+
   return (
     <div className="page-shell settings-shell">
       <section className="subpage-heading settings-heading">
@@ -4017,21 +4064,7 @@ function SettingsView({
                   {!availableModels.some((availableModel) => availableModel.id === model) && <option value={model}>{model} · current</option>}
                   {availableModels.length
                     ? availableModels.map((availableModel) => <option key={availableModel.id} value={availableModel.id}>{availableModel.displayName} · {availableModel.id}</option>)
-                    : [
-                        { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Recommended · Fast Multimodal)" },
-                        { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash (Proven Workhorse)" },
-                        { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash (Universal Fallback)" },
-                        { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview (Latest Recommended)" },
-                        { id: "gemini-3.1-flash-tts", label: "Gemini 3.1 Flash TTS" },
-                        { id: "gemini-lite-latest", label: "Gemini Lite Latest (High Speed)" },
-                        { id: "gemini-3.8-flash-tts", label: "Gemini 3.8 Flash TTS" },
-                        { id: "gemini-3.8-flash-lite-tts", label: "Gemini 3.8 Flash-Lite TTS" },
-                        { id: "gemma-4-31b", label: "Gemma 4 31B Open Model" },
-                        { id: "gemma-4-31b-it", label: "Gemma 4 31B Instruction-Tuned" },
-                        { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite (High Speed)" },
-                        { id: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash-Lite (Fast Fallback)" },
-                        { id: "gemini-1.5-pro", label: "Gemini 1.5 Pro (Deep Analysis)" },
-                      ].map(({ id, label }) => <option key={id} value={id}>{label} · {id}</option>)}
+                    : DEFAULT_GEMINI_MODELS.map(({ id, label }) => <option key={id} value={id}>{label} · {id}</option>)}
                 </select>
               </label>
               <button className="outline-button" disabled={modelsLoading} onClick={loadAvailableModels}>{modelsLoading ? "LOADING MODELS…" : "REFRESH AVAILABLE MODELS"} <Icon name="arrow" size={15} /></button>
@@ -4100,7 +4133,8 @@ function App() {
   const [theme, setTheme] = useState("Dark");
   const [model, setModel] = useState(() => {
     const savedModel = localStorage.getItem("scoutai_primary_model");
-    return savedModel && /^(gemini|gemma)-/i.test(savedModel) ? savedModel : "gemini-2.5-flash";
+    const isVisionModel = (id: string) => /^gemini-/i.test(id) && !/-tts/i.test(id) && !/^gemma/i.test(id);
+    return savedModel && isVisionModel(savedModel) ? normalizeGeminiModel(savedModel) : "gemini-3.8-flash";
   });
   const [modelSaveError, setModelSaveError] = useState("");
   const [frameCount, setFrameCount] = useState(6);
