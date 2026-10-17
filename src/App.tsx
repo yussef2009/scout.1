@@ -3826,7 +3826,7 @@ export type PointTouch = {
   rating: number
   quality: "Elite" | "Optimal" | "Suboptimal" | "Fault"
   critique: string
-  biomechanics: { metric: string val: string }[]
+  biomechanics: { metric: string; val: string }[]
 }
 
 export type RecordedPoint = {
@@ -4723,7 +4723,7 @@ type TeamEntry = {
   weakPoints: string
 }
 
-function ClubTeamsPanel({ sport, name }: { sport: string name: string }) {
+function ClubTeamsPanel({ sport, name }: { sport: string; name: string }) {
   const [teams, setTeams] = useState<TeamEntry[]>(() => {
     try {
       return JSON.parse(
@@ -5735,7 +5735,7 @@ export type FeedPost = {
   isLiked?: boolean
   commentsCount: number
   comments?: PostComment[]
-  metrics?: { label: string value: string }[]
+  metrics?: { label: string; value: string }[]
   isVerified?: boolean
 }
 
@@ -5955,7 +5955,7 @@ function FeedView({
     } catch {}
   }
 
-  const handleToggleMetricTag = (tag: { label: string value: string }) => {
+  const handleToggleMetricTag = (tag: { label: string; value: string }) => {
     if (selectedMetrics.some((m) => m.label === tag.label)) {
       setSelectedMetrics(selectedMetrics.filter((m) => m.label !== tag.label))
     } else {

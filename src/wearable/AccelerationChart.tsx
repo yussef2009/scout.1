@@ -94,7 +94,7 @@ export function AccelerationChart({
 
   // Y-axis grid ticks (4-5 intervals)
   const yTicks = useMemo(() => {
-    const ticks: { value: number y: number }[] = []
+    const ticks: { value: number; y: number }[] = []
     const count = 4
     const step = (maxY - minY) / count
     for (let i = 0; i <= count; i++) {
