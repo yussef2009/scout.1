@@ -3425,6 +3425,14 @@ function SearchModal({
 // Home Feed View — Filterable Posts Feed
 // ──────────────────────────────────────────────────────────────
 
+export type PostComment = {
+  id: string;
+  authorName: string;
+  authorRole: string;
+  content: string;
+  timestamp: string;
+};
+
 export type FeedPost = {
   id: string;
   authorName: string;
@@ -3437,6 +3445,9 @@ export type FeedPost = {
   likes: number;
   isLiked?: boolean;
   commentsCount: number;
+  comments?: PostComment[];
+  metrics?: { label: string; value: string }[];
+  isVerified?: boolean;
 };
 
 const INITIAL_POSTS: FeedPost[] = [
@@ -3450,7 +3461,29 @@ const INITIAL_POSTS: FeedPost[] = [
     content: "Official lineup assessment for our U-18 squad completed ahead of the Cairo youth cup. Scot AI registered a 97 squad rating with top-tier counter-press transition metrics!",
     mediaUrl: "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=800&q=80",
     likes: 42,
-    commentsCount: 9,
+    commentsCount: 2,
+    isVerified: true,
+    metrics: [
+      { label: "SQUAD RATING", value: "97/100" },
+      { label: "COUNTER-PRESS", value: "3.2s" },
+      { label: "TRANSITION SPEED", value: "+14.8%" },
+    ],
+    comments: [
+      {
+        id: "c1",
+        authorName: "EMEA Talent Scouts Ltd",
+        authorRole: "Scout",
+        content: "Outstanding defensive transition phase. We have indexed three players from this keyframe audit.",
+        timestamp: "12m ago",
+      },
+      {
+        id: "c2",
+        authorName: "Coach Hassan",
+        authorRole: "Club",
+        content: "The high-press recovery times are consistent with our first-team benchmarks.",
+        timestamp: "5m ago",
+      },
+    ],
   },
   {
     id: "post-2",
@@ -3462,7 +3495,22 @@ const INITIAL_POSTS: FeedPost[] = [
     content: "Vertical takeoff workout today in Alexandria. Hit 78.4 cm with 0.83 sec hang time. Verified directly with Scot AI Vision Engine keyframe analysis!",
     mediaUrl: "https://images.unsplash.com/photo-1762025884013-8a42741468e2?auto=format&fit=crop&w=800&q=80",
     likes: 67,
-    commentsCount: 14,
+    commentsCount: 1,
+    isVerified: true,
+    metrics: [
+      { label: "VERTICAL ELEVATION", value: "78.4 CM" },
+      { label: "HANG TIME", value: "0.83 SEC" },
+      { label: "TAKEOFF ACCEL", value: "3.84 M/S²" },
+    ],
+    comments: [
+      {
+        id: "c3",
+        authorName: "Mateo Ruiz",
+        authorRole: "Player",
+        content: "Insane elevation Omar! The hip flexion on takeoff is text-book.",
+        timestamp: "45m ago",
+      },
+    ],
   },
   {
     id: "post-3",
@@ -3473,7 +3521,13 @@ const INITIAL_POSTS: FeedPost[] = [
     timestamp: "3h ago",
     content: "Scouting bulletin: Evaluating high-pace wingers and point guards in North Africa & Southern Europe. Video submissions reviewed daily on Scot network.",
     likes: 31,
-    commentsCount: 5,
+    commentsCount: 0,
+    isVerified: true,
+    metrics: [
+      { label: "SCOUT STATUS", value: "LICENSED" },
+      { label: "COVERAGE", value: "EMEA / MENA" },
+    ],
+    comments: [],
   },
   {
     id: "post-4",
@@ -3484,7 +3538,21 @@ const INITIAL_POSTS: FeedPost[] = [
     timestamp: "5h ago",
     content: "Youth biomechanical audit in Madrid: Precision movement symmetry and sprint acceleration tracking using edge computer vision. The future of talent scouting is here.",
     likes: 89,
-    commentsCount: 22,
+    commentsCount: 1,
+    isVerified: true,
+    metrics: [
+      { label: "MOVEMENT SYMMETRY", value: "98.2%" },
+      { label: "ACCELERATION", value: "4.12 M/S²" },
+    ],
+    comments: [
+      {
+        id: "c4",
+        authorName: "Al Ahly SC Academy",
+        authorRole: "Club",
+        content: "Exemplary precision metrics. Modern scouting is truly quantitative.",
+        timestamp: "3h ago",
+      },
+    ],
   },
   {
     id: "post-5",
@@ -3495,8 +3563,31 @@ const INITIAL_POSTS: FeedPost[] = [
     timestamp: "8h ago",
     content: "Catch-and-shoot mechanics breakdown from morning drills. Release angle dialed in at 48° with zero wasted motion.",
     likes: 29,
-    commentsCount: 4,
+    commentsCount: 0,
+    isVerified: true,
+    metrics: [
+      { label: "RELEASE ANGLE", value: "48.2°" },
+      { label: "RELEASE TIME", value: "0.38S" },
+    ],
+    comments: [],
   },
+];
+
+const SAMPLE_MEDIA_OPTIONS = [
+  { label: "No media attachment", url: "" },
+  { label: "Soccer Match Footage", url: "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=800&q=80" },
+  { label: "Basketball Jump Drill", url: "https://images.unsplash.com/photo-1762025884013-8a42741468e2?auto=format&fit=crop&w=800&q=80" },
+  { label: "Stadium Session", url: "https://images.unsplash.com/photo-1517927033932-b3d18e61fb3a?auto=format&fit=crop&w=800&q=80" },
+  { label: "Field Agility Drill", url: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80" },
+];
+
+const QUICK_METRICS_LIST = [
+  { label: "VERTICAL JUMP", value: "78.4 cm" },
+  { label: "SPRINT SPEED", value: "34.8 km/h" },
+  { label: "HANG TIME", value: "0.83 sec" },
+  { label: "ACCELERATION", value: "3.84 m/s²" },
+  { label: "GROUND CONTACT", value: "186 ms" },
+  { label: "RELEASE ANGLE", value: "48.2°" },
 ];
 
 function FeedView({
@@ -3512,7 +3603,8 @@ function FeedView({
   currentUserRole: string;
   followingList: string[];
 }) {
-  const [filter, setFilter] = useState<"all" | "following" | "followers" | "clubs" | "scouts" | "sport">("all");
+  const [filter, setFilter] = useState<"all" | "following" | "clubs" | "scouts" | "sport">("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [posts, setPosts] = useState<FeedPost[]>(() => {
     try {
       const stored = localStorage.getItem("scot_feed_posts");
@@ -3523,14 +3615,33 @@ function FeedView({
   });
   const [newContent, setNewContent] = useState("");
   const [newSport, setNewSport] = useState(sport);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
+  const [selectedMetrics, setSelectedMetrics] = useState<{ label: string; value: string }[]>([]);
+  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   const savePosts = (updated: FeedPost[]) => {
     setPosts(updated);
     try { localStorage.setItem("scot_feed_posts", JSON.stringify(updated)); } catch {}
   };
 
+  const handleToggleMetricTag = (tag: { label: string; value: string }) => {
+    if (selectedMetrics.some((m) => m.label === tag.label)) {
+      setSelectedMetrics(selectedMetrics.filter((m) => m.label !== tag.label));
+    } else {
+      setSelectedMetrics([...selectedMetrics, tag]);
+    }
+  };
+
   const handleCreatePost = () => {
     if (!newContent.trim()) return;
+    const mediaUrl = SAMPLE_MEDIA_OPTIONS[selectedMediaIndex]?.url || undefined;
     const post: FeedPost = {
       id: `post-${Date.now()}`,
       authorName: currentUserName || "Verified Athlete",
@@ -3539,11 +3650,18 @@ function FeedView({
       sport: newSport,
       timestamp: "Just now",
       content: newContent.trim(),
+      mediaUrl,
       likes: 0,
       commentsCount: 0,
+      comments: [],
+      metrics: selectedMetrics.length > 0 ? selectedMetrics : undefined,
+      isVerified: true,
     };
     savePosts([post, ...posts]);
     setNewContent("");
+    setSelectedMetrics([]);
+    setSelectedMediaIndex(0);
+    showToast("Performance intel published to SCOT network!");
   };
 
   const toggleLike = (id: string) => {
@@ -3560,145 +3678,427 @@ function FeedView({
     );
   };
 
-  const followersList = ["Coach Henderson", "Alexandre Ramos", "Real Betis Youth", "Scout Network EMEA"];
+  const handleAddComment = (postId: string) => {
+    const draft = commentDrafts[postId]?.trim();
+    if (!draft) return;
+    const newComment: PostComment = {
+      id: `comm-${Date.now()}`,
+      authorName: currentUserName || "Athletic Scout",
+      authorRole: currentUserRole,
+      content: draft,
+      timestamp: "Just now",
+    };
+    savePosts(
+      posts.map((p) => {
+        if (p.id !== postId) return p;
+        const existingComments = p.comments || [];
+        return {
+          ...p,
+          commentsCount: (p.commentsCount || 0) + 1,
+          comments: [...existingComments, newComment],
+        };
+      })
+    );
+    setCommentDrafts({ ...commentDrafts, [postId]: "" });
+    setExpandedComments({ ...expandedComments, [postId]: true });
+    showToast("Comment recorded on telemetry log.");
+  };
 
   const filteredPosts = posts.filter((p) => {
-    if (filter === "all") return true;
-    if (filter === "following") return followingList.includes(p.authorName);
-    if (filter === "followers") return followersList.includes(p.authorName);
-    if (filter === "clubs") return p.authorRole === "Club";
-    if (filter === "scouts") return p.authorRole === "Scout";
-    if (filter === "sport") return p.sport === sport;
+    if (filter === "following" && !followingList.includes(p.authorName)) return false;
+    if (filter === "clubs" && p.authorRole !== "Club") return false;
+    if (filter === "scouts" && p.authorRole !== "Scout") return false;
+    if (filter === "sport" && p.sport !== sport) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchText = (p.content || "").toLowerCase().includes(q);
+      const matchAuthor = (p.authorName || "").toLowerCase().includes(q);
+      const matchSport = (p.sport || "").toLowerCase().includes(q);
+      const matchMetrics = (p.metrics || []).some(
+        (m) => m.label.toLowerCase().includes(q) || m.value.toLowerCase().includes(q)
+      );
+      if (!matchText && !matchAuthor && !matchSport && !matchMetrics) return false;
+    }
     return true;
   });
 
   return (
     <div className="feed-shell">
-      <div className="panel-title">
-        <div><span className="section-kicker">ATHLETIC COMMUNITY</span><h2>SCOT NETWORK FEED</h2></div>
-        <span className="updated"><i /> REAL-TIME PULSE</span>
+      {/* Toast banner */}
+      {toastMessage && (
+        <div className="feed-toast" role="status">
+          <Icon name="shield" size={14} />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Explore Header Hero */}
+      <section className="explore-header-card">
+        <div className="explore-header-meta">
+          <span className="section-kicker">ATHLETIC COMMUNITY & TALENT INTEL</span>
+          <h2>EXPLORE SCOT NETWORK</h2>
+          <p className="explore-tagline">
+            Real-time biomechanical telemetry, scout reports, and club talent bulletins across 10 global sports.
+          </p>
+        </div>
+        <div className="explore-stats-row">
+          <div className="explore-stat-badge">
+            <span>NETWORK SCOUTS</span>
+            <strong>1,420+</strong>
+            <small><i /> LIVE EVALUATORS</small>
+          </div>
+          <div className="explore-stat-badge">
+            <span>COMPUTER VISION</span>
+            <strong>60 FPS</strong>
+            <small>AI KEYFRAMES</small>
+          </div>
+          <div className="explore-stat-badge">
+            <span>INDEXED RECRUITS</span>
+            <strong>12.8K</strong>
+            <small>VERIFIED PLAYERS</small>
+          </div>
+        </div>
+      </section>
+
+      {/* Search & Navigation Bar */}
+      <div className="feed-controls-bar">
+        <div className="feed-search-wrap">
+          <Icon name="search" size={14} />
+          <input
+            type="text"
+            placeholder="Search by athlete name, club, sport, or biometric keyword..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              className="feed-search-clear"
+              onClick={() => setSearchQuery("")}
+              aria-label="Clear search"
+            >
+              <Icon name="close" size={12} />
+            </button>
+          )}
+        </div>
+
+        <div className="feed-filters-nav" role="tablist">
+          {[
+            { key: "all", label: "ALL INTEL", count: posts.length },
+            { key: "following", label: "FOLLOWING", count: followingList.length },
+            { key: "clubs", label: "CLUBS & ACADEMIES" },
+            { key: "scouts", label: "SCOUTS" },
+            { key: "sport", label: `${sport.toUpperCase()} ONLY` },
+          ].map(({ key, label, count }) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={filter === key}
+              className={`feed-filter-btn ${filter === key ? "active" : ""}`}
+              onClick={() => setFilter(key as any)}
+            >
+              <span>{label}</span>
+              {typeof count === "number" && <b className="filter-count-badge">{count}</b>}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Feed Filters */}
-      <div className="feed-filters-nav">
-        {[
-          { key: "all", label: "ALL POSTS" },
-          { key: "following", label: `FOLLOWING (${followingList.length})` },
-          { key: "followers", label: `FOLLOWERS (${followersList.length})` },
-          { key: "clubs", label: "CLUBS" },
-          { key: "scouts", label: "SCOUTS" },
-          { key: "sport", label: `RELATED SPORTS (${sport.toUpperCase()})` },
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            className={`feed-filter-btn ${filter === key ? "active" : ""}`}
-            onClick={() => setFilter(key as any)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Create Post Card */}
+      {/* Professional Intel Composer */}
       <div className="create-post-card">
-        <span className="section-kicker">SHARE PERFORMANCE FOOTAGE OR UPDATE</span>
+        <div className="create-post-header">
+          <div className="composer-user-avatar">
+            <span>{(currentUserName || "Athlete").slice(0, 2).toUpperCase()}</span>
+          </div>
+          <div className="composer-user-info">
+            <strong>{currentUserName || "Verified Athlete"}</strong>
+            <span className="role-badge"><i /> {currentUserRole.toUpperCase()} DISPATCH</span>
+          </div>
+          <span className="composer-badge">AI BIOMECHANICS LOG</span>
+        </div>
+
         <textarea
           rows={3}
           value={newContent}
           onChange={(e) => setNewContent(e.target.value)}
-          placeholder={`Share match highlights, AI scouting results, or team announcements in ${sport}...`}
+          placeholder={`Log training telemetry, match keyframes, or talent announcements in ${sport}...`}
         />
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 9, color: "var(--muted)", fontWeight: 700 }}>SPORT:</span>
-            <select
-              style={{ background: "#0a0a0c", color: "var(--white)", border: "1px solid var(--line)", padding: "4px 8px", fontSize: 10 }}
-              value={newSport}
-              onChange={(e) => setNewSport(e.target.value)}
-            >
-              {sports.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+
+        {/* Quick telemetry tags picker */}
+        <div className="quick-metrics-container">
+          <span className="quick-metrics-label">ATTACH TELEMETRY TAG:</span>
+          <div className="quick-metrics-pills">
+            {QUICK_METRICS_LIST.map((tag) => {
+              const isSelected = selectedMetrics.some((m) => m.label === tag.label);
+              return (
+                <button
+                  type="button"
+                  key={tag.label}
+                  className={`metric-tag-chip ${isSelected ? "selected" : ""}`}
+                  onClick={() => handleToggleMetricTag(tag)}
+                >
+                  <span>{tag.label}</span>
+                  <small>{tag.value}</small>
+                </button>
+              );
+            })}
           </div>
-          <button className="primary-button" onClick={handleCreatePost} disabled={!newContent.trim()}>
-            PUBLISH POST <Icon name="arrow" size={14} />
+        </div>
+
+        {/* Composer Footer Actions */}
+        <div className="composer-footer">
+          <div className="composer-selectors">
+            <div className="composer-select-group">
+              <span>SPORT:</span>
+              <select value={newSport} onChange={(e) => setNewSport(e.target.value)}>
+                {sports.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            <div className="composer-select-group">
+              <span>FOOTAGE:</span>
+              <select
+                value={selectedMediaIndex}
+                onChange={(e) => setSelectedMediaIndex(Number(e.target.value))}
+              >
+                {SAMPLE_MEDIA_OPTIONS.map((opt, idx) => (
+                  <option key={opt.label} value={idx}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="primary-button"
+            onClick={handleCreatePost}
+            disabled={!newContent.trim()}
+          >
+            PUBLISH INTEL <Icon name="arrow" size={14} />
           </button>
         </div>
       </div>
 
-      {/* Posts List */}
+      {/* Posts Stream */}
       {filteredPosts.length === 0 ? (
-        <div className="empty-state" style={{ padding: "48px 16px" }}>
-          <Icon name="bolt" size={28} />
-          <strong>NO POSTS FOUND IN THIS CATEGORY</strong>
-          <p>Try switching filter tabs or be the first to publish a performance update!</p>
+        <div className="empty-state" style={{ padding: "54px 16px" }}>
+          <div className="empty-icon-ring"><Icon name="trend" size={24} /></div>
+          <strong>NO INTEL LOGS FOUND</strong>
+          <p>No posts match your selected filter or keyword. Try switching categories or publish your first performance dispatch.</p>
+          <button type="button" className="outline-button" onClick={() => { setFilter("all"); setSearchQuery(""); }}>
+            RESET FILTERS
+          </button>
         </div>
       ) : (
-        filteredPosts.map((post) => (
-          <article key={post.id} className="post-card">
-            <div className="post-header">
-              <img
-                src={post.authorImage}
-                alt={post.authorName}
-                onError={(e) => {
-                  e.currentTarget.src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&h=160&q=80";
-                }}
-                onClick={() => {
-                  const match = directoryProfiles.find((d) => d.name === post.authorName);
-                  if (match) onSelectProfile(match);
-                }}
-              />
-              <div className="post-header-info">
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <strong
+        <div className="posts-stack">
+          {filteredPosts.map((post) => {
+            const isCommentsOpen = !!expandedComments[post.id];
+            const commentsList = post.comments || [];
+            return (
+              <article key={post.id} className="post-card">
+                {/* Post Header */}
+                <div className="post-header">
+                  <div className={`post-avatar-wrap role-${post.authorRole.toLowerCase()}`}>
+                    <img
+                      src={post.authorImage}
+                      alt={post.authorName}
+                      onError={(e) => {
+                        e.currentTarget.src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&h=160&q=80";
+                      }}
+                      onClick={() => {
+                        const match = directoryProfiles.find((d) => d.name === post.authorName);
+                        if (match) onSelectProfile(match);
+                      }}
+                    />
+                  </div>
+
+                  <div className="post-header-info">
+                    <div className="post-author-row">
+                      <strong
+                        onClick={() => {
+                          const match = directoryProfiles.find((d) => d.name === post.authorName);
+                          if (match) onSelectProfile(match);
+                        }}
+                      >
+                        {post.authorName}
+                      </strong>
+                      {post.isVerified && (
+                        <span className="verified-shield-icon" title="SCOT Verified Athletic Identity">
+                          <Icon name="shield" size={12} />
+                        </span>
+                      )}
+                      <span className={`post-role-badge badge-${post.authorRole.toLowerCase()}`}>
+                        {post.authorRole.toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div className="post-meta-sub">
+                      <span className="sport-indicator-chip">{post.sport}</span>
+                      <span className="meta-separator">·</span>
+                      <span className="post-time">{post.timestamp}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="outline-button post-view-btn"
                     onClick={() => {
                       const match = directoryProfiles.find((d) => d.name === post.authorName);
                       if (match) onSelectProfile(match);
                     }}
                   >
-                    {post.authorName}
-                  </strong>
-                  <span className="role-badge" style={{ display: "inline-block" }}>{post.authorRole.toUpperCase()}</span>
+                    VIEW PROFILE
+                  </button>
                 </div>
-                <small>{post.sport} · {post.timestamp}</small>
-              </div>
-              <button
-                className="outline-button"
-                style={{ minHeight: 28, padding: "0 10px", fontSize: 9 }}
-                onClick={() => {
-                  const match = directoryProfiles.find((d) => d.name === post.authorName);
-                  if (match) onSelectProfile(match);
-                }}
-              >
-                VIEW PROFILE
-              </button>
-            </div>
 
-            <p className="post-content">{post.content}</p>
+                {/* Telemetry Metric Badges */}
+                {post.metrics && post.metrics.length > 0 && (
+                  <div className="post-telemetry-strip">
+                    {post.metrics.map((m, i) => (
+                      <div key={i} className="post-metric-pill">
+                        <Icon name="bolt" size={10} />
+                        <span>{m.label}:</span>
+                        <strong>{m.value}</strong>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-            {post.mediaUrl && (
-              <img
-                src={post.mediaUrl}
-                alt="Match footage"
-                className="post-media-preview"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-              />
-            )}
+                {/* Content */}
+                <p className="post-content">{post.content}</p>
 
-            <div className="post-footer-actions">
-              <button
-                className={`post-action-btn ${post.isLiked ? "liked" : ""}`}
-                onClick={() => toggleLike(post.id)}
-              >
-                <Icon name="bolt" size={13} /> {post.likes} {post.isLiked ? "LIKED" : "RESPECTS"}
-              </button>
-              <span style={{ color: "var(--muted)", fontSize: 10 }}>
-                {post.commentsCount} Comments
-              </span>
-            </div>
-          </article>
-        ))
+                {/* Media with HUD Overlay */}
+                {post.mediaUrl && (
+                  <div className="post-media-hud-container">
+                    <img
+                      src={post.mediaUrl}
+                      alt="Match footage"
+                      className="post-media-preview"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                    <div className="hud-badge top-left">
+                      <i className="hud-pulse-dot" />
+                      <span>60 FPS · AI VISION TRACKING</span>
+                    </div>
+                    <div className="hud-badge top-right">
+                      <Icon name="shield" size={11} />
+                      <span>BIOMECHANICS VERIFIED</span>
+                    </div>
+                    <div className="hud-scanlines-overlay" />
+                  </div>
+                )}
+
+                {/* Post Footer Actions */}
+                <div className="post-footer-actions">
+                  <button
+                    type="button"
+                    className={`post-action-btn respects-btn ${post.isLiked ? "liked" : ""}`}
+                    onClick={() => toggleLike(post.id)}
+                    title="Give respects / kudos"
+                  >
+                    <Icon name="bolt" size={14} />
+                    <span>{post.likes}</span>
+                    <small>{post.isLiked ? "RESPECTED" : "RESPECTS"}</small>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`post-action-btn comments-btn ${isCommentsOpen ? "active" : ""}`}
+                    onClick={() => setExpandedComments({ ...expandedComments, [post.id]: !isCommentsOpen })}
+                    title="View and post comments"
+                  >
+                    <span>{post.commentsCount || 0}</span>
+                    <small>COMMENTS</small>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="post-action-btn share-btn"
+                    onClick={() => {
+                      try {
+                        navigator.clipboard.writeText(window.location.href);
+                        showToast("Post link copied to clipboard!");
+                      } catch {
+                        showToast("Intel link indexed.");
+                      }
+                    }}
+                    title="Share post"
+                  >
+                    <Icon name="trend" size={12} />
+                    <small>SHARE INTEL</small>
+                  </button>
+
+                  <span className="post-verified-stamp">
+                    <Icon name="shield" size={11} />
+                    <span>VERIFIED RECORD</span>
+                  </span>
+                </div>
+
+                {/* Expandable Comments Drawer */}
+                {isCommentsOpen && (
+                  <div className="post-comments-drawer">
+                    <div className="comments-header">
+                      <span>COMMENTS LOG & SCOUT NOTES ({commentsList.length})</span>
+                    </div>
+
+                    {commentsList.length > 0 ? (
+                      <div className="comments-list">
+                        {commentsList.map((comm) => (
+                          <div key={comm.id} className="comment-item">
+                            <div className="comment-avatar">
+                              <span>{(comm.authorName || "User").slice(0, 2).toUpperCase()}</span>
+                            </div>
+                            <div className="comment-content-box">
+                              <div className="comment-author-bar">
+                                <strong>{comm.authorName}</strong>
+                                <span className={`comment-role-pill role-${(comm.authorRole || "Player").toLowerCase()}`}>
+                                  {comm.authorRole}
+                                </span>
+                                <small>{comm.timestamp}</small>
+                              </div>
+                              <p className="comment-text">{comm.content}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="comments-empty">
+                        <span>No comments recorded yet. Be the first scout or athlete to contribute!</span>
+                      </div>
+                    )}
+
+                    {/* New Comment Input */}
+                    <div className="comment-composer">
+                      <input
+                        type="text"
+                        placeholder={`Add scout note as ${currentUserName || "Observer"}...`}
+                        value={commentDrafts[post.id] || ""}
+                        onChange={(e) => setCommentDrafts({ ...commentDrafts, [post.id]: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleAddComment(post.id);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="primary-button"
+                        style={{ minHeight: 32, padding: "0 12px", fontSize: 9 }}
+                        disabled={!commentDrafts[post.id]?.trim()}
+                        onClick={() => handleAddComment(post.id)}
+                      >
+                        POST NOTE
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -4143,8 +4543,22 @@ function App() {
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState("");
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("scoutai_gemini_key")?.trim() ?? "");
-  const [view, setView] = useState("Home");
+  const [view, setView] = useState("Dashboard");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(e.target as Node)) {
+        setAccountMenuOpen(false);
+      }
+    }
+    if (accountMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [accountMenuOpen]);
 
   const [theme, setTheme] = useState("Dark");
   const [model, setModel] = useState(() => {
@@ -4535,7 +4949,7 @@ function App() {
     <main className={theme === "Light" ? "theme-light" : ""} style={{ "--gold": palette.gold, "--gold-bright": palette.bright } as React.CSSProperties}>
       <header className="topbar">
         <div className="topbar-left">
-          <Logo onClick={() => { setView("Home"); setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+          <Logo onClick={() => { setView("Dashboard"); setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
           <button
             type="button"
             className={`demo-toggle-btn ${demoMode ? "active" : ""}`}
@@ -4549,7 +4963,7 @@ function App() {
 
         {/* Desktop + tablet nav */}
         <nav className="desktop-nav" aria-label="Main navigation">
-          {["Home", "Dashboard", "Profile", "Settings"].map((item) => (
+          {["Dashboard", "Explore", "Profile", "Settings"].map((item) => (
             <button
               key={item}
               className={view === item ? "active" : ""}
@@ -4558,7 +4972,6 @@ function App() {
               {item}
             </button>
           ))}
-          <button onClick={() => { setView("Dashboard"); setTimeout(() => document.getElementById("leaderboard")?.scrollIntoView({ behavior: "smooth" }), 0); }}>Leaderboards</button>
         </nav>
 
         <div className="header-actions">
@@ -4572,9 +4985,89 @@ function App() {
             <Icon name="search" size={13} /> SEARCH
           </button>
           <span className="role-badge desktop-only"><i /> {!authReady ? "CONNECTING" : authenticated ? `${role.toUpperCase()} SESSION` : "PUBLIC VIEW"}</span>
-          {authenticated
-            ? <><button className="primary-button" onClick={() => setView("Profile")}>{userName.toUpperCase()} <Icon name="arrow" size={15} /></button><button className="text-button desktop-only" onClick={() => void handleSignOut()}>SIGN OUT</button></>
-            : <button className="primary-button" disabled={!authReady} onClick={() => setAuthOpen(true)}>SIGN IN / JOIN <Icon name="arrow" size={15} /></button>}
+
+          {/* Account Icon Button & Popover */}
+          <div className="account-menu-container" ref={accountMenuRef}>
+            <button
+              type="button"
+              className={`header-account-btn ${accountMenuOpen ? "active" : ""}`}
+              onClick={() => setAccountMenuOpen(!accountMenuOpen)}
+              aria-label="Account options"
+              title={authenticated ? `${userName} · ${role}` : "Sign In or Join SCOT"}
+            >
+              <span className="account-btn-avatar">
+                {authenticated ? (
+                  <span className="account-btn-initials">{userName.slice(0, 2).toUpperCase()}</span>
+                ) : (
+                  <Icon name="user" size={16} />
+                )}
+                <span className={`account-pulse-indicator ${authenticated ? "active" : "guest"}`} />
+              </span>
+              <Icon name="chevron" size={11} />
+            </button>
+
+            {accountMenuOpen && (
+              <div className="account-dropdown-panel" role="menu">
+                {authenticated ? (
+                  <>
+                    <div className="account-dropdown-header">
+                      <div className="account-avatar-large">
+                        <span>{userName.slice(0, 2).toUpperCase()}</span>
+                      </div>
+                      <div className="account-header-details">
+                        <strong className="account-user-name">{userName}</strong>
+                        <span className="account-user-role"><i /> {role.toUpperCase()} SESSION</span>
+                        <small className="account-user-email">{userEmail || "Local Performance Hub"}</small>
+                      </div>
+                    </div>
+                    <div className="account-dropdown-items">
+                      <button
+                        type="button"
+                        className="account-dropdown-item"
+                        onClick={() => { setView("Profile"); setAccountMenuOpen(false); }}
+                      >
+                        <Icon name="user" size={14} />
+                        <span>View Profile & Clips</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="account-dropdown-item"
+                        onClick={() => { setView("Settings"); setAccountMenuOpen(false); }}
+                      >
+                        <Icon name="settings" size={14} />
+                        <span>Account & Model Settings</span>
+                      </button>
+                      <div className="account-dropdown-separator" />
+                      <button
+                        type="button"
+                        className="account-dropdown-item danger"
+                        onClick={() => { void handleSignOut(); setAccountMenuOpen(false); }}
+                      >
+                        <Icon name="close" size={13} />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="account-dropdown-guest">
+                    <div className="guest-badge-wrap">
+                      <Icon name="shield" size={20} />
+                    </div>
+                    <strong>PERFORMANCE IDENTITY</strong>
+                    <p>Connect your athlete, scout, or club account to save computer-vision audits and rank on global leaderboards.</p>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      style={{ width: "100%", marginTop: 12 }}
+                      onClick={() => { setAuthOpen(true); setAccountMenuOpen(false); }}
+                    >
+                      SIGN IN / JOIN SCOT <Icon name="arrow" size={13} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Separated tab in upper right corner on screen shrink / mobile */}
           <button
@@ -4611,8 +5104,8 @@ function App() {
 
               <div className="mobile-tab-links">
                 {[
-                  { id: "Home", name: "Home", icon: "home" as const, desc: "Global feed & talent stream" },
                   { id: "Dashboard", name: "Dashboard", icon: "chart" as const, desc: "Analytics & sports benchmarks" },
+                  { id: "Explore", name: "Explore", icon: "trend" as const, desc: "Global feed & talent stream" },
                   { id: "Profile", name: "Profile", icon: "user" as const, desc: "Your stats, bio & clips" },
                   { id: "Settings", name: "Settings", icon: "settings" as const, desc: "Club credentials & themes" },
                 ].map((item) => (
@@ -4622,7 +5115,7 @@ function App() {
                     onClick={() => {
                       setView(item.id);
                       setMenuOpen(false);
-                      if (item.id === "Home") window.scrollTo({ top: 0, behavior: "smooth" });
+                      if (item.id === "Dashboard") window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                   >
                     <span className="mobile-tab-link-icon">
@@ -4635,23 +5128,6 @@ function App() {
                     {view === item.id && <span className="mobile-tab-active-indicator" />}
                   </button>
                 ))}
-
-                <button
-                  className="mobile-tab-link"
-                  onClick={() => {
-                    setView("Dashboard");
-                    setMenuOpen(false);
-                    setTimeout(() => document.getElementById("leaderboard")?.scrollIntoView({ behavior: "smooth" }), 100);
-                  }}
-                >
-                  <span className="mobile-tab-link-icon">
-                    <Icon name="bolt" size={16} />
-                  </span>
-                  <div className="mobile-tab-link-info">
-                    <span className="mobile-tab-link-name">Leaderboards</span>
-                    <span className="mobile-tab-link-desc">Verified global ranks</span>
-                  </div>
-                </button>
               </div>
 
               <div className="mobile-tab-actions">
@@ -4699,8 +5175,8 @@ function App() {
       </header>
       {authError && <div className="analysis-error" role="alert">{authError}</div>}
 
-      {/* HOME FEED VIEW */}
-      {view === "Home" && (
+      {/* EXPLORE / POSTS FEED VIEW */}
+      {(view === "Explore" || view === "Home") && (
         <FeedView
           sport={sport}
           onSelectProfile={setViewingProfile}
