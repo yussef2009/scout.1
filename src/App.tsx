@@ -6073,10 +6073,7 @@ function FeedView({
             ATHLETIC COMMUNITY & TALENT INTEL
           </span>
           <h2>EXPLORE SCOT NETWORK</h2>
-          <p className="explore-tagline">
-            Real-time biomechanical telemetry, scout reports, and club talent
-            bulletins across 10 global sports.
-          </p>
+
         </div>
         <div className="explore-stats-row">
           <div className="explore-stat-badge">
@@ -6715,10 +6712,7 @@ function SettingsView({
             <br />
             <em>CENTER.</em>
           </h1>
-          <p className="intro">
-            Configure your identity, performance workspace, and local vision
-            engine.
-          </p>
+
         </div>
       </section>
       <div className="settings-layout">

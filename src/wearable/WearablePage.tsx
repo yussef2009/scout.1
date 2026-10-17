@@ -91,11 +91,7 @@ export function WearablePage({ theme = "Dark" }: WearablePageProps) {
               </span>
             </div>
           </div>
-          <p className="intro">
-            Real-time motion sensing for athlete performance monitoring. Direct,
-            browser-native integration with physical 6-axis IMU microcontrollers
-            over local Wi-Fi.
-          </p>
+
         </div>
       </section>
 

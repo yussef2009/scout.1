@@ -579,11 +579,7 @@ export default function FullDashboardPage({
             <br />
             <em>Biomechanical Precision</em>
           </h1>
-          <p className="full-dash-hero-desc">
-            Computer vision-verified tracking at 60 FPS. Discover elite prospects, compare
-            acceleration signatures, and evaluate biomechanical consistency across international
-            divisions.
-          </p>
+
         </div>
 
         {/* Global Sport Pills Bar */}
