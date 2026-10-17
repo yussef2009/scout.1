@@ -180,8 +180,13 @@ function Logo({ onClick }: { onClick?: () => void }) {
       aria-label="SCOT – Go to Home"
       title="Go to Home"
     >
-      <span className="logo-mark"><Icon name="bolt" size={17} /></span>
-      <span>SC<span>O</span>T</span>
+      <span className="logo-mark" aria-hidden="true">
+        <img src="/logo-crest.png" alt="SCOT Crest" className="logo-crest-img" />
+      </span>
+      <span className="logo-text">
+        <span className="logo-wordmark">SC<span>O</span>T</span>
+        <span className="logo-since">SINCE 2026</span>
+      </span>
     </button>
   );
 }
