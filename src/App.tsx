@@ -23,10 +23,12 @@ import {
 } from "./supabase"
 import { SCOT_LOGO_CREST } from "./logo-data"
 import WearablePage from "./wearable/WearablePage"
+import FullDashboardPage from "./dashboard/FullDashboardPage"
+import SportBackground from "./SportBackground"
 
-type IconName = "bolt" | "search" | "chevron" | "location" | "trend" | "play" | "close" | "google" | "facebook" | "arrow" | "shield" | "menu" | "video" | "camera" | "home" | "chart" | "user" | "settings" | "activity" | "cpu" | "wifi"
+export type IconName = "bolt" | "search" | "chevron" | "location" | "trend" | "play" | "close" | "google" | "facebook" | "arrow" | "shield" | "menu" | "video" | "camera" | "home" | "chart" | "user" | "settings" | "activity" | "cpu" | "wifi"
 
-function Icon({ name, size = 18 }: { name: IconName size?: number }) {
+export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, React.ReactNode> = {
     bolt: (
       <path
@@ -164,7 +166,7 @@ function Icon({ name, size = 18 }: { name: IconName size?: number }) {
   )
 }
 
-const sports = [
+export const sports = [
   "Soccer",
   "Basketball",
   "Tennis",
@@ -177,7 +179,7 @@ const sports = [
   "Baseball",
 ]
 
-const sportMetrics: Record<string, {
+export const sportMetrics: Record<string, {
   label: string
   value: string
   unit: string
@@ -438,7 +440,6 @@ function Logo({ onClick }: { onClick?: () => void }) {
         <span className="logo-wordmark">
           SC<span>O</span>T
         </span>
-        <span className="logo-since">SINCE 2026</span>
       </span>
     </button>
   )
@@ -1279,7 +1280,7 @@ function AuthModal({
   )
 }
 
-function ScoreRing({ score }: { score: number }) {
+export function ScoreRing({ score }: { score: number }) {
   return (
     <div
       className="score-ring"
@@ -7771,6 +7772,7 @@ const genericMetrics = [
 
 function App() {
   const [sport, setSport] = useState("Basketball")
+  const [showSportsMenu, setShowSportsMenu] = useState(false)
   const [scope, setScope] = useState("Town / City Level")
   const [region, setRegion] = useState("All regions")
   const [query, setQuery] = useState("")
@@ -8273,6 +8275,7 @@ function App() {
         } as React.CSSProperties
       }
     >
+      <SportBackground sport={sport} theme={theme} />
       <header className="topbar">
         <div className="topbar-left">
           <Logo
@@ -8307,7 +8310,11 @@ function App() {
             (item) => (
               <button
                 key={item}
-                className={view === item ? "active" : ""}
+                className={
+                  view === item || (item === "Dashboard" && view === "FullDashboard")
+                    ? "active"
+                    : ""
+                }
                 onClick={() => {
                   setView(item)
                 }}
@@ -8540,7 +8547,7 @@ function App() {
                   <button
                     key={item.id}
                     className={`mobile-tab-link ${
-                      view === item.id ? "active" : ""
+                      view === item.id || (item.id === "Dashboard" && view === "FullDashboard") ? "active" : ""
                     }`}
                     onClick={() => {
                       setView(item.id)
@@ -8556,7 +8563,7 @@ function App() {
                       <span className="mobile-tab-link-name">{item.name}</span>
                       <span className="mobile-tab-link-desc">{item.desc}</span>
                     </div>
-                    {view === item.id && (
+                    {(view === item.id || (item.id === "Dashboard" && view === "FullDashboard")) && (
                       <span className="mobile-tab-active-indicator" />
                     )}
                   </button>
@@ -8624,19 +8631,42 @@ function App() {
       )}
 
       {view === "Dashboard" && (
-        <section className="sport-strip" aria-label="Select a sport">
-          <span>SPORT SCHEMA</span>
-          <div>
-            {sports.map((item) => (
-              <button
-                key={item}
-                className={sport === item ? "active" : ""}
-                onClick={() => setSport(item)}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
+        <section className="sport-strip" aria-label="Scot sports selector">
+          <button
+            type="button"
+            className={`sport-strip-trigger ${showSportsMenu ? "open" : ""}`}
+            onClick={() => setShowSportsMenu((prev) => !prev)}
+            aria-expanded={showSportsMenu}
+            title="Click to select sports for the dashboard"
+          >
+            <span className="sport-strip-title">Scot sports</span>
+            <span className="sport-active-pill">
+              <span className="sport-active-dot" />
+              {sport}
+            </span>
+            <span className={`sport-chevron ${showSportsMenu ? "open" : ""}`}>
+              <Icon name="chevron" size={13} />
+            </span>
+          </button>
+
+          {showSportsMenu && (
+            <div className="sport-strip-list" role="tablist">
+              {sports.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={sport === item ? "active" : ""}
+                  onClick={() => {
+                    setSport(item)
+                  }}
+                  role="tab"
+                  aria-selected={sport === item}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -8645,17 +8675,13 @@ function App() {
           <section className="hero-heading">
             <div>
               <p className="eyebrow">
-                <span /> LIVE PERFORMANCE NETWORK · {sport.toUpperCase()}
+                <span /> {sport.toUpperCase()}
               </p>
               <h1>
-                FIND THE EDGE.
+                Find the edge
                 <br />
-                <em>PROVE THE IMPACT.</em>
+                <em>Prove the impact</em>
               </h1>
-              <p className="intro">
-                Browser-native biomechanical intelligence for the athletes,
-                clubs, and scouts shaping tomorrow's game.
-              </p>
             </div>
             <div className="network-stat">
               <span>NETWORK SIGNAL</span>
@@ -8885,7 +8911,11 @@ function App() {
                 </span>
                 <button
                   className="text-button"
-                  onClick={() => setSearchOpen(true)}
+                  onClick={() => {
+                    setView("FullDashboard")
+                    window.scrollTo({ top: 0, behavior: "smooth" })
+                  }}
+                  title="Open full interactive athlete dashboard with deep analytics and comparison"
                 >
                   EXPLORE FULL RANKINGS & PROFILES{" "}
                   <Icon name="arrow" size={15} />
@@ -8901,78 +8931,23 @@ function App() {
               onToggleDemo={toggleDemoMode}
             />
           </div>
-
-          <section className="telemetry-section" id="telemetry">
-            <div className="telemetry-copy">
-              <span className="section-kicker">
-                COMPUTER VISION · NO WEARABLES
-              </span>
-              <h2>
-                EVERY FRAME.
-                <br />
-                <em>MEASURABLE.</em>
-              </h2>
-              <p>
-                Scot converts standard match footage into decision-ready
-                biomechanical data—directly in your browser.
-              </p>
-              <div className="telemetry-proof">
-                <span>
-                  <b>60 FPS</b> frame analysis
-                </span>
-                <span>
-                  <b>±2.4%</b> model variance
-                </span>
-              </div>
-              <button
-                className="outline-button"
-                onClick={() => setView("Profile")}
-              >
-                ANALYZE YOUR FOOTAGE <Icon name="arrow" size={15} />
-              </button>
-            </div>
-            <div className="video-hud">
-              <img
-                src="https://images.unsplash.com/photo-1762025884013-8a42741468e2?auto=format&fit=crop&w=1200&q=85"
-                alt="Basketball players in a jump analysis sequence"
-              />
-              <div className="scan-grid" />
-              <span className="hud-label">TAKEOFF FRAME · 00:04:18</span>
-              <span className="tracking-point point-a">
-                <i />
-              </span>
-              <span className="tracking-point point-b">
-                <i />
-              </span>
-              <span className="tracking-line" />
-              <button
-                className="play-button"
-                aria-label="Play movement analysis"
-              >
-                <Icon name="play" size={22} />
-              </button>
-              <div className="hud-metrics">
-                {activeMetrics.slice(0, 3).map((metric) => (
-                  <div key={metric.label}>
-                    <span>{metric.label.toUpperCase()}</span>
-                    <strong>
-                      {metric.value} <small>{metric.unit}</small>
-                    </strong>
-                    <b
-                      className={
-                        metric.delta.toLowerCase().includes("risk")
-                          ? "safe"
-                          : ""
-                      }
-                    >
-                      {metric.delta}
-                    </b>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
         </div>
+      )}
+
+      {view === "FullDashboard" && (
+        <FullDashboardPage
+          sport={sport}
+          setSport={setSport}
+          theme={theme}
+          demoMode={demoMode}
+          onSelectProfile={setViewingProfile}
+          onBackToOverview={() => {
+            setView("Dashboard")
+            window.scrollTo({ top: 0, behavior: "smooth" })
+          }}
+          onOpenSearch={() => setSearchOpen(true)}
+          onOpenSettings={() => setView("Settings")}
+        />
       )}
       {view === "Profile" && (
         <ProfileView
