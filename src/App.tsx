@@ -7331,24 +7331,52 @@ function SettingsView({
                 Choose the interface that best fits your analysis environment.
               </p>
               <div className="theme-options">
-                {["Dark", "Light"].map((item) => (
+                {[
+                  {
+                    id: "Dark",
+                    name: "Dark Obsidian",
+                    desc: "Optimized for film rooms & low light",
+                    previewClass: "dark",
+                  },
+                  {
+                    id: "Light",
+                    name: "Daylight Arena",
+                    desc: "Enhanced daylight clarity & sunlit arenas",
+                    previewClass: "light",
+                  },
+                  {
+                    id: "Midnight",
+                    name: "Midnight Navy",
+                    desc: "Deep tactical navy for night matches",
+                    previewClass: "midnight",
+                  },
+                  {
+                    id: "OLED",
+                    name: "OLED Pitch Black",
+                    desc: "Pure pitch black with sharp contrast borders",
+                    previewClass: "oled",
+                  },
+                  {
+                    id: "Cyber",
+                    name: "Cyber Matrix",
+                    desc: "Tactical biomechanical intelligence lab",
+                    previewClass: "cyber",
+                  },
+                ].map((item) => (
                   <button
-                    key={item}
-                    className={theme === item ? "active" : ""}
-                    onClick={() => setTheme(item)}
+                    key={item.id}
+                    type="button"
+                    className={theme === item.id ? "active" : ""}
+                    onClick={() => setTheme(item.id)}
                   >
-                    <span className={`theme-preview ${item.toLowerCase()}`}>
+                    <span className={`theme-preview ${item.previewClass}`}>
                       <i />
                       <i />
                       <i />
                     </span>
-                    <strong>{item} mode</strong>
-                    <small>
-                      {item === "Dark"
-                        ? "Optimized for film rooms"
-                        : "Enhanced daylight clarity"}
-                    </small>
-                    <b>{theme === item ? "ACTIVE" : "SELECT"}</b>
+                    <strong>{item.name}</strong>
+                    <small>{item.desc}</small>
+                    <b>{theme === item.id ? "ACTIVE" : "SELECT"}</b>
                   </button>
                 ))}
               </div>
@@ -7357,11 +7385,16 @@ function SettingsView({
                 {[
                   ["Pure Gold", "gold"],
                   ["Electric Amber", "amber"],
+                  ["Neon Emerald", "emerald"],
+                  ["Cyber Cyan", "cyan"],
+                  ["Viper Crimson", "crimson"],
+                  ["Ultra Violet", "violet"],
                   ["Platinum", "platinum"],
                   ["Champion Bronze", "bronze"],
                 ].map(([name, color]) => (
                   <button
                     key={name}
+                    type="button"
                     className={accent === name ? "active" : ""}
                     onClick={() => setAccent(name)}
                   >
@@ -7749,11 +7782,58 @@ function SettingsView({
   )
 }
 
-const accentTokens: Record<string, { gold: string bright: string }> = {
-  "Pure Gold": { gold: "#d4af37", bright: "#ffd700" },
-  "Electric Amber": { gold: "#ff9f0a", bright: "#ffb340" },
-  Platinum: { gold: "#94a3b8", bright: "#e2e8f0" },
-  "Champion Bronze": { gold: "#b77945", bright: "#d4a574" },
+const accentTokens: Record<
+  string,
+  { gold: string; bright: string; pale: string; line: string }
+> = {
+  "Pure Gold": {
+    gold: "#d4af37",
+    bright: "#ffd700",
+    pale: "#f3e5ab",
+    line: "rgba(212, 175, 55, 0.35)",
+  },
+  "Electric Amber": {
+    gold: "#ff9f0a",
+    bright: "#ffb340",
+    pale: "#ffe0b2",
+    line: "rgba(255, 159, 10, 0.35)",
+  },
+  "Neon Emerald": {
+    gold: "#10b981",
+    bright: "#34d399",
+    pale: "#a7f3d0",
+    line: "rgba(16, 185, 129, 0.35)",
+  },
+  "Cyber Cyan": {
+    gold: "#0ea5e9",
+    bright: "#38bdf8",
+    pale: "#bae6fd",
+    line: "rgba(14, 165, 233, 0.35)",
+  },
+  "Viper Crimson": {
+    gold: "#f43f5e",
+    bright: "#fb7185",
+    pale: "#fecdd3",
+    line: "rgba(244, 63, 94, 0.35)",
+  },
+  "Ultra Violet": {
+    gold: "#a855f7",
+    bright: "#c084fc",
+    pale: "#e9d5ff",
+    line: "rgba(168, 85, 247, 0.35)",
+  },
+  Platinum: {
+    gold: "#94a3b8",
+    bright: "#e2e8f0",
+    pale: "#f1f5f9",
+    line: "rgba(148, 163, 184, 0.35)",
+  },
+  "Champion Bronze": {
+    gold: "#b77945",
+    bright: "#d4a574",
+    pale: "#f4dec9",
+    line: "rgba(183, 121, 69, 0.35)",
+  },
 }
 
 const genericMetrics = [
@@ -8259,13 +8339,26 @@ function App() {
     }
   }
 
+  const themeClass =
+    theme === "Light"
+      ? "theme-light"
+      : theme === "Midnight"
+        ? "theme-midnight"
+        : theme === "OLED"
+          ? "theme-oled"
+          : theme === "Cyber"
+            ? "theme-cyber"
+            : ""
+
   return (
     <main
-      className={theme === "Light" ? "theme-light" : ""}
+      className={themeClass}
       style={
         {
           "--gold": palette.gold,
           "--gold-bright": palette.bright,
+          "--gold-pale": palette.pale,
+          "--gold-line": palette.line,
         } as React.CSSProperties
       }
     >

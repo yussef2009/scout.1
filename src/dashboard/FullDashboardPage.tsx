@@ -388,7 +388,7 @@ const FULL_ATHLETES_ROSTER: FullDashboardAthlete[] = [
 interface FullDashboardPageProps {
   sport: string
   setSport: (sport: string) => void
-  theme: "Dark" | "Light"
+  theme: string
   demoMode: boolean
   onSelectProfile: (profile: DirectoryProfile) => void
   onBackToOverview: () => void
@@ -508,8 +508,19 @@ export default function FullDashboardPage({
   // Active sport stats
   const activeTopAthlete = filteredAthletes[0] || FULL_ATHLETES_ROSTER[0]
 
+  const themeClass =
+    theme === "Light"
+      ? "theme-light"
+      : theme === "Midnight"
+        ? "theme-midnight"
+        : theme === "OLED"
+          ? "theme-oled"
+          : theme === "Cyber"
+            ? "theme-cyber"
+            : ""
+
   return (
-    <div className={`full-dashboard-shell ${theme === "Light" ? "theme-light" : ""}`}>
+    <div className={`full-dashboard-shell ${themeClass}`}>
       {/* Top Breadcrumb & Executive Navigation */}
       <div className="full-dashboard-header">
         <div className="full-dashboard-breadcrumb-area">

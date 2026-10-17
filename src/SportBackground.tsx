@@ -2,15 +2,54 @@ import React from "react"
 
 interface SportBackgroundProps {
   sport: string
-  theme: "Dark" | "Light"
+  theme: string
 }
 
 export default function SportBackground({ sport, theme }: SportBackgroundProps) {
   const isLight = theme === "Light"
-  const strokeColor = isLight ? "rgba(15, 23, 42, 0.08)" : "rgba(212, 175, 55, 0.12)"
-  const strokeAccent = isLight ? "rgba(180, 83, 9, 0.22)" : "rgba(255, 215, 0, 0.28)"
-  const strokeSubtle = isLight ? "rgba(15, 23, 42, 0.04)" : "rgba(255, 255, 255, 0.05)"
-  const ballFill = isLight ? "rgba(255, 255, 255, 0.6)" : "rgba(18, 18, 22, 0.5)"
+  const isMidnight = theme === "Midnight"
+  const isCyber = theme === "Cyber"
+  const isOled = theme === "OLED"
+
+  const strokeColor = isLight
+    ? "rgba(15, 23, 42, 0.08)"
+    : isMidnight
+      ? "rgba(56, 189, 248, 0.12)"
+      : isCyber
+        ? "rgba(16, 185, 129, 0.12)"
+        : isOled
+          ? "rgba(255, 255, 255, 0.08)"
+          : "rgba(212, 175, 55, 0.12)"
+
+  const strokeAccent = isLight
+    ? "rgba(180, 83, 9, 0.22)"
+    : isMidnight
+      ? "rgba(56, 189, 248, 0.28)"
+      : isCyber
+        ? "rgba(16, 185, 129, 0.28)"
+        : isOled
+          ? "rgba(255, 255, 255, 0.25)"
+          : "rgba(255, 215, 0, 0.28)"
+
+  const strokeSubtle = isLight
+    ? "rgba(15, 23, 42, 0.04)"
+    : isMidnight
+      ? "rgba(56, 189, 248, 0.05)"
+      : isCyber
+        ? "rgba(16, 185, 129, 0.05)"
+        : isOled
+          ? "rgba(255, 255, 255, 0.04)"
+          : "rgba(255, 255, 255, 0.05)"
+
+  const ballFill = isLight
+    ? "rgba(255, 255, 255, 0.6)"
+    : isMidnight
+      ? "rgba(11, 19, 34, 0.6)"
+      : isCyber
+        ? "rgba(9, 20, 14, 0.6)"
+        : isOled
+          ? "rgba(5, 5, 5, 0.6)"
+          : "rgba(18, 18, 22, 0.5)"
 
   // Render sport-specific court/field and ball watermark
   const renderSportGraphic = () => {
