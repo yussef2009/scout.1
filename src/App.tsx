@@ -16,6 +16,7 @@ import {
   type VideoFrame,
 } from "./video-analysis";
 import { isSupabaseConfigured, supabase, type ProfileRow, type SupabaseUser } from "./supabase";
+import { SCOT_LOGO_CREST } from "./logo-data";
 
 type IconName =
   | "bolt"
@@ -181,7 +182,7 @@ function Logo({ onClick }: { onClick?: () => void }) {
       title="Go to Home"
     >
       <span className="logo-mark" aria-hidden="true">
-        <img src="/logo-crest.png" alt="SCOT Crest" className="logo-crest-img" />
+        <img src={SCOT_LOGO_CREST} alt="SCOT Crest" className="logo-crest-img" />
       </span>
       <span className="logo-text">
         <span className="logo-wordmark">SC<span>O</span>T</span>
@@ -3144,7 +3145,7 @@ export const directoryProfiles: DirectoryProfile[] = [
     flag: "🇪🇸",
     score: 98,
     trend: "+2.9",
-    image: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=160&h=160&q=80",
+    image: "https://images.unsplash.com/photo-1517927033932-b3d18e61fb3a?auto=format&fit=crop&w=160&h=160&q=80",
     role: "Club",
     sport: "Soccer",
     followers: 84200,
@@ -3447,7 +3448,7 @@ const INITIAL_POSTS: FeedPost[] = [
     sport: "Soccer",
     timestamp: "18m ago",
     content: "Official lineup assessment for our U-18 squad completed ahead of the Cairo youth cup. Scot AI registered a 97 squad rating with top-tier counter-press transition metrics!",
-    mediaUrl: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=800&q=80",
+    mediaUrl: "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=800&q=80",
     likes: 42,
     commentsCount: 9,
   },
@@ -3478,7 +3479,7 @@ const INITIAL_POSTS: FeedPost[] = [
     id: "post-4",
     authorName: "Real Madrid Cantera",
     authorRole: "Club",
-    authorImage: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=160&h=160&q=80",
+    authorImage: "https://images.unsplash.com/photo-1517927033932-b3d18e61fb3a?auto=format&fit=crop&w=160&h=160&q=80",
     sport: "Soccer",
     timestamp: "5h ago",
     content: "Youth biomechanical audit in Madrid: Precision movement symmetry and sprint acceleration tracking using edge computer vision. The future of talent scouting is here.",
@@ -3638,6 +3639,9 @@ function FeedView({
               <img
                 src={post.authorImage}
                 alt={post.authorName}
+                onError={(e) => {
+                  e.currentTarget.src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&h=160&q=80";
+                }}
                 onClick={() => {
                   const match = directoryProfiles.find((d) => d.name === post.authorName);
                   if (match) onSelectProfile(match);
@@ -3672,7 +3676,14 @@ function FeedView({
             <p className="post-content">{post.content}</p>
 
             {post.mediaUrl && (
-              <img src={post.mediaUrl} alt="Match footage" className="post-media-preview" />
+              <img
+                src={post.mediaUrl}
+                alt="Match footage"
+                className="post-media-preview"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
             )}
 
             <div className="post-footer-actions">
