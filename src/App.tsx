@@ -8438,7 +8438,10 @@ function App() {
               className={`header-account-btn ${
                 accountMenuOpen ? "active" : ""
               }`}
-              onClick={() => setAccountMenuOpen(!accountMenuOpen)}
+              onClick={() => {
+                setAccountMenuOpen(!accountMenuOpen)
+                setMenuOpen(false)
+              }}
               aria-label="Account options"
               title={
                 authenticated ? `${userName} · ${role}` : "Sign In or Join SCOT"
@@ -8462,7 +8465,12 @@ function App() {
             </button>
 
             {accountMenuOpen && (
-              <div className="account-dropdown-panel" role="menu">
+              <>
+                <div
+                  className="mobile-account-backdrop"
+                  onClick={() => setAccountMenuOpen(false)}
+                />
+                <div className="account-dropdown-panel" role="menu">
                 {authenticated ? (
                   <>
                     <div className="account-dropdown-header">
@@ -8553,6 +8561,7 @@ function App() {
                   </div>
                 )}
               </div>
+            </>
             )}
           </div>
 
@@ -8564,142 +8573,144 @@ function App() {
               menuOpen ? "Close navigation tabs" : "Open navigation tabs"
             }
             aria-expanded={menuOpen}
-            onClick={() => setMenuOpen(!menuOpen)}
+            onClick={() => {
+              setMenuOpen(!menuOpen)
+              setAccountMenuOpen(false)
+            }}
           >
             <Icon name={menuOpen ? "close" : "menu"} size={16} />
             <span className="mobile-tab-btn-text">TABS</span>
           </button>
         </div>
+      </header>
 
-        {/* Mobile dropdown panel pinned to upper right corner */}
-        {menuOpen && (
-          <>
-            <div
-              className="mobile-tab-backdrop"
-              onClick={() => setMenuOpen(false)}
-            />
-            <div
-              className="mobile-tab-panel"
-              role="dialog"
-              aria-label="Main navigation tabs"
-            >
-              <div className="mobile-tab-panel-header">
-                <div className="mobile-tab-panel-title">
-                  <Icon name="bolt" size={14} />
-                  <span>MAIN TABS</span>
-                </div>
-                <button
-                  type="button"
-                  className="mobile-tab-panel-close"
-                  onClick={() => setMenuOpen(false)}
-                  aria-label="Close navigation tabs"
-                >
-                  <Icon name="close" size={14} />
-                </button>
+      {/* Mobile dropdown panel pinned to upper right corner, mounted at root */}
+      {menuOpen && (
+        <>
+          <div
+            className="mobile-tab-backdrop"
+            onClick={() => setMenuOpen(false)}
+          />
+          <div
+            className="mobile-tab-panel"
+            role="dialog"
+            aria-label="Main navigation tabs"
+          >
+            <div className="mobile-tab-panel-header">
+              <div className="mobile-tab-panel-title">
+                <Icon name="bolt" size={14} />
+                <span>MAIN TABS</span>
               </div>
+              <button
+                type="button"
+                className="mobile-tab-panel-close"
+                onClick={() => setMenuOpen(false)}
+                aria-label="Close navigation tabs"
+              >
+                <Icon name="close" size={14} />
+              </button>
+            </div>
 
-              <div className="mobile-tab-links">
-                {[
-                  {
-                    id: "Dashboard",
-                    name: "Dashboard",
-                    icon: "chart" as const,
-                    desc: "Analytics & sports benchmarks",
-                  },
-                  {
-                    id: "Explore",
-                    name: "Explore",
-                    icon: "trend" as const,
-                    desc: "Global feed & talent stream",
-                  },
-                  {
-                    id: "Wearable",
-                    name: "Wearable",
-                    icon: "activity" as const,
-                    desc: "ESP32 & MPU6050 live telemetry",
-                  },
-                  {
-                    id: "Profile",
-                    name: "Profile",
-                    icon: "user" as const,
-                    desc: "Your stats, bio & clips",
-                  },
-                  {
-                    id: "Settings",
-                    name: "Settings",
-                    icon: "settings" as const,
-                    desc: "Club credentials & themes",
-                  },
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    className={`mobile-tab-link ${
-                      view === item.id || (item.id === "Dashboard" && view === "FullDashboard") ? "active" : ""
-                    }`}
-                    onClick={() => {
-                      setView(item.id)
-                      setMenuOpen(false)
-                      if (item.id === "Dashboard")
-                        window.scrollTo({ top: 0, behavior: "smooth" })
-                    }}
-                  >
-                    <span className="mobile-tab-link-icon">
-                      <Icon name={item.icon} size={16} />
-                    </span>
-                    <div className="mobile-tab-link-info">
-                      <span className="mobile-tab-link-name">{item.name}</span>
-                      <span className="mobile-tab-link-desc">{item.desc}</span>
-                    </div>
-                    {(view === item.id || (item.id === "Dashboard" && view === "FullDashboard")) && (
-                      <span className="mobile-tab-active-indicator" />
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mobile-tab-actions">
+            <div className="mobile-tab-links">
+              {[
+                {
+                  id: "Dashboard",
+                  name: "Dashboard",
+                  icon: "chart" as const,
+                  desc: "Analytics & sports benchmarks",
+                },
+                {
+                  id: "Explore",
+                  name: "Explore",
+                  icon: "trend" as const,
+                  desc: "Global feed & talent stream",
+                },
+                {
+                  id: "Wearable",
+                  name: "Wearable",
+                  icon: "activity" as const,
+                  desc: "ESP32 & MPU6050 live telemetry",
+                },
+                {
+                  id: "Profile",
+                  name: "Profile",
+                  icon: "user" as const,
+                  desc: "Your stats, bio & clips",
+                },
+                {
+                  id: "Settings",
+                  name: "Settings",
+                  icon: "settings" as const,
+                  desc: "Club credentials & themes",
+                },
+              ].map((item) => (
                 <button
-                  type="button"
-                  className="mobile-tab-action-btn search"
+                  key={item.id}
+                  className={`mobile-tab-link ${
+                    view === item.id || (item.id === "Dashboard" && view === "FullDashboard") ? "active" : ""
+                  }`}
                   onClick={() => {
+                    setView(item.id)
                     setMenuOpen(false)
-                    setSearchOpen(true)
+                    window.scrollTo({ top: 0, behavior: "smooth" })
                   }}
                 >
-                  <Icon name="search" size={14} />
-                  <span>Search Clubs & Athletes</span>
+                  <span className="mobile-tab-link-icon">
+                    <Icon name={item.icon} size={16} />
+                  </span>
+                  <div className="mobile-tab-link-info">
+                    <span className="mobile-tab-link-name">{item.name}</span>
+                    <span className="mobile-tab-link-desc">{item.desc}</span>
+                  </div>
+                  {(view === item.id || (item.id === "Dashboard" && view === "FullDashboard")) && (
+                    <span className="mobile-tab-active-indicator" />
+                  )}
                 </button>
-
-                {authenticated ? (
-                  <button
-                    type="button"
-                    className="mobile-tab-action-btn signout"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      void handleSignOut()
-                    }}
-                  >
-                    <Icon name="close" size={14} />
-                    <span>Sign Out ({userName.toUpperCase()})</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="mobile-tab-action-btn signin"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setAuthOpen(true)
-                    }}
-                  >
-                    <Icon name="arrow" size={14} />
-                    <span>Sign In or Join</span>
-                  </button>
-                )}
-              </div>
+              ))}
             </div>
-          </>
-        )}
-      </header>
+
+            <div className="mobile-tab-actions">
+              <button
+                type="button"
+                className="mobile-tab-action-btn search"
+                onClick={() => {
+                  setMenuOpen(false)
+                  setSearchOpen(true)
+                }}
+              >
+                <Icon name="search" size={14} />
+                <span>Search Clubs & Athletes</span>
+              </button>
+
+              {authenticated ? (
+                <button
+                  type="button"
+                  className="mobile-tab-action-btn signout"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    void handleSignOut()
+                  }}
+                >
+                  <Icon name="close" size={14} />
+                  <span>Sign Out ({userName.toUpperCase()})</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="mobile-tab-action-btn signin"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setAuthOpen(true)
+                  }}
+                >
+                  <Icon name="arrow" size={14} />
+                  <span>Sign In or Join</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
       {authError && (
         <div className="analysis-error" role="alert">
           {authError}
@@ -9092,6 +9103,42 @@ function App() {
           onSaveAllSettings={handleSaveAllSettings}
         />
       )}
+
+      {/* Mobile Sticky Bottom Navigation Bar */}
+      <nav className="mobile-bottom-nav" aria-label="Mobile navigation bar">
+        {[
+          { id: "Dashboard", label: "Dashboard", icon: "chart" as const },
+          { id: "Explore", label: "Explore", icon: "trend" as const },
+          { id: "Wearable", label: "Wearable", icon: "activity" as const },
+          { id: "Profile", label: "Profile", icon: "user" as const },
+          { id: "Settings", label: "Settings", icon: "settings" as const },
+        ].map((tab) => {
+          const isActive =
+            view === tab.id || (tab.id === "Dashboard" && view === "FullDashboard")
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              className={`mobile-bottom-nav-item ${isActive ? "active" : ""}`}
+              onClick={() => {
+                setView(tab.id)
+                setMenuOpen(false)
+                setAccountMenuOpen(false)
+                window.scrollTo({ top: 0, behavior: "smooth" })
+              }}
+              aria-label={tab.label}
+              aria-current={isActive ? "page" : undefined}
+            >
+              {isActive && <span className="mobile-bottom-nav-indicator" />}
+              <span className="mobile-bottom-nav-icon-wrap">
+                <Icon name={tab.icon} size={18} />
+              </span>
+              <span className="mobile-bottom-nav-label">{tab.label}</span>
+            </button>
+          )
+        })}
+      </nav>
+
       <footer>
         <Logo />
         <span>SERVERLESS ATHLETIC INTELLIGENCE · BUILT FOR THE NEXT PLAY</span>
