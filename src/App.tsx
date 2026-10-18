@@ -25,6 +25,29 @@ import { SCOT_LOGO_CREST } from "./logo-data"
 import WearablePage from "./wearable/WearablePage"
 import FullDashboardPage from "./dashboard/FullDashboardPage"
 import SportBackground from "./SportBackground"
+import {
+  MediaCenterPage,
+  initialDemoClips,
+  type MediaClip,
+} from "./media/MediaCenterPage"
+import { PerformanceReportPage } from "./reports/PerformanceReportPage"
+
+export interface ProfileRecord {
+  id: string
+  date: string
+  sport: string
+  playerName: string
+  overallScore: number
+  overallGrade: string
+  verticalCm?: string
+  flightSec?: string
+  contactMs?: string
+  strengths: string[]
+  areasToImprove: string[]
+  recommendations: string[]
+  narrative?: string
+  verified: boolean
+}
 
 export type IconName = "bolt" | "search" | "chevron" | "location" | "trend" | "play" | "close" | "google" | "facebook" | "arrow" | "shield" | "menu" | "video" | "camera" | "home" | "chart" | "user" | "settings" | "activity" | "cpu" | "wifi"
 
@@ -420,7 +443,7 @@ export type ManualPlayerEntry = {
   cropFrame?: string
 }
 
-function Logo({ onClick }: { onClick?: () => void }) {
+export function Logo({ onClick }: { onClick?: () => void }) {
   return (
     <button
       type="button"
@@ -1616,6 +1639,12 @@ function ProfileView({
   onOpenSettings,
   onModelChange,
   demoMode = true,
+  mediaClips,
+  onAddMediaClip,
+  onOpenMediaCenter,
+  onOpenPerformanceReport,
+  profileRecords,
+  onSaveProfileRecord,
 }: {
   sport: string
   role: string
@@ -1626,6 +1655,12 @@ function ProfileView({
   onOpenSettings: () => void
   onModelChange: (model: string) => void
   demoMode?: boolean
+  mediaClips?: MediaClip[]
+  onAddMediaClip?: (clip: MediaClip) => void
+  onOpenMediaCenter?: () => void
+  onOpenPerformanceReport?: (report?: VideoAnalysisReport | null) => void
+  profileRecords?: ProfileRecord[]
+  onSaveProfileRecord?: (record: ProfileRecord) => void
 }) {
   const [videoFile, setVideoFile] = useState<File | null>(null)
   const [videoUrl, setVideoUrl] = useState("")
@@ -1639,6 +1674,7 @@ function ProfileView({
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState("")
   const [error, setError] = useState("")
+  const [savedReportIds, setSavedReportIds] = useState<string[]>([])
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [activeTab, setActiveTab] =
     useState<"analysis" | "live" | "teams" | "privacy">("analysis")
@@ -1726,6 +1762,31 @@ function ProfileView({
     setStatus("")
     setError("")
     setLoadingProgress(0)
+
+    // Automatically save uploaded video to Media Center
+    if (onAddMediaClip) {
+      const clipId = `clip-up-${Date.now()}`
+      const clipUrl = URL.createObjectURL(file)
+      const newClip: MediaClip = {
+        id: clipId,
+        session: `SESSION ${(mediaClips?.length ?? 0) + 1}`,
+        title: file.name.replace(/\.[^/.]+$/, "") || `Session ${(mediaClips?.length ?? 0) + 1}`,
+        value: "Uploaded",
+        label: "Ready for Analysis",
+        image:
+          "https://images.unsplash.com/photo-1762025884013-8a42741468e2?auto=format&fit=crop&w=800&q=80",
+        videoUrl: clipUrl,
+        date: new Date().toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }),
+        sport,
+        duration: "0:24",
+        verified: false,
+      }
+      onAddMediaClip(newClip)
+    }
   }
 
   const extractCandidateFrames = async () => {
@@ -2196,7 +2257,33 @@ function ProfileView({
           )
         }
       }
-      if (nextReports.length) setReports(nextReports)
+      if (nextReports.length) {
+        setReports(nextReports)
+        // Automatically update the analyzed clip in Media Center
+        if (onAddMediaClip && videoFile) {
+          const firstRep = nextReports[0].report
+          const updatedClip: MediaClip = {
+            id: `clip-done-${Date.now()}`,
+            session: `SESSION ${(mediaClips?.length ?? 0) + 1}`,
+            title: videoFile.name.replace(/\.[^/.]+$/, "") || `Session ${(mediaClips?.length ?? 0) + 1}`,
+            value: `${firstRep.overallScore}/100`,
+            label: `Grade ${firstRep.overallGrade} · ${sport}`,
+            image: frames[0]?.data || "https://images.unsplash.com/photo-1762025884013-8a42741468e2?auto=format&fit=crop&w=800&q=80",
+            videoUrl: videoUrl,
+            date: new Date().toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            }),
+            sport,
+            duration: "0:24",
+            overallScore: firstRep.overallScore,
+            grade: firstRep.overallGrade,
+            verified: true,
+          }
+          onAddMediaClip(updatedClip)
+        }
+      }
       if (failures.length) throw new Error(failures.join(" "))
       setLoadingProgress(100)
       setStatus("Video analysis & touch tracking complete.")
@@ -3619,6 +3706,55 @@ function ProfileView({
                       {report.narrative && (
                         <p className="analysis-narrative">{report.narrative}</p>
                       )}
+
+                      {/* Save to Profile Records Action */}
+                      <div className="analysis-save-banner">
+                        <div className="save-banner-info">
+                          <Icon name="shield" size={18} />
+                          <div>
+                            <strong>AI VERIFIED ANALYSIS READY</strong>
+                            <span>
+                              Save this certified session to your athlete profile career records
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="primary-button save-to-records-btn"
+                          onClick={() => {
+                            if (!onSaveProfileRecord) return
+                            const key = `${report.overallScore}-${report.overallGrade}`
+                            const newRecord: ProfileRecord = {
+                              id: `rec-${Date.now()}`,
+                              date: new Date().toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              }),
+                              sport,
+                              playerName: player?.label || name,
+                              overallScore: report.overallScore,
+                              overallGrade: report.overallGrade,
+                              verticalCm: demoMode ? "78.4 cm" : "N/A",
+                              flightSec: demoMode ? "0.83 s" : "N/A",
+                              contactMs: demoMode ? "186 ms" : "N/A",
+                              strengths: report.strengths,
+                              areasToImprove: report.areasToImprove,
+                              recommendations: report.recommendations,
+                              narrative: report.narrative,
+                              verified: true,
+                            }
+                            onSaveProfileRecord(newRecord)
+                            setSavedReportIds((prev) => [...prev, key])
+                            setStatus("Session successfully certified and saved to athlete profile records.")
+                          }}
+                        >
+                          <Icon name="bolt" size={14} />
+                          {savedReportIds.includes(`${report.overallScore}-${report.overallGrade}`)
+                            ? "SAVED TO PROFILE RECORDS ✓"
+                            : "SAVE TO PROFILE RECORDS"}
+                        </button>
+                      </div>
                     </article>
                   )
                 })}
@@ -3638,43 +3774,59 @@ function ProfileView({
                   <span className="section-kicker">MEDIA CENTER</span>
                   <h2>ANALYZED CLIPS</h2>
                 </div>
-                {demoMode && (
-                  <button className="text-button">
-                    VIEW ALL 12 <Icon name="arrow" size={15} />
-                  </button>
-                )}
+                <button
+                  className="text-button"
+                  onClick={onOpenMediaCenter}
+                  title="Open full Media Center"
+                >
+                  VIEW ALL {mediaClips?.length ?? 12}{" "}
+                  <Icon name="arrow" size={15} />
+                </button>
               </div>
-              {demoMode ? (
+              {(mediaClips && mediaClips.length > 0) || demoMode ? (
                 <div className="clip-grid">
-                  {[
-                    [
-                      "0.83s",
-                      "Hang time",
-                      "SESSION 18",
-                      "https://images.unsplash.com/photo-1762025884013-8a42741468e2?auto=format&fit=crop&w=500&q=80",
-                    ],
-                    [
-                      "78.4cm",
-                      "Vertical",
-                      "SESSION 17",
-                      "https://images.unsplash.com/photo-1762025753986-b6227fe6debb?auto=format&fit=crop&w=500&q=80",
-                    ],
-                    [
-                      "186ms",
-                      "Contact",
-                      "SESSION 16",
-                      "https://images.unsplash.com/photo-1762025721967-76b6280f8e04?auto=format&fit=crop&w=500&q=80",
-                    ],
-                  ].map(([value, label, session, image]) => (
-                    <button className="clip-card" key={session}>
-                      <img src={image} alt="" />
+                  {(mediaClips && mediaClips.length > 0
+                    ? mediaClips.slice(0, 3)
+                    : [
+                        {
+                          id: "clip-demo-18",
+                          session: "SESSION 18",
+                          value: "0.83s",
+                          label: "Hang time",
+                          image:
+                            "https://images.unsplash.com/photo-1762025884013-8a42741468e2?auto=format&fit=crop&w=500&q=80",
+                        },
+                        {
+                          id: "clip-demo-17",
+                          session: "SESSION 17",
+                          value: "78.4cm",
+                          label: "Vertical",
+                          image:
+                            "https://images.unsplash.com/photo-1762025753986-b6227fe6debb?auto=format&fit=crop&w=500&q=80",
+                        },
+                        {
+                          id: "clip-demo-16",
+                          session: "SESSION 16",
+                          value: "186ms",
+                          label: "Contact",
+                          image:
+                            "https://images.unsplash.com/photo-1762025721967-76b6280f8e04?auto=format&fit=crop&w=500&q=80",
+                        },
+                      ]
+                  ).map((clip) => (
+                    <button
+                      className="clip-card"
+                      key={clip.id}
+                      onClick={onOpenMediaCenter}
+                    >
+                      <img src={clip.image} alt="" />
                       <span className="clip-play">
                         <Icon name="play" size={13} />
                       </span>
-                      <small>{session}</small>
+                      <small>{clip.session}</small>
                       <div>
-                        <strong>{value}</strong>
-                        <span>{label}</span>
+                        <strong>{clip.value}</strong>
+                        <span>{clip.label}</span>
                       </div>
                     </button>
                   ))}
@@ -3782,11 +3934,97 @@ function ProfileView({
               <button
                 className="outline-button report-export"
                 disabled={!demoMode && !reports.length}
+                onClick={() => onOpenPerformanceReport?.(reports[0]?.report ?? null)}
               >
                 EXPORT VERIFIED PDF <Icon name="arrow" size={15} />
               </button>
             </div>
           </section>
+
+          {/* Profile Career Records Section */}
+          {profileRecords && profileRecords.length > 0 && (
+            <section className="profile-records-section">
+              <div className="panel-title">
+                <div>
+                  <span className="section-kicker">CAREER HISTORY</span>
+                  <h2>SAVED PROFILE RECORDS & SESSIONS</h2>
+                </div>
+                <span className="verified-stamp">
+                  <Icon name="shield" size={13} /> {profileRecords.length} VERIFIED
+                </span>
+              </div>
+              <div className="records-grid">
+                {profileRecords.map((rec) => (
+                  <div key={rec.id} className="record-item-card">
+                    <div className="record-item-header">
+                      <strong>
+                        {rec.sport} · {rec.playerName}
+                      </strong>
+                      <span>{rec.date}</span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
+                      <span
+                        style={{
+                          font: "700 22px 'Space Grotesk'",
+                          color: "var(--gold-bright)",
+                        }}
+                      >
+                        {rec.overallScore}/100
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "var(--white)",
+                          fontWeight: 600,
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          background: "rgba(212, 175, 55, 0.15)",
+                          border: "1px solid var(--gold-line)",
+                        }}
+                      >
+                        Grade {rec.overallGrade}
+                      </span>
+                    </div>
+                    <div className="record-metrics-pills">
+                      {rec.verticalCm && (
+                        <span className="record-pill">
+                          Vert: {rec.verticalCm}
+                        </span>
+                      )}
+                      {rec.flightSec && (
+                        <span className="record-pill">
+                          Flight: {rec.flightSec}
+                        </span>
+                      )}
+                      {rec.contactMs && (
+                        <span className="record-pill">
+                          Contact: {rec.contactMs}
+                        </span>
+                      )}
+                    </div>
+                    {rec.narrative && (
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 12,
+                          color: "var(--gray)",
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {rec.narrative}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </>
       )}
 
@@ -7977,6 +8215,76 @@ function App() {
     })
   }
 
+  const [mediaClips, setMediaClips] = useState<MediaClip[]>(() => {
+    try {
+      const saved = localStorage.getItem("scot_media_clips")
+      if (saved) return JSON.parse(saved)
+    } catch {}
+    return initialDemoClips
+  })
+
+  const [profileRecords, setProfileRecords] = useState<ProfileRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem("scot_profile_records")
+      if (saved) return JSON.parse(saved)
+    } catch {}
+    return [
+      {
+        id: "rec-initial-01",
+        date: "Oct 18, 2026",
+        sport: "Basketball",
+        playerName: "Omar Khalil",
+        overallScore: 94,
+        overallGrade: "A+",
+        verticalCm: "78.4 cm",
+        flightSec: "0.83 s",
+        contactMs: "186 ms",
+        strengths: [
+          "Elite rapid force development",
+          "Optimal bilateral takeoff symmetry",
+        ],
+        areasToImprove: ["Minor valgus drift on rapid stop"],
+        recommendations: ["Isometric depth drops 2x weekly"],
+        narrative:
+          "Standout kinetic chain efficiency with top-tier reactive strength index.",
+        verified: true,
+      },
+    ]
+  })
+
+  const [activeReportForExport, setActiveReportForExport] =
+    useState<VideoAnalysisReport | null>(null)
+
+  const handleAddMediaClip = (clip: MediaClip) => {
+    setMediaClips((prev) => {
+      const next = [clip, ...prev.filter((c) => c.id !== clip.id)]
+      try {
+        localStorage.setItem("scot_media_clips", JSON.stringify(next))
+      } catch {}
+      return next
+    })
+  }
+
+  const handleDeleteMediaClip = (id: string) => {
+    setMediaClips((prev) => {
+      const next = prev.filter((c) => c.id !== id)
+      try {
+        localStorage.setItem("scot_media_clips", JSON.stringify(next))
+      } catch {}
+      return next
+    })
+  }
+
+  const handleSaveProfileRecord = (record: ProfileRecord) => {
+    setProfileRecords((prev) => {
+      const next = [record, ...prev.filter((r) => r.id !== record.id)]
+      try {
+        localStorage.setItem("scot_profile_records", JSON.stringify(next))
+      } catch {}
+      return next
+    })
+  }
+
   const handleSaveAllSettings = async () => {
     const payload = {
       userName,
@@ -9127,6 +9435,39 @@ function App() {
           onOpenSettings={() => setView("Settings")}
           onModelChange={selectModel}
           demoMode={demoMode}
+          mediaClips={mediaClips}
+          onAddMediaClip={handleAddMediaClip}
+          onOpenMediaCenter={() => setView("MediaCenter")}
+          onOpenPerformanceReport={(rep) => {
+            setActiveReportForExport(rep ?? null)
+            setView("PerformanceReport")
+          }}
+          profileRecords={profileRecords}
+          onSaveProfileRecord={handleSaveProfileRecord}
+        />
+      )}
+      {view === "MediaCenter" && (
+        <MediaCenterPage
+          onBack={() => setView("Profile")}
+          sport={sport}
+          name={userName}
+          role={role}
+          mediaClips={mediaClips}
+          onDeleteClip={handleDeleteMediaClip}
+          onAddClip={handleAddMediaClip}
+          onOpenReport={() => setView("PerformanceReport")}
+        />
+      )}
+      {view === "PerformanceReport" && (
+        <PerformanceReportPage
+          onBack={() => setView("Profile")}
+          name={userName}
+          sport={sport}
+          role={role}
+          country={country}
+          city={city}
+          report={activeReportForExport}
+          onOpenMedia={() => setView("MediaCenter")}
         />
       )}
       {view === "Wearable" && <WearablePage theme={theme} />}
