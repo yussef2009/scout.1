@@ -49,7 +49,19 @@ export interface ProfileRecord {
   verified: boolean
 }
 
-export type IconName = "bolt" | "search" | "chevron" | "location" | "trend" | "play" | "close" | "google" | "facebook" | "arrow" | "shield" | "menu" | "video" | "camera" | "home" | "chart" | "user" | "settings" | "activity" | "cpu" | "wifi"
+export interface NotificationItem {
+  id: string
+  type: "message" | "follower" | "post"
+  senderName: string
+  senderRole?: string
+  title: string
+  body: string
+  time: string
+  read: boolean
+  badge?: string
+}
+
+export type IconName = "bolt" | "search" | "chevron" | "location" | "trend" | "play" | "close" | "google" | "facebook" | "arrow" | "shield" | "menu" | "video" | "camera" | "home" | "chart" | "user" | "settings" | "activity" | "cpu" | "wifi" | "bell"
 
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, React.ReactNode> = {
@@ -170,6 +182,12 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
         <path d="M1.42 9a16 16 0 0 1 21.16 0" />
         <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
         <line x1="12" y1="20" x2="12.01" y2="20" />
+      </>
+    ),
+    bell: (
+      <>
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
       </>
     ),
   }
@@ -8144,6 +8162,108 @@ function App() {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement>(null)
 
+  // Notifications state
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const notificationsMenuRef = useRef<HTMLDivElement>(null)
+  const [postNotificationsActive, setPostNotificationsActive] = useState(() => {
+    return localStorage.getItem("scot_post_notifications") !== "false"
+  })
+  const [notificationsTab, setNotificationsTab] = useState<
+    "all" | "message" | "follower" | "post"
+  >("all")
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
+    try {
+      const saved = localStorage.getItem("scot_notifications")
+      if (saved) return JSON.parse(saved)
+    } catch {}
+    return [
+      {
+        id: "notif-1",
+        type: "message",
+        senderName: "Victor Valdés (FC Barcelona Academy)",
+        senderRole: "Lead Youth Scout",
+        title: "Official Scouting Inquiry & Trial Invitation",
+        body: "We reviewed your 0.83s hang time & 78.4cm vertical jump analysis. Our technical staff would like to schedule an assessment call next week.",
+        time: "10m ago",
+        read: false,
+        badge: "CLUB SCOUT",
+      },
+      {
+        id: "notif-2",
+        type: "follower",
+        senderName: "Coach Marcus Henderson",
+        senderRole: "Head Coach, Elite Prep",
+        title: "New Coach Follower",
+        body: "Coach Marcus Henderson started tracking your verified biomechanics and jump telemetry.",
+        time: "45m ago",
+        read: false,
+        badge: "VERIFIED COACH",
+      },
+      {
+        id: "notif-3",
+        type: "message",
+        senderName: "Alexandria Falcons Management",
+        senderRole: "Recruiting Coordinator",
+        title: "Contract Evaluation Update",
+        body: "Your kinetic symmetry (96%) and landing scores have been added to the Tier-1 draft board.",
+        time: "2h ago",
+        read: false,
+        badge: "DIRECT CLUB MESSAGE",
+      },
+      {
+        id: "notif-4",
+        type: "follower",
+        senderName: "Ziad El-Sayed & 2 others",
+        senderRole: "National League Athletes",
+        title: "New Athlete Followers",
+        body: "Ziad El-Sayed, Malak Nabil, and FC Barcelona Academy followed your profile.",
+        time: "4h ago",
+        read: true,
+        badge: "ATHLETES",
+      },
+      {
+        id: "notif-5",
+        type: "post",
+        senderName: "Real Betis Youth Academy",
+        senderRole: "Tactical Channel",
+        title: "New Training Drill Footage",
+        body: "Published new tactical session: 'Perimeter Motion & Rapid Deceleration Mechanics'.",
+        time: "6h ago",
+        read: true,
+        badge: "DRILL POST",
+      },
+    ]
+  })
+  const [activeMessageReply, setActiveMessageReply] =
+    useState<NotificationItem | null>(null)
+  const [replyText, setReplyText] = useState("")
+  const [replySentSuccess, setReplySentSuccess] = useState(false)
+
+  const unreadNotificationsCount = useMemo(() => {
+    return notifications.filter((n) => {
+      if (n.type === "post" && !postNotificationsActive) return false
+      return !n.read
+    }).length
+  }, [notifications, postNotificationsActive])
+
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter((n) => {
+      if (n.type === "post" && !postNotificationsActive) return false
+      if (notificationsTab === "all") return true
+      return n.type === notificationsTab
+    })
+  }, [notifications, notificationsTab, postNotificationsActive])
+
+  const markAllNotificationsAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+    try {
+      localStorage.setItem(
+        "scot_notifications",
+        JSON.stringify(notifications.map((n) => ({ ...n, read: true }))),
+      )
+    } catch {}
+  }
+
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
@@ -8152,12 +8272,18 @@ function App() {
       ) {
         setAccountMenuOpen(false)
       }
+      if (
+        notificationsMenuRef.current &&
+        !notificationsMenuRef.current.contains(e.target as Node)
+      ) {
+        setNotificationsOpen(false)
+      }
     }
-    if (accountMenuOpen) {
+    if (accountMenuOpen || notificationsOpen) {
       document.addEventListener("mousedown", handleClickOutside)
       return () => document.removeEventListener("mousedown", handleClickOutside)
     }
-  }, [accountMenuOpen])
+  }, [accountMenuOpen, notificationsOpen])
 
   const [theme, setTheme] = useState("Dark")
   const [model, setModel] = useState(() => {
@@ -8770,7 +8896,7 @@ function App() {
 
         {/* Desktop + tablet nav */}
         <nav className="desktop-nav" aria-label="Main navigation">
-          {["Dashboard", "Explore", "Wearable", "Profile", "Settings"].map(
+          {["Dashboard", "Explore", "Wearable", "Profile"].map(
             (item) => (
               <button
                 key={item}
@@ -8807,6 +8933,216 @@ function App() {
                 ? `${role.toUpperCase()} SESSION`
                 : "PUBLIC VIEW"}
           </span>
+
+          {/* Notifications Button & Dropdown Tab */}
+          <div className="notifications-menu-container" ref={notificationsMenuRef}>
+            <button
+              type="button"
+              className={`header-notification-btn ${notificationsOpen ? "active" : ""}`}
+              onClick={() => {
+                setNotificationsOpen(!notificationsOpen)
+                setAccountMenuOpen(false)
+                setMenuOpen(false)
+              }}
+              aria-label="Open notifications"
+              title="Notifications"
+            >
+              <Icon name="bell" size={17} />
+              {unreadNotificationsCount > 0 && (
+                <span className="notification-unread-pill">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+
+            {notificationsOpen && (
+              <>
+                <div
+                  className="mobile-account-backdrop"
+                  onClick={() => setNotificationsOpen(false)}
+                />
+                <div
+                  className="notifications-dropdown-panel"
+                  role="region"
+                  aria-label="Notifications panel"
+                >
+                  {/* Header */}
+                  <div className="notifications-header">
+                    <div className="notifications-title-wrap">
+                      <Icon name="bell" size={15} />
+                      <strong>NOTIFICATIONS</strong>
+                      {unreadNotificationsCount > 0 && (
+                        <span
+                          className="stamp-verified-label"
+                          style={{ padding: "2px 6px", fontSize: 10 }}
+                        >
+                          {unreadNotificationsCount} NEW
+                        </span>
+                      )}
+                    </div>
+                    {unreadNotificationsCount > 0 && (
+                      <button
+                        type="button"
+                        className="notifications-mark-read-btn"
+                        onClick={markAllNotificationsAsRead}
+                      >
+                        Mark all read ✓
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Filter Tabs */}
+                  <div className="notifications-tabs">
+                    {[
+                      { id: "all", label: "All" },
+                      { id: "message", label: "Scout & Club" },
+                      { id: "follower", label: "Followers" },
+                      { id: "post", label: "Posts" },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        className={`notifications-tab-btn ${
+                          notificationsTab === tab.id ? "active" : ""
+                        }`}
+                        onClick={() => setNotificationsTab(tab.id as any)}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Post notifications active toggle strip */}
+                  <div className="post-notifications-toggle-strip">
+                    <div className="post-toggle-text">
+                      <strong>Post Notifications</strong>
+                      <span>
+                        {postNotificationsActive
+                          ? "Alerts enabled for club & coach posts"
+                          : "Post alerts currently paused"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className={`toggle-switch-btn ${
+                        postNotificationsActive ? "active" : ""
+                      }`}
+                      onClick={() => {
+                        const next = !postNotificationsActive
+                        setPostNotificationsActive(next)
+                        try {
+                          localStorage.setItem(
+                            "scot_post_notifications",
+                            next ? "true" : "false",
+                          )
+                        } catch {}
+                      }}
+                    >
+                      {postNotificationsActive ? "ENABLED" : "PAUSED"}
+                    </button>
+                  </div>
+
+                  {/* List of notifications */}
+                  <div className="notification-list">
+                    {filteredNotifications.length > 0 ? (
+                      filteredNotifications.map((n) => (
+                        <div
+                          key={n.id}
+                          className={`notification-item ${n.type} ${
+                            !n.read ? "unread" : ""
+                          }`}
+                          onClick={() => {
+                            setNotifications((prev) =>
+                              prev.map((item) =>
+                                item.id === n.id ? { ...item, read: true } : item,
+                              ),
+                            )
+                          }}
+                        >
+                          <div className="notification-item-icon">
+                            {n.type === "message" ? (
+                              <Icon name="bolt" size={16} />
+                            ) : n.type === "follower" ? (
+                              <Icon name="user" size={16} />
+                            ) : (
+                              <Icon name="video" size={16} />
+                            )}
+                          </div>
+                          <div className="notification-item-content">
+                            <div className="notification-item-top">
+                              <span className="notification-sender">
+                                {n.senderName}
+                              </span>
+                              <span className="notification-time">{n.time}</span>
+                            </div>
+                            {n.badge && (
+                              <span className="notification-badge-pill">
+                                {n.badge}
+                              </span>
+                            )}
+                            <p className="notification-body">{n.body}</p>
+                            <div className="notification-action-bar">
+                              {n.type === "message" && (
+                                <button
+                                  type="button"
+                                  className="notif-action-btn primary"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setActiveMessageReply(n)
+                                    setReplyText("")
+                                  }}
+                                >
+                                  Reply to Scout
+                                </button>
+                              )}
+                              {n.type === "follower" && (
+                                <button
+                                  type="button"
+                                  className="notif-action-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleToggleFollow(n.senderName)
+                                  }}
+                                >
+                                  {followingList.includes(n.senderName)
+                                    ? "Following ✓"
+                                    : "Follow Back"}
+                                </button>
+                              )}
+                              {n.type === "post" && (
+                                <button
+                                  type="button"
+                                  className="notif-action-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setView("Explore")
+                                    setNotificationsOpen(false)
+                                  }}
+                                >
+                                  View Footage
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div
+                        style={{
+                          padding: "32px 16px",
+                          textAlign: "center",
+                          color: "var(--muted)",
+                          fontSize: 13,
+                        }}
+                      >
+                        No notifications in this category.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Account Icon Button & Popover */}
           <div className="account-menu-container" ref={accountMenuRef}>
@@ -8934,6 +9270,18 @@ function App() {
                       }}
                     >
                       SIGN IN / JOIN SCOT <Icon name="arrow" size={13} />
+                    </button>
+                    <div className="account-dropdown-separator" style={{ margin: "12px 0 8px" }} />
+                    <button
+                      type="button"
+                      className="account-dropdown-item"
+                      onClick={() => {
+                        setView("Settings")
+                        setAccountMenuOpen(false)
+                      }}
+                    >
+                      <Icon name="settings" size={14} />
+                      <span>System & Theme Settings</span>
                     </button>
                   </div>
                 )}
@@ -9607,6 +9955,110 @@ function App() {
             setViewingProfile(p)
           }}
         />
+      )}
+      {activeMessageReply && (
+        <div
+          className="customize-pdf-modal"
+          onClick={() => setActiveMessageReply(null)}
+        >
+          <div
+            className="customize-modal-dialog"
+            style={{ maxWidth: 500 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="customize-modal-header">
+              <h2>Reply to {activeMessageReply.senderName}</h2>
+              <button
+                className="modal-close-icon"
+                onClick={() => setActiveMessageReply(null)}
+              >
+                <Icon name="close" size={18} />
+              </button>
+            </div>
+            <div className="customize-modal-body">
+              <div
+                style={{
+                  padding: "12px",
+                  background: "rgba(255, 255, 255, 0.03)",
+                  borderRadius: 8,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 10,
+                    color: "var(--gold-bright)",
+                    fontWeight: 700,
+                    display: "block",
+                    marginBottom: 4,
+                  }}
+                >
+                  INQUIRY FROM {activeMessageReply.badge}
+                </span>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 13,
+                    color: "var(--gray)",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  &ldquo;{activeMessageReply.body}&rdquo;
+                </p>
+              </div>
+              <label className="field-label">
+                YOUR ATHLETE RESPONSE
+                <textarea
+                  rows={4}
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="Thank you for reaching out! I am available next Thursday to review my verified kinematic report..."
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    borderRadius: 8,
+                    background: "var(--panel)",
+                    border: "1px solid var(--line)",
+                    color: "var(--white)",
+                    fontSize: 13,
+                  }}
+                />
+              </label>
+              {replySentSuccess && (
+                <div
+                  style={{
+                    color: "var(--green)",
+                    fontWeight: 600,
+                    fontSize: 13,
+                  }}
+                >
+                  Response transmitted securely to scout network ✓
+                </div>
+              )}
+            </div>
+            <div className="customize-modal-footer">
+              <button
+                className="secondary-button"
+                onClick={() => setActiveMessageReply(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="primary-button"
+                disabled={!replyText.trim() || replySentSuccess}
+                onClick={() => {
+                  setReplySentSuccess(true)
+                  setTimeout(() => {
+                    setActiveMessageReply(null)
+                    setReplySentSuccess(false)
+                    setReplyText("")
+                  }, 1200)
+                }}
+              >
+                {replySentSuccess ? "SENT ✓" : "Send Response"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   )

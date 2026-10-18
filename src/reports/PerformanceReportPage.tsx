@@ -26,6 +26,42 @@ export function PerformanceReportPage({
   onOpenMedia,
 }: PerformanceReportPageProps) {
   const [copiedLink, setCopiedLink] = useState(false)
+  const [showCustomizeModal, setShowCustomizeModal] = useState(false)
+
+  // Customization Options State
+  const [reportTitle, setReportTitle] = useState(
+    "SCOT BIOMECHANICAL INTELLIGENCE LAB",
+  )
+  const [reportSubtitle, setReportSubtitle] = useState(
+    "VERIFIED ATHLETE PERFORMANCE CERTIFICATION · PROTOCOL v4.2",
+  )
+  const [athleteTagline, setAthleteTagline] = useState(
+    "D1 Elite Prospect · Verified Kinematic Evaluation",
+  )
+  const [showAvatar, setShowAvatar] = useState(true)
+  const [showSpecs, setShowSpecs] = useState(true)
+  const [showScoreRing, setShowScoreRing] = useState(true)
+  const [showBiometrics, setShowBiometrics] = useState(true)
+  const [showNarrative, setShowNarrative] = useState(true)
+  const [showStrengths, setShowStrengths] = useState(true)
+  const [showImprovements, setShowImprovements] = useState(true)
+  const [showRecommendations, setShowRecommendations] = useState(true)
+  const [showQrCode, setShowQrCode] = useState(true)
+  const [showSignatures, setShowSignatures] = useState(true)
+  const [highlightMetric, setHighlightMetric] = useState("vertical")
+  const [colorTheme, setColorTheme] = useState<"dark" | "clean-white" | "navy">(
+    "dark",
+  )
+  const [customScoutNote, setCustomScoutNote] = useState("")
+
+  const [visibleMetrics, setVisibleMetrics] = useState({
+    vertical: true,
+    flight: true,
+    contact: true,
+    acceleration: true,
+    flexion: true,
+    symmetry: true,
+  })
 
   const athleteName = name || "OMAR KHALIL"
   const athleteId = "SC-28491-VERIFIED"
@@ -72,6 +108,53 @@ export function PerformanceReportPage({
     window.print()
   }
 
+  const applyPreset = (preset: "full" | "summary" | "white") => {
+    if (preset === "full") {
+      setShowAvatar(true)
+      setShowSpecs(true)
+      setShowScoreRing(true)
+      setShowBiometrics(true)
+      setShowNarrative(true)
+      setShowStrengths(true)
+      setShowImprovements(true)
+      setShowRecommendations(true)
+      setShowQrCode(true)
+      setShowSignatures(true)
+      setColorTheme("dark")
+      setVisibleMetrics({
+        vertical: true,
+        flight: true,
+        contact: true,
+        acceleration: true,
+        flexion: true,
+        symmetry: true,
+      })
+    } else if (preset === "summary") {
+      setShowAvatar(true)
+      setShowSpecs(true)
+      setShowScoreRing(true)
+      setShowBiometrics(true)
+      setShowNarrative(true)
+      setShowStrengths(false)
+      setShowImprovements(false)
+      setShowRecommendations(false)
+      setShowQrCode(true)
+      setShowSignatures(true)
+    } else if (preset === "white") {
+      setColorTheme("clean-white")
+    }
+  }
+
+  const resetCustomization = () => {
+    setReportTitle("SCOT BIOMECHANICAL INTELLIGENCE LAB")
+    setReportSubtitle(
+      "VERIFIED ATHLETE PERFORMANCE CERTIFICATION · PROTOCOL v4.2",
+    )
+    setAthleteTagline("D1 Elite Prospect · Verified Kinematic Evaluation")
+    setCustomScoutNote("")
+    applyPreset("full")
+  }
+
   return (
     <div className="performance-report-page">
       {/* Non-Printable Header & Action Bar */}
@@ -90,219 +173,665 @@ export function PerformanceReportPage({
               <Icon name="play" size={14} /> View Analyzed Footage
             </button>
           )}
+          <button
+            className="secondary-button"
+            onClick={() => setShowCustomizeModal(true)}
+            style={{
+              borderColor: "var(--gold-line)",
+              color: "var(--gold-bright)",
+            }}
+          >
+            <Icon name="settings" size={14} /> Customize PDF Record
+          </button>
           <button className="secondary-button" onClick={handleCopyLink}>
             <Icon name="wifi" size={14} />
             {copiedLink ? "Link Copied! ✓" : "Copy Verification URL"}
           </button>
           <button className="primary-button" onClick={handlePrint}>
-            <Icon name="chart" size={14} /> Print / Save as PDF
+            <Icon name="chart" size={14} /> Download / Print PDF
           </button>
         </div>
       </div>
 
       {/* Main Printable Document Sheet */}
-      <div className="official-report-sheet">
+      <div className={`official-report-sheet sheet-theme-${colorTheme}`}>
         {/* Document Header */}
         <div className="sheet-top-header">
           <div className="sheet-logo-group">
             <Logo />
             <div className="sheet-lab-title">
-              <strong>SCOT BIOMECHANICAL INTELLIGENCE LAB</strong>
-              <span>VERIFIED ATHLETE PERFORMANCE CERTIFICATION · PROTOCOL v4.2</span>
+              <strong>{reportTitle}</strong>
+              <span>{reportSubtitle}</span>
             </div>
           </div>
 
-          <div className="sheet-stamp-box">
-            <span className="stamp-verified-label">
-              <Icon name="shield" size={13} /> SCOT PROTOCOL CERTIFIED
-            </span>
-            <span className="stamp-id">{athleteId}</span>
-          </div>
+          {showQrCode && (
+            <div className="sheet-stamp-box">
+              <span className="stamp-verified-label">
+                <Icon name="shield" size={13} /> SCOT PROTOCOL CERTIFIED
+              </span>
+              <span className="stamp-id">{athleteId}</span>
+            </div>
+          )}
         </div>
 
         {/* Athlete Overview Card */}
         <div className="sheet-athlete-card">
           <div className="sheet-athlete-bio">
-            <div className="sheet-avatar">
-              <Icon name="user" size={32} />
-            </div>
+            {showAvatar && (
+              <div className="sheet-avatar">
+                <Icon name="user" size={32} />
+              </div>
+            )}
             <div>
               <span className="sheet-kicker">REGISTERED ATHLETE</span>
               <h1 className="sheet-athlete-name">{athleteName}</h1>
               <p className="sheet-athlete-meta">
-                {sport} · {role}{player?.jerseyNumber ? ` (#${player.jerseyNumber})` : ""} |{" "}
+                {sport} · {role}
+                {player?.jerseyNumber ? ` (#${player.jerseyNumber})` : ""} |{" "}
                 {city}, {country}
               </p>
+              {athleteTagline && (
+                <p
+                  style={{
+                    color: "var(--gold-bright)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    margin: "4px 0 0",
+                  }}
+                >
+                  {athleteTagline}
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="sheet-overall-score-box">
-            <ScoreRing score={overallScore} />
-            <div className="sheet-score-label">
-              <span>SCOT RATING</span>
-              <strong>{overallScore}/100</strong>
-              <small>GRADE {overallGrade} · ELITE PROSPECT</small>
+          {showScoreRing && (
+            <div className="sheet-overall-score-box">
+              <ScoreRing score={overallScore} />
+              <div className="sheet-score-label">
+                <span>SCOT RATING</span>
+                <strong>{overallScore}/100</strong>
+                <small>GRADE {overallGrade} · ELITE PROSPECT</small>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Physical Profile Strip */}
-        <div className="sheet-specs-strip">
-          <div className="spec-col">
-            <span>POSITION</span>
-            <strong>{role || "Point Guard"}</strong>
+        {showSpecs && (
+          <div className="sheet-specs-strip">
+            <div className="spec-col">
+              <span>POSITION</span>
+              <strong>{role || "Point Guard"}</strong>
+            </div>
+            <div className="spec-col">
+              <span>HEIGHT</span>
+              <strong>188 cm</strong>
+            </div>
+            <div className="spec-col">
+              <span>WINGSPAN</span>
+              <strong>196 cm</strong>
+            </div>
+            <div className="spec-col">
+              <span>BODY MASS</span>
+              <strong>82 kg</strong>
+            </div>
+            <div className="spec-col">
+              <span>DOMINANT SIDE</span>
+              <strong>Right</strong>
+            </div>
+            <div className="spec-col">
+              <span>CERTIFICATION DATE</span>
+              <strong>{issueDate}</strong>
+            </div>
           </div>
-          <div className="spec-col">
-            <span>HEIGHT</span>
-            <strong>188 cm</strong>
+        )}
+
+        {/* Custom Recruiter Note if specified */}
+        {customScoutNote && (
+          <div
+            style={{
+              padding: "16px 20px",
+              borderRadius: 8,
+              border: "1px dashed var(--gold-line)",
+              background: "rgba(212, 175, 55, 0.05)",
+              marginBottom: 24,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 10,
+                color: "var(--gold-bright)",
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                display: "block",
+                marginBottom: 4,
+              }}
+            >
+              CERTIFIED SCOUT & RECRUITING EVALUATION NOTE
+            </span>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 13,
+                color: "var(--gray)",
+                lineHeight: 1.5,
+              }}
+            >
+              {customScoutNote}
+            </p>
           </div>
-          <div className="spec-col">
-            <span>WINGSPAN</span>
-            <strong>196 cm</strong>
-          </div>
-          <div className="spec-col">
-            <span>BODY MASS</span>
-            <strong>82 kg</strong>
-          </div>
-          <div className="spec-col">
-            <span>DOMINANT SIDE</span>
-            <strong>Right</strong>
-          </div>
-          <div className="spec-col">
-            <span>CERTIFICATION DATE</span>
-            <strong>{issueDate}</strong>
-          </div>
-        </div>
+        )}
 
         {/* Key Biometrics Grid */}
-        <div className="sheet-section-title">
-          <Icon name="bolt" size={15} /> VERIFIED BIOMECHANICAL METRICS
-        </div>
-        <div className="sheet-metrics-grid">
-          <div className="sheet-metric-card highlighted">
-            <span className="sheet-metric-kicker">MAX VERTICAL</span>
-            <strong className="sheet-metric-val">78.4 cm</strong>
-            <span className="sheet-metric-benchmark">Top 3.2% in Age Category</span>
-            <div className="sheet-metric-bar">
-              <div style={{ width: "94%" }} />
+        {showBiometrics && (
+          <>
+            <div className="sheet-section-title">
+              <Icon name="bolt" size={15} /> VERIFIED BIOMECHANICAL METRICS
             </div>
-          </div>
+            <div className="sheet-metrics-grid">
+              {visibleMetrics.vertical && (
+                <div
+                  className={`sheet-metric-card ${
+                    highlightMetric === "vertical" ? "highlighted" : ""
+                  }`}
+                >
+                  <span className="sheet-metric-kicker">MAX VERTICAL</span>
+                  <strong className="sheet-metric-val">78.4 cm</strong>
+                  <span className="sheet-metric-benchmark">
+                    Top 3.2% in Age Category
+                  </span>
+                  <div className="sheet-metric-bar">
+                    <div style={{ width: "94%" }} />
+                  </div>
+                </div>
+              )}
 
-          <div className="sheet-metric-card">
-            <span className="sheet-metric-kicker">FLIGHT DURATION</span>
-            <strong className="sheet-metric-val">0.83 s</strong>
-            <span className="sheet-metric-benchmark">Elite Hang-Time Threshold</span>
-            <div className="sheet-metric-bar">
-              <div style={{ width: "91%" }} />
-            </div>
-          </div>
+              {visibleMetrics.flight && (
+                <div
+                  className={`sheet-metric-card ${
+                    highlightMetric === "flight" ? "highlighted" : ""
+                  }`}
+                >
+                  <span className="sheet-metric-kicker">FLIGHT DURATION</span>
+                  <strong className="sheet-metric-val">0.83 s</strong>
+                  <span className="sheet-metric-benchmark">
+                    Elite Hang-Time Threshold
+                  </span>
+                  <div className="sheet-metric-bar">
+                    <div style={{ width: "91%" }} />
+                  </div>
+                </div>
+              )}
 
-          <div className="sheet-metric-card">
-            <span className="sheet-metric-kicker">GROUND CONTACT TIME</span>
-            <strong className="sheet-metric-val">186 ms</strong>
-            <span className="sheet-metric-benchmark">Rapid Stretch-Shortening</span>
-            <div className="sheet-metric-bar">
-              <div style={{ width: "88%" }} />
-            </div>
-          </div>
+              {visibleMetrics.contact && (
+                <div
+                  className={`sheet-metric-card ${
+                    highlightMetric === "contact" ? "highlighted" : ""
+                  }`}
+                >
+                  <span className="sheet-metric-kicker">
+                    GROUND CONTACT TIME
+                  </span>
+                  <strong className="sheet-metric-val">186 ms</strong>
+                  <span className="sheet-metric-benchmark">
+                    Rapid Stretch-Shortening
+                  </span>
+                  <div className="sheet-metric-bar">
+                    <div style={{ width: "88%" }} />
+                  </div>
+                </div>
+              )}
 
-          <div className="sheet-metric-card">
-            <span className="sheet-metric-kicker">PEAK ACCELERATION</span>
-            <strong className="sheet-metric-val">8.42 m/s²</strong>
-            <span className="sheet-metric-benchmark">High Explosive Burst</span>
-            <div className="sheet-metric-bar">
-              <div style={{ width: "92%" }} />
-            </div>
-          </div>
+              {visibleMetrics.acceleration && (
+                <div
+                  className={`sheet-metric-card ${
+                    highlightMetric === "acceleration" ? "highlighted" : ""
+                  }`}
+                >
+                  <span className="sheet-metric-kicker">PEAK ACCELERATION</span>
+                  <strong className="sheet-metric-val">8.42 m/s²</strong>
+                  <span className="sheet-metric-benchmark">
+                    High Explosive Burst
+                  </span>
+                  <div className="sheet-metric-bar">
+                    <div style={{ width: "92%" }} />
+                  </div>
+                </div>
+              )}
 
-          <div className="sheet-metric-card">
-            <span className="sheet-metric-kicker">LANDING FLEXION</span>
-            <strong className="sheet-metric-val">42.6°</strong>
-            <span className="sheet-metric-benchmark">Optimal Shock Attenuation</span>
-            <div className="sheet-metric-bar">
-              <div style={{ width: "89%" }} />
-            </div>
-          </div>
+              {visibleMetrics.flexion && (
+                <div
+                  className={`sheet-metric-card ${
+                    highlightMetric === "flexion" ? "highlighted" : ""
+                  }`}
+                >
+                  <span className="sheet-metric-kicker">LANDING FLEXION</span>
+                  <strong className="sheet-metric-val">42.6°</strong>
+                  <span className="sheet-metric-benchmark">
+                    Optimal Shock Attenuation
+                  </span>
+                  <div className="sheet-metric-bar">
+                    <div style={{ width: "89%" }} />
+                  </div>
+                </div>
+              )}
 
-          <div className="sheet-metric-card">
-            <span className="sheet-metric-kicker">BILATERAL SYMMETRY</span>
-            <strong className="sheet-metric-val">96.4%</strong>
-            <span className="sheet-metric-benchmark">Minimal Injury Risk Offset</span>
-            <div className="sheet-metric-bar">
-              <div style={{ width: "96%" }} />
+              {visibleMetrics.symmetry && (
+                <div
+                  className={`sheet-metric-card ${
+                    highlightMetric === "symmetry" ? "highlighted" : ""
+                  }`}
+                >
+                  <span className="sheet-metric-kicker">
+                    BILATERAL SYMMETRY
+                  </span>
+                  <strong className="sheet-metric-val">96.4%</strong>
+                  <span className="sheet-metric-benchmark">
+                    Minimal Injury Risk Offset
+                  </span>
+                  <div className="sheet-metric-bar">
+                    <div style={{ width: "96%" }} />
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
+          </>
+        )}
 
         {/* Narrative & Detailed Evaluation */}
-        <div className="sheet-section-title">
-          <Icon name="chart" size={15} /> AI SCOUTING OBSERVATION & TACTICAL ANALYSIS
-        </div>
-        <div className="sheet-narrative-card">
-          <p>{narrative}</p>
-        </div>
+        {showNarrative && (
+          <>
+            <div className="sheet-section-title">
+              <Icon name="chart" size={15} /> AI SCOUTING OBSERVATION & TACTICAL
+              ANALYSIS
+            </div>
+            <div className="sheet-narrative-card">
+              <p>{narrative}</p>
+            </div>
+          </>
+        )}
 
         {/* Three Columns: Strengths, Areas, Drills */}
-        <div className="sheet-analysis-cols">
-          <div className="sheet-col-box">
-            <h3 className="col-header strengths">
-              <Icon name="shield" size={14} /> OBSERVED STRENGTHS
-            </h3>
-            <ul>
-              {strengths.map((item, idx) => (
-                <li key={idx}>{item}</li>
-              ))}
-            </ul>
-          </div>
+        {(showStrengths || showImprovements || showRecommendations) && (
+          <div className="sheet-analysis-cols">
+            {showStrengths && (
+              <div className="sheet-col-box">
+                <h3 className="col-header strengths">
+                  <Icon name="shield" size={14} /> OBSERVED STRENGTHS
+                </h3>
+                <ul>
+                  {strengths.map((item, idx) => (
+                    <li key={idx}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-          <div className="sheet-col-box">
-            <h3 className="col-header improvements">
-              <Icon name="activity" size={14} /> AREAS FOR REFINEMENT
-            </h3>
-            <ul>
-              {areasToImprove.map((item, idx) => (
-                <li key={idx}>{item}</li>
-              ))}
-            </ul>
-          </div>
+            {showImprovements && (
+              <div className="sheet-col-box">
+                <h3 className="col-header improvements">
+                  <Icon name="activity" size={14} /> AREAS FOR REFINEMENT
+                </h3>
+                <ul>
+                  {areasToImprove.map((item, idx) => (
+                    <li key={idx}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-          <div className="sheet-col-box">
-            <h3 className="col-header recommendations">
-              <Icon name="trend" size={14} /> TARGETED DEVELOPMENT PLAN
-            </h3>
-            <ul>
-              {recommendations.map((item, idx) => (
-                <li key={idx}>{item}</li>
-              ))}
-            </ul>
+            {showRecommendations && (
+              <div className="sheet-col-box">
+                <h3 className="col-header recommendations">
+                  <Icon name="trend" size={14} /> TARGETED DEVELOPMENT PLAN
+                </h3>
+                <ul>
+                  {recommendations.map((item, idx) => (
+                    <li key={idx}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
         {/* Official Certification Footer */}
-        <div className="sheet-footer">
-          <div className="sheet-qr-block">
-            <div className="sheet-qr-visual">
-              <i /><i /><i /><i /><i /><i /><i /><i /><i />
-            </div>
-            <div className="sheet-qr-text">
-              <strong>SCAN TO AUTHENTICATE</strong>
-              <span>scot.performance/verify/{athleteId}</span>
-              <small>SHA-256: {verificationHash}</small>
-            </div>
-          </div>
+        {(showQrCode || showSignatures) && (
+          <div className="sheet-footer">
+            {showQrCode ? (
+              <div className="sheet-qr-block">
+                <div className="sheet-qr-visual">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </div>
+                <div className="sheet-qr-text">
+                  <strong>SCAN TO AUTHENTICATE</strong>
+                  <span>scot.performance/verify/{athleteId}</span>
+                  <small>SHA-256: {verificationHash}</small>
+                </div>
+              </div>
+            ) : (
+              <div />
+            )}
 
-          <div className="sheet-signatures">
-            <div className="sig-line">
-              <div className="sig-stroke">Dr. H. Vance, PhD</div>
-              <span>DIRECTOR OF BIOMECHANICS & SPORTS SCIENCE</span>
+            {showSignatures && (
+              <div className="sheet-signatures">
+                <div className="sig-line">
+                  <div className="sig-stroke">Dr. H. Vance, PhD</div>
+                  <span>DIRECTOR OF BIOMECHANICS & SPORTS SCIENCE</span>
+                </div>
+                <div className="sig-line">
+                  <div className="sig-stroke">SCOT Neural Engine v4.2</div>
+                  <span>AUTONOMOUS VISION SYSTEM CERTIFIED</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Customize PDF Record Modal */}
+      {showCustomizeModal && (
+        <div
+          className="customize-pdf-modal"
+          onClick={() => setShowCustomizeModal(false)}
+        >
+          <div
+            className="customize-modal-dialog"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="customize-modal-header">
+              <h2>Customize PDF Record for Download</h2>
+              <button
+                className="modal-close-icon"
+                onClick={() => setShowCustomizeModal(false)}
+              >
+                <Icon name="close" size={18} />
+              </button>
             </div>
-            <div className="sig-line">
-              <div className="sig-stroke">SCOT Neural Engine v4.2</div>
-              <span>AUTONOMOUS VISION SYSTEM CERTIFIED</span>
+
+            <div className="customize-modal-body">
+              {/* Presets Bar */}
+              <div className="customize-section">
+                <span className="customize-section-title">Quick Presets</span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    className="notif-action-btn primary"
+                    onClick={() => applyPreset("full")}
+                  >
+                    Full Comprehensive Audit
+                  </button>
+                  <button
+                    className="notif-action-btn"
+                    onClick={() => applyPreset("summary")}
+                  >
+                    1-Page Recruiter Summary
+                  </button>
+                  <button
+                    className="notif-action-btn"
+                    onClick={() => applyPreset("white")}
+                  >
+                    Clean White Sheet (Ink Saver)
+                  </button>
+                </div>
+              </div>
+
+              {/* Title & Subtitle */}
+              <div className="customize-section">
+                <span className="customize-section-title">
+                  Report Headers & Subtitle
+                </span>
+                <label className="field-label" style={{ marginBottom: 8 }}>
+                  REPORT TITLE
+                  <input
+                    type="text"
+                    value={reportTitle}
+                    onChange={(e) => setReportTitle(e.target.value)}
+                  />
+                </label>
+                <label className="field-label" style={{ marginBottom: 8 }}>
+                  ATHLETE TAGLINE / SUBTITLE
+                  <input
+                    type="text"
+                    value={athleteTagline}
+                    onChange={(e) => setAthleteTagline(e.target.value)}
+                  />
+                </label>
+                <label className="field-label">
+                  CUSTOM SCOUT / COACH COMMENTARY (PRINTED ON PDF)
+                  <textarea
+                    rows={2}
+                    value={customScoutNote}
+                    onChange={(e) => setCustomScoutNote(e.target.value)}
+                    placeholder="e.g. Scouted live in national cup semi-finals; outstanding lateral agility and rim protection..."
+                    style={{
+                      width: "100%",
+                      padding: "10px",
+                      borderRadius: 6,
+                      background: "var(--panel)",
+                      border: "1px solid var(--line)",
+                      color: "var(--white)",
+                      fontSize: 12,
+                    }}
+                  />
+                </label>
+              </div>
+
+              {/* PDF Color Theme */}
+              <div className="customize-section">
+                <span className="customize-section-title">
+                  PDF Visual Color Scheme
+                </span>
+                <div className="theme-choice-group">
+                  <button
+                    type="button"
+                    className={`theme-choice-btn ${
+                      colorTheme === "dark" ? "active" : ""
+                    }`}
+                    onClick={() => setColorTheme("dark")}
+                  >
+                    <strong>Dark Obsidian Gold</strong>
+                    <span>Sleek digital presentation</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`theme-choice-btn ${
+                      colorTheme === "clean-white" ? "active" : ""
+                    }`}
+                    onClick={() => setColorTheme("clean-white")}
+                  >
+                    <strong>Clean White Sheet</strong>
+                    <span>Ink-saving print format</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`theme-choice-btn ${
+                      colorTheme === "navy" ? "active" : ""
+                    }`}
+                    onClick={() => setColorTheme("navy")}
+                  >
+                    <strong>Federation Navy</strong>
+                    <span>Tactical navy contrast</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Included Sections */}
+              <div className="customize-section">
+                <span className="customize-section-title">
+                  Included Sections
+                </span>
+                <div className="customize-grid">
+                  <div
+                    className={`customize-toggle-card ${
+                      showAvatar ? "active" : ""
+                    }`}
+                    onClick={() => setShowAvatar(!showAvatar)}
+                  >
+                    <span>Athlete Avatar</span>
+                    <strong style={{ color: showAvatar ? "var(--green)" : "var(--muted)" }}>
+                      {showAvatar ? "ON" : "OFF"}
+                    </strong>
+                  </div>
+                  <div
+                    className={`customize-toggle-card ${
+                      showSpecs ? "active" : ""
+                    }`}
+                    onClick={() => setShowSpecs(!showSpecs)}
+                  >
+                    <span>Physical Specs Strip</span>
+                    <strong style={{ color: showSpecs ? "var(--green)" : "var(--muted)" }}>
+                      {showSpecs ? "ON" : "OFF"}
+                    </strong>
+                  </div>
+                  <div
+                    className={`customize-toggle-card ${
+                      showScoreRing ? "active" : ""
+                    }`}
+                    onClick={() => setShowScoreRing(!showScoreRing)}
+                  >
+                    <span>SCOT Rating Score Ring</span>
+                    <strong style={{ color: showScoreRing ? "var(--green)" : "var(--muted)" }}>
+                      {showScoreRing ? "ON" : "OFF"}
+                    </strong>
+                  </div>
+                  <div
+                    className={`customize-toggle-card ${
+                      showBiometrics ? "active" : ""
+                    }`}
+                    onClick={() => setShowBiometrics(!showBiometrics)}
+                  >
+                    <span>Biometric Metrics Grid</span>
+                    <strong style={{ color: showBiometrics ? "var(--green)" : "var(--muted)" }}>
+                      {showBiometrics ? "ON" : "OFF"}
+                    </strong>
+                  </div>
+                  <div
+                    className={`customize-toggle-card ${
+                      showNarrative ? "active" : ""
+                    }`}
+                    onClick={() => setShowNarrative(!showNarrative)}
+                  >
+                    <span>AI Scouting Narrative</span>
+                    <strong style={{ color: showNarrative ? "var(--green)" : "var(--muted)" }}>
+                      {showNarrative ? "ON" : "OFF"}
+                    </strong>
+                  </div>
+                  <div
+                    className={`customize-toggle-card ${
+                      showStrengths ? "active" : ""
+                    }`}
+                    onClick={() => setShowStrengths(!showStrengths)}
+                  >
+                    <span>Observed Strengths</span>
+                    <strong style={{ color: showStrengths ? "var(--green)" : "var(--muted)" }}>
+                      {showStrengths ? "ON" : "OFF"}
+                    </strong>
+                  </div>
+                  <div
+                    className={`customize-toggle-card ${
+                      showImprovements ? "active" : ""
+                    }`}
+                    onClick={() => setShowImprovements(!showImprovements)}
+                  >
+                    <span>Areas for Refinement</span>
+                    <strong style={{ color: showImprovements ? "var(--green)" : "var(--muted)" }}>
+                      {showImprovements ? "ON" : "OFF"}
+                    </strong>
+                  </div>
+                  <div
+                    className={`customize-toggle-card ${
+                      showRecommendations ? "active" : ""
+                    }`}
+                    onClick={() => setShowRecommendations(!showRecommendations)}
+                  >
+                    <span>Targeted Development Drills</span>
+                    <strong style={{ color: showRecommendations ? "var(--green)" : "var(--muted)" }}>
+                      {showRecommendations ? "ON" : "OFF"}
+                    </strong>
+                  </div>
+                  <div
+                    className={`customize-toggle-card ${
+                      showQrCode ? "active" : ""
+                    }`}
+                    onClick={() => setShowQrCode(!showQrCode)}
+                  >
+                    <span>Verification Stamp & QR</span>
+                    <strong style={{ color: showQrCode ? "var(--green)" : "var(--muted)" }}>
+                      {showQrCode ? "ON" : "OFF"}
+                    </strong>
+                  </div>
+                  <div
+                    className={`customize-toggle-card ${
+                      showSignatures ? "active" : ""
+                    }`}
+                    onClick={() => setShowSignatures(!showSignatures)}
+                  >
+                    <span>Biomechanist Signatures</span>
+                    <strong style={{ color: showSignatures ? "var(--green)" : "var(--muted)" }}>
+                      {showSignatures ? "ON" : "OFF"}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Metric Card Highlights */}
+              <div className="customize-section">
+                <span className="customize-section-title">
+                  Highlighted Primary Metric
+                </span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {[
+                    { id: "vertical", label: "Max Vertical" },
+                    { id: "flight", label: "Flight Duration" },
+                    { id: "contact", label: "Ground Contact" },
+                    { id: "acceleration", label: "Acceleration" },
+                    { id: "flexion", label: "Landing Flexion" },
+                    { id: "symmetry", label: "Symmetry" },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      className={`notif-action-btn ${
+                        highlightMetric === m.id ? "primary" : ""
+                      }`}
+                      onClick={() => setHighlightMetric(m.id)}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="customize-modal-footer">
+              <button
+                className="secondary-button"
+                onClick={resetCustomization}
+              >
+                Reset to Default
+              </button>
+              <button
+                className="primary-button"
+                onClick={() => {
+                  setShowCustomizeModal(false)
+                  setTimeout(() => window.print(), 300)
+                }}
+              >
+                <Icon name="chart" size={14} /> Download / Print PDF Record
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
