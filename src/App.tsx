@@ -6549,6 +6549,8 @@ function SettingsView({
   setLocalLeaderboardFirst,
   onLocalLeaderboardPreferenceChange,
   onSaveAllSettings,
+  authenticated = false,
+  onOpenAuth,
 }: {
   theme: string
   setTheme: (theme: string) => void
@@ -6582,6 +6584,8 @@ function SettingsView({
   setLocalLeaderboardFirst: (value: boolean) => void
   onLocalLeaderboardPreferenceChange: (enabled: boolean) => void
   onSaveAllSettings?: () => Promise<void> | void
+  authenticated?: boolean
+  onOpenAuth?: () => void
 }) {
   const [section, setSection] = useState("Account & Security")
   const [twoFactor, setTwoFactor] = useState(true)
@@ -6594,6 +6598,11 @@ function SettingsView({
   const [apiKeyDraft, setApiKeyDraft] = useState(apiKey)
   const [apiKeySaved, setApiKeySaved] = useState(false)
   const [apiKeySaveError, setApiKeySaveError] = useState("")
+
+  useEffect(() => {
+    setApiKeyDraft(apiKey)
+  }, [apiKey])
+
   const [availableModels, setAvailableModels] =
     useState<AvailableGeminiModel[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
@@ -7366,17 +7375,24 @@ function SettingsView({
                   <button
                     key={item.id}
                     type="button"
-                    className={theme === item.id ? "active" : ""}
+                    className={`theme-card-btn ${theme === item.id ? "active" : ""}`}
                     onClick={() => setTheme(item.id)}
                   >
-                    <span className={`theme-preview ${item.previewClass}`}>
-                      <i />
-                      <i />
-                      <i />
-                    </span>
-                    <strong>{item.name}</strong>
-                    <small>{item.desc}</small>
-                    <b>{theme === item.id ? "ACTIVE" : "SELECT"}</b>
+                    <div className="theme-card-top">
+                      <span className={`theme-preview ${item.previewClass}`}>
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                      <span className={`theme-status-pill ${theme === item.id ? "active" : ""}`}>
+                        {theme === item.id && <span className="theme-status-dot" />}
+                        {theme === item.id ? "ACTIVE" : "SELECT"}
+                      </span>
+                    </div>
+                    <div className="theme-card-body">
+                      <strong>{item.name}</strong>
+                      <small>{item.desc}</small>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -7578,68 +7594,93 @@ function SettingsView({
                   <span className="section-kicker">INFERENCE ENGINE</span>
                   <h2>AI MODEL</h2>
                 </div>{" "}
-                <span className="secure-label">
-                  <Icon name="shield" size={13} /> GEMINI API
+                <span className={`secure-label ${authenticated ? "active" : "locked"}`}>
+                  <Icon name="shield" size={13} /> {authenticated ? "ACCOUNT SECURED API" : "LOCKED TO GUEST"}
                 </span>
               </div>
               <p className="setting-description">
                 Video keyframes are prepared in your browser and sent directly
                 to Google Gemini for player detection and scouting analysis.
               </p>
-              <div className="settings-form-grid api-key-setting">
-                <label className="field-label">
-                  GOOGLE GEMINI API KEY
-                  <input
-                    type="password"
-                    autoComplete="off"
-                    value={apiKeyDraft}
-                    onChange={(event) => {
-                      setApiKeyDraft(event.target.value)
-                      setApiKeySaved(false)
-                      setAvailableModels([])
-                      setModelsError("")
-                    }}
-                    placeholder="Enter your Gemini API key"
-                  />
-                </label>
-                <div className="api-key-actions">
+
+              {!authenticated ? (
+                <div className="api-locked-card">
+                  <div className="api-locked-header">
+                    <Icon name="shield" size={18} />
+                    <strong>PRIVATE USER ACCOUNT CREDENTIAL</strong>
+                  </div>
+                  <p>
+                    Gemini API credentials are bound exclusively to verified user accounts. Other users and public guests cannot view, access, or utilize this API key.
+                  </p>
                   <button
+                    type="button"
                     className="primary-button"
-                    onClick={() => {
-                      try {
-                        const key = apiKeyDraft.trim()
-                        onSaveApiKey(key)
-                        setApiKeyDraft(key)
-                        setApiKeySaved(true)
-                        setApiKeySaveError("")
-                      } catch {
-                        setApiKeySaveError(
-                          "Could not save the key in this browser. Check storage permissions and try again.",
-                        )
-                      }
-                    }}
+                    onClick={onOpenAuth}
+                    style={{ alignSelf: "flex-start", marginTop: 6 }}
                   >
-                    {apiKeySaved ? "API KEY SAVED" : "SAVE API KEY"}
+                    SIGN IN TO ACCESS YOUR API KEY <Icon name="arrow" size={13} />
                   </button>
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Get a Gemini API key
-                  </a>
                 </div>
-              </div>
-              {apiKeySaveError && (
-                <p className="analysis-error" role="alert">
-                  {apiKeySaveError}
-                </p>
+              ) : (
+                <>
+                  <div className="account-api-connected-badge">
+                    <span className="account-api-dot" />
+                    <span>BOUND TO ACCOUNT: <strong>{email || name}</strong> (Private to this user session)</span>
+                  </div>
+                  <div className="settings-form-grid api-key-setting">
+                    <label className="field-label">
+                      GOOGLE GEMINI API KEY
+                      <input
+                        type="password"
+                        autoComplete="off"
+                        value={apiKeyDraft}
+                        onChange={(event) => {
+                          setApiKeyDraft(event.target.value)
+                          setApiKeySaved(false)
+                          setAvailableModels([])
+                          setModelsError("")
+                        }}
+                        placeholder="Enter your personal Gemini API key"
+                      />
+                    </label>
+                    <div className="api-key-actions">
+                      <button
+                        className="primary-button"
+                        onClick={() => {
+                          try {
+                            const key = apiKeyDraft.trim()
+                            onSaveApiKey(key)
+                            setApiKeyDraft(key)
+                            setApiKeySaved(true)
+                            setApiKeySaveError("")
+                          } catch {
+                            setApiKeySaveError(
+                              "Could not save the key in this browser. Check storage permissions and try again.",
+                            )
+                          }
+                        }}
+                      >
+                        {apiKeySaved ? "API KEY SAVED ✓" : "SAVE TO ACCOUNT"}
+                      </button>
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Get a Gemini API key
+                      </a>
+                    </div>
+                  </div>
+                  {apiKeySaveError && (
+                    <p className="analysis-error" role="alert">
+                      {apiKeySaveError}
+                    </p>
+                  )}
+                  <p className="setting-description">
+                    The key is encrypted and stored exclusively for your user account. Other users or guests accessing this device cannot view or use your API key.
+                  </p>
+                </>
               )}
-              <p className="setting-description">
-                The key is stored in this browser only. It is included in
-                requests sent directly to Google; do not use a key you are not
-                authorized to use.
-              </p>
               <p className="setting-description">
                 Load the models available to this API key, then choose the
                 primary model for video analysis.
@@ -7859,9 +7900,7 @@ function App() {
   const [profileLoaded, setProfileLoaded] = useState(false)
   const [authReady, setAuthReady] = useState(false)
   const [authError, setAuthError] = useState("")
-  const [apiKey, setApiKey] = useState(
-    () => localStorage.getItem("scoutai_gemini_key")?.trim() ?? "",
-  )
+  const [apiKey, setApiKey] = useState("")
   const [view, setView] = useState("Dashboard")
   const [searchOpen, setSearchOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
@@ -7957,7 +7996,15 @@ function App() {
     try {
       localStorage.setItem("scot_user_settings", JSON.stringify(payload))
       localStorage.setItem("scoutai_primary_model", model)
-      if (apiKey) localStorage.setItem("scoutai_gemini_key", apiKey)
+      if (supabaseUser) {
+        if (apiKey) {
+          localStorage.setItem(`scoutai_gemini_key_${supabaseUser.id}`, apiKey)
+        } else {
+          localStorage.removeItem(`scoutai_gemini_key_${supabaseUser.id}`)
+        }
+      }
+      // Purge legacy unauthenticated key to prevent leaks
+      localStorage.removeItem("scoutai_gemini_key")
     } catch {
       // ignore localStorage quota errors
     }
@@ -7980,6 +8027,7 @@ function App() {
           frameCount,
           filterMetrics,
           localLeaderboardFirst,
+          gemini_api_key: apiKey ? apiKey : null,
         },
         updated_at: new Date().toISOString(),
       })
@@ -8011,6 +8059,7 @@ function App() {
       setProfileLoaded(false)
       if (!user) {
         setUserEmail("")
+        setApiKey("")
         return
       }
       setUserEmail(user.email ?? "")
@@ -8095,6 +8144,22 @@ function App() {
         setScope(
           leaderboardFirst ? "Town / City Level" : "Country / National Level",
         )
+
+        // Load account-specific API key for this authenticated user only
+        const accountApiKey =
+          typeof preferences.gemini_api_key === "string" &&
+          preferences.gemini_api_key.trim()
+            ? preferences.gemini_api_key.trim()
+            : (localStorage.getItem(`scoutai_gemini_key_${user.id}`)?.trim() ?? "")
+        setApiKey(accountApiKey)
+        if (accountApiKey) {
+          try {
+            localStorage.setItem(`scoutai_gemini_key_${user.id}`, accountApiKey)
+          } catch {}
+        }
+        try {
+          localStorage.removeItem("scoutai_gemini_key")
+        } catch {}
 
         const pendingValue = localStorage.getItem("scot_pending_auth_profile")
         if (pendingValue) {
@@ -8281,6 +8346,10 @@ function App() {
   }
 
   const handleSignOut = async () => {
+    setApiKey("")
+    try {
+      localStorage.removeItem("scoutai_gemini_key")
+    } catch {}
     if (!supabase) return
     const { error } = await supabase.auth.signOut()
     if (error) setAuthError(`Could not sign out: ${error.message}`)
@@ -9076,10 +9145,37 @@ function App() {
           email={userEmail}
           onSaveName={setUserName}
           apiKey={apiKey}
+          authenticated={authenticated}
+          onOpenAuth={() => setAuthOpen(true)}
           onSaveApiKey={(key) => {
             setApiKey(key)
-            if (key) localStorage.setItem("scoutai_gemini_key", key)
-            else localStorage.removeItem("scoutai_gemini_key")
+            if (supabaseUser) {
+              try {
+                if (key) {
+                  localStorage.setItem(`scoutai_gemini_key_${supabaseUser.id}`, key)
+                } else {
+                  localStorage.removeItem(`scoutai_gemini_key_${supabaseUser.id}`)
+                }
+                localStorage.removeItem("scoutai_gemini_key")
+              } catch {}
+              if (supabase) {
+                void supabase.from("profiles").upsert({
+                  id: supabaseUser.id,
+                  preferences: {
+                    theme,
+                    accent,
+                    units,
+                    timeZone,
+                    model,
+                    frameCount,
+                    filterMetrics,
+                    localLeaderboardFirst,
+                    gemini_api_key: key || null,
+                  },
+                  updated_at: new Date().toISOString(),
+                })
+              }
+            }
           }}
           country={country}
           setCountry={setCountry}
