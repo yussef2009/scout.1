@@ -31,8 +31,18 @@ import {
   type MediaClip,
 } from "./media/MediaCenterPage"
 import { PerformanceReportPage } from "./reports/PerformanceReportPage"
+import AdminPortalPage from "./admin/AdminPortalPage"
+import {
+  isValidClubCode,
+  isValidScoutCode,
+  getAllClubCodes,
+  getAllScoutCodes,
+  submitClubOrScoutRegistration,
+  getAdminRegistrations,
+  type AdminRegistration,
+} from "./admin/adminStore"
 
-export interface ProfileRecord {
+export interface PerformanceReport {
   id: string
   date: string
   sport: string
@@ -544,31 +554,27 @@ function preferenceString(value: unknown, fallback: string): string {
   return typeof value === "string" ? value : fallback
 }
 
-export const VALID_CLUB_CODES = [
-  "SCOT-CLUB-VIP",
-  "FIFA-ACAD-2026",
-  "ELITE-CLUB-77",
-]
-export const VALID_SCOUT_CODES = [
-  "SCOT-PRO-SCOUT",
-  "UEFA-SCT-88",
-  "FIBA-TALENT-99",
-]
+export const VALID_CLUB_CODES = getAllClubCodes()
+export const VALID_SCOUT_CODES = getAllScoutCodes()
 
 function AuthModal({
   onClose,
   onEmailAuth,
   onOAuth,
   onAuthenticated,
+  onOpenAdmin,
 }: {
   onClose: () => void
   onEmailAuth: (payload: AuthPayload) => Promise<boolean>
   onOAuth: (provider: AuthProvider, profile: AuthProfileDraft) => Promise<void>
   onAuthenticated: (mode: AuthMode) => void
+  onOpenAdmin?: () => void
 }) {
   const [role, setRole] = useState("Player")
   const [mode, setMode] = useState<AuthMode>("Register")
-  const [step, setStep] = useState<"form" | "verify-email">("form")
+  const [step, setStep] = useState<"form" | "verify-email" | "submitted-to-admin">("form")
+  const [submittedApp, setSubmittedApp] = useState<AdminRegistration | null>(null)
+  const [adminCodeInput, setAdminCodeInput] = useState("")
   const [name, setName] = useState("")
   const [sport, setSelectedSport] = useState("Basketball")
   const [email, setEmail] = useState("")
@@ -586,10 +592,11 @@ function AuthModal({
   const isSpecialCodeVerified = useMemo(() => {
     const clean = specialCode.trim().toUpperCase()
     if (!clean) return false
-    if (role === "Club / Academy") return VALID_CLUB_CODES.includes(clean)
-    if (role === "Scout / Agent") return VALID_SCOUT_CODES.includes(clean)
+    if (role === "Club / Academy") return isValidClubCode(clean)
+    if (role === "Scout / Agent") return isValidScoutCode(clean)
     return false
   }, [specialCode, role])
+
 
   // 3-minute Countdown Timer
   useEffect(() => {
@@ -705,6 +712,25 @@ function AuthModal({
 
     setBusy(true)
     try {
+      // If registering as Club or Scout without an already-verified special code, dispatch registration to admin
+      if (mode === "Register" && (role === "Club / Academy" || role === "Scout / Agent") && !isSpecialCodeVerified) {
+        const regRole = role === "Club / Academy" ? "Club" : "Scout"
+        const app = submitClubOrScoutRegistration({
+          role: regRole,
+          name: name.trim() || (regRole === "Club" ? "Alexandria Falcons" : "Independent Scout"),
+          email: email.trim(),
+          country,
+          city: city.trim(),
+          sport,
+          organizationType: role === "Club / Academy" ? "Youth Academy / Sporting Club" : "Licensed Evaluator Agency",
+          benchmark: "High-cadence transition evaluation, 60 FPS keyframe verification",
+        })
+        setSubmittedApp(app)
+        setStep("submitted-to-admin")
+        setBusy(false)
+        return
+      }
+
       if (isSpecialCodeVerified) {
         localStorage.setItem(
           "scot_accredited_code",
@@ -726,6 +752,35 @@ function AuthModal({
       setError(
         cause instanceof Error ? cause.message : "Profile registration failed.",
       )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleEnterIssuedCode = async (codeToVerify: string) => {
+    setError("")
+    const clean = codeToVerify.trim().toUpperCase()
+    const isOk = (role === "Club / Academy" && isValidClubCode(clean)) ||
+                 (role === "Scout / Agent" && isValidScoutCode(clean))
+    if (!isOk) {
+      setError("Special code not recognized. Ensure Admin has approved your application and issued a code.")
+      return
+    }
+    setSpecialCode(clean)
+    setBusy(true)
+    try {
+      localStorage.setItem("scot_accredited_code", clean)
+      localStorage.setItem("scot_is_accredited", "true")
+      await onEmailAuth({
+        ...profileDraft(),
+        email: email.trim(),
+        password,
+        specialCode: clean,
+        isAccredited: true,
+      })
+      onAuthenticated(mode)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Profile registration failed.")
     } finally {
       setBusy(false)
     }
@@ -770,11 +825,13 @@ function AuthModal({
           <div>
             <p className="eyebrow">BUILD YOUR PERFORMANCE IDENTITY</p>
             <h2 id="auth-title">
-              {step === "verify-email"
-                ? "CONFIRM EMAIL."
-                : mode === "Register"
-                  ? "JOIN THE NETWORK."
-                  : "WELCOME BACK."}
+              {step === "submitted-to-admin"
+                ? "ADMIN VERIFICATION."
+                : step === "verify-email"
+                  ? "CONFIRM EMAIL."
+                  : mode === "Register"
+                    ? "JOIN THE NETWORK."
+                    : "WELCOME BACK."}
             </h2>
             <p className="modal-copy">
               One account. Local analysis. Global opportunity.
@@ -795,7 +852,90 @@ function AuthModal({
           )}
         </div>
 
-        {step === "verify-email" ? (
+        {step === "submitted-to-admin" ? (
+          <div className="verification-code-card">
+            <div style={{ textAlign: "center", padding: "10px 0" }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>🛡️</div>
+              <span className="section-kicker" style={{ color: "var(--gold-bright)" }}>
+                APPLICATION DISPATCHED TO ADMIN
+              </span>
+              <h3 style={{ margin: "4px 0 10px", fontSize: 18, color: "var(--white)" }}>
+                REGISTRATION PENDING ADMIN AUDIT
+              </h3>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", background: "rgba(234, 179, 8, 0.15)", border: "1px solid rgba(234, 179, 8, 0.4)", borderRadius: 4, color: "#facc15", fontSize: 11, fontWeight: 700 }}>
+                ⏳ STATUS: PENDING VERIFICATION
+              </div>
+            </div>
+
+            <div className="special-code-box" style={{ margin: 0, padding: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700 }}>APPLICATION TRACKING ID:</span>
+                <strong style={{ fontFamily: "monospace", color: "var(--gold-bright)", fontSize: 13 }}>
+                  {submittedApp?.id || "REG-2026-CLUB-881"}
+                </strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700 }}>REGISTERED ENTITY:</span>
+                <strong style={{ color: "var(--white)", fontSize: 12 }}>{submittedApp?.name || name}</strong>
+              </div>
+            </div>
+
+            <p style={{ fontSize: 12, color: "var(--muted)", margin: 0, lineHeight: 1.5 }}>
+              Your {role} accreditation request has been dispatched to the Scot Admin Command Console.
+              Once an administrator audits your federation credentials, an official Special Code will be generated and issued for your account.
+            </p>
+
+            <div style={{ background: "rgba(255, 255, 255, 0.03)", padding: 14, borderRadius: 6, border: "1px solid var(--line)" }}>
+              <label className="field-label" style={{ margin: "0 0 8px 0" }}>
+                ENTER SPECIAL CODE (ONCE ISSUED BY ADMIN):
+                <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                  <input
+                    type="text"
+                    value={adminCodeInput}
+                    onChange={(e) => setAdminCodeInput(e.target.value.toUpperCase())}
+                    placeholder="e.g. SCOT-CLUB-VIP"
+                    style={{ textTransform: "uppercase", flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    className="primary-button"
+                    style={{ whiteSpace: "nowrap", padding: "0 14px", minHeight: 38 }}
+                    disabled={!adminCodeInput.trim() || busy}
+                    onClick={() => handleEnterIssuedCode(adminCodeInput)}
+                  >
+                    ACTIVATE NOW
+                  </button>
+                </div>
+              </label>
+            </div>
+
+            {error && (
+              <p className="analysis-error" role="alert">
+                {error}
+              </p>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+              {onOpenAdmin && (
+                <button
+                  type="button"
+                  className="primary-button"
+                  style={{ background: "rgba(212, 175, 55, 0.15)", border: "1px solid var(--gold)", color: "var(--gold-bright)" }}
+                  onClick={onOpenAdmin}
+                >
+                  ⚡ OPEN ADMIN CONSOLE (VERIFY & APPROVE APPLICATION)
+                </button>
+              )}
+              <button
+                type="button"
+                className="text-button"
+                onClick={onClose}
+              >
+                CLOSE FOR NOW & WAIT FOR VERIFICATION
+              </button>
+            </div>
+          </div>
+        ) : step === "verify-email" ? (
           <div className="verification-code-card">
             <div className="verification-timer-banner">
               <div>
@@ -6198,6 +6338,7 @@ function FeedView({
     useState<Record<string, boolean>>({})
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({})
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [showComposer, setShowComposer] = useState(false)
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -6247,6 +6388,7 @@ function FeedView({
     setNewContent("")
     setSelectedMetrics([])
     setSelectedMediaIndex(0)
+    setShowComposer(false)
     showToast("Performance intel published to SCOT network!")
   }
 
@@ -6375,6 +6517,18 @@ function FeedView({
         </div>
 
         <div className="feed-filters-nav" role="tablist">
+          {/* Dispatch composer toggle (+) under search bar with the other tabs */}
+          <button
+            type="button"
+            className={`feed-filter-btn feed-new-dispatch-btn ${showComposer ? "active" : ""}`}
+            onClick={() => setShowComposer(!showComposer)}
+            title={showComposer ? "Hide dispatch composer" : "Log new telemetry dispatch (+)"}
+            aria-expanded={showComposer}
+          >
+            <span className="dispatch-toggle-icon">{showComposer ? "✕" : "+"}</span>
+            <span>{showComposer ? "CLOSE DISPATCH" : "NEW DISPATCH"}</span>
+          </button>
+
           {[
             { key: "all", label: "ALL INTEL", count: posts.length },
             {
@@ -6402,95 +6556,98 @@ function FeedView({
         </div>
       </div>
 
-      {/* Professional Intel Composer */}
-      <div className="create-post-card">
-        <div className="create-post-header">
-          <div className="composer-user-avatar">
-            <span>
-              {(currentUserName || "Athlete").slice(0, 2).toUpperCase()}
-            </span>
+      {/* Professional Intel Composer (hidden by default under (+)) */}
+      {showComposer && (
+        <div className="create-post-card animate-fadeIn">
+          <div className="create-post-header">
+            <div className="composer-user-avatar">
+              <span>
+                {(currentUserName || "Athlete").slice(0, 2).toUpperCase()}
+              </span>
+            </div>
+            <div className="composer-user-info">
+              <strong>{currentUserName || "Verified Athlete"}</strong>
+              <span className="role-badge">
+                <i /> {currentUserRole.toUpperCase()} DISPATCH
+              </span>
+            </div>
+            <span className="composer-badge">AI BIOMECHANICS LOG</span>
           </div>
-          <div className="composer-user-info">
-            <strong>{currentUserName || "Verified Athlete"}</strong>
-            <span className="role-badge">
-              <i /> {currentUserRole.toUpperCase()} DISPATCH
-            </span>
+
+          <textarea
+            rows={3}
+            value={newContent}
+            onChange={(e) => setNewContent(e.target.value)}
+            placeholder={`Log training telemetry, match keyframes, or talent announcements in ${sport}...`}
+            autoFocus
+          />
+
+          {/* Quick telemetry tags picker */}
+          <div className="quick-metrics-container">
+            <span className="quick-metrics-label">ATTACH TELEMETRY TAG:</span>
+            <div className="quick-metrics-pills">
+              {QUICK_METRICS_LIST.map((tag) => {
+                const isSelected = selectedMetrics.some(
+                  (m) => m.label === tag.label,
+                )
+                return (
+                  <button
+                    type="button"
+                    key={tag.label}
+                    className={`metric-tag-chip ${isSelected ? "selected" : ""}`}
+                    onClick={() => handleToggleMetricTag(tag)}
+                  >
+                    <span>{tag.label}</span>
+                    <small>{tag.value}</small>
+                  </button>
+                )
+              })}
+            </div>
           </div>
-          <span className="composer-badge">AI BIOMECHANICS LOG</span>
-        </div>
 
-        <textarea
-          rows={3}
-          value={newContent}
-          onChange={(e) => setNewContent(e.target.value)}
-          placeholder={`Log training telemetry, match keyframes, or talent announcements in ${sport}...`}
-        />
-
-        {/* Quick telemetry tags picker */}
-        <div className="quick-metrics-container">
-          <span className="quick-metrics-label">ATTACH TELEMETRY TAG:</span>
-          <div className="quick-metrics-pills">
-            {QUICK_METRICS_LIST.map((tag) => {
-              const isSelected = selectedMetrics.some(
-                (m) => m.label === tag.label,
-              )
-              return (
-                <button
-                  type="button"
-                  key={tag.label}
-                  className={`metric-tag-chip ${isSelected ? "selected" : ""}`}
-                  onClick={() => handleToggleMetricTag(tag)}
+          {/* Composer Footer Actions */}
+          <div className="composer-footer">
+            <div className="composer-selectors">
+              <div className="composer-select-group">
+                <span>SPORT:</span>
+                <select
+                  value={newSport}
+                  onChange={(e) => setNewSport(e.target.value)}
                 >
-                  <span>{tag.label}</span>
-                  <small>{tag.value}</small>
-                </button>
-              )
-            })}
-          </div>
-        </div>
+                  {sports.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-        {/* Composer Footer Actions */}
-        <div className="composer-footer">
-          <div className="composer-selectors">
-            <div className="composer-select-group">
-              <span>SPORT:</span>
-              <select
-                value={newSport}
-                onChange={(e) => setNewSport(e.target.value)}
-              >
-                {sports.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+              <div className="composer-select-group">
+                <span>FOOTAGE:</span>
+                <select
+                  value={selectedMediaIndex}
+                  onChange={(e) => setSelectedMediaIndex(Number(e.target.value))}
+                >
+                  {SAMPLE_MEDIA_OPTIONS.map((opt, idx) => (
+                    <option key={opt.label} value={idx}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div className="composer-select-group">
-              <span>FOOTAGE:</span>
-              <select
-                value={selectedMediaIndex}
-                onChange={(e) => setSelectedMediaIndex(Number(e.target.value))}
-              >
-                {SAMPLE_MEDIA_OPTIONS.map((opt, idx) => (
-                  <option key={opt.label} value={idx}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={handleCreatePost}
+              disabled={!newContent.trim()}
+            >
+              PUBLISH INTEL <Icon name="arrow" size={14} />
+            </button>
           </div>
-
-          <button
-            type="button"
-            className="primary-button"
-            onClick={handleCreatePost}
-            disabled={!newContent.trim()}
-          >
-            PUBLISH INTEL <Icon name="arrow" size={14} />
-          </button>
         </div>
-      </div>
+      )}
 
       {/* Posts Stream */}
       {filteredPosts.length === 0 ? (
@@ -6903,12 +7060,12 @@ function SettingsView({
 
   const isClubAccredited = useMemo(() => {
     const code = (roleProfile.specialCode || "").trim().toUpperCase()
-    return VALID_CLUB_CODES.includes(code)
+    return isValidClubCode(code)
   }, [roleProfile.specialCode])
 
   const isScoutAccredited = useMemo(() => {
     const code = (roleProfile.specialCode || "").trim().toUpperCase()
-    return VALID_SCOUT_CODES.includes(code)
+    return isValidScoutCode(code)
   }, [roleProfile.specialCode])
 
   const handleSaveAll = async (sectionName?: string) => {
@@ -8853,6 +9010,25 @@ function App() {
             ? "theme-cyber"
             : ""
 
+  useEffect(() => {
+    const themeClasses = ["theme-light", "theme-midnight", "theme-oled", "theme-cyber"]
+    document.documentElement.classList.remove(...themeClasses)
+    document.body.classList.remove(...themeClasses)
+    if (themeClass) {
+      document.documentElement.classList.add(themeClass)
+      document.body.classList.add(themeClass)
+    }
+    document.documentElement.setAttribute("data-theme", theme.toLowerCase())
+  }, [themeClass, theme])
+
+  const pendingRegistrationsCount = useMemo(() => {
+    try {
+      return getAdminRegistrations().filter((r) => r.status === "pending").length
+    } catch {
+      return 0
+    }
+  }, [view])
+
   return (
     <main
       className={themeClass}
@@ -8866,7 +9042,9 @@ function App() {
       }
     >
       <SportBackground sport={sport} theme={theme} />
-      <header className="topbar">
+      {view !== "Admin" && (
+        <>
+          <header className="topbar">
         <div className="topbar-left">
           <Logo
             onClick={() => {
@@ -8916,6 +9094,27 @@ function App() {
         </nav>
 
         <div className="header-actions">
+          {/* Admin Console trigger */}
+          <button
+            type="button"
+            className={`admin-portal-trigger-btn ${view === "Admin" ? "active" : ""}`}
+            onClick={() => {
+              setView(view === "Admin" ? "Dashboard" : "Admin")
+              setAccountMenuOpen(false)
+              setNotificationsOpen(false)
+              setMenuOpen(false)
+            }}
+            title="Launch Admin Portal (Club & Scout Accreditation)"
+          >
+            <span className="admin-trigger-shield">🛡️</span>
+            <span className="desktop-only">ADMIN CONSOLE</span>
+            {pendingRegistrationsCount > 0 && (
+              <span className="admin-pending-alert-badge">
+                {pendingRegistrationsCount}
+              </span>
+            )}
+          </button>
+
           <button
             type="button"
             className="outline-button desktop-only"
@@ -9236,6 +9435,20 @@ function App() {
                         <Icon name="settings" size={14} />
                         <span>Account & Model Settings</span>
                       </button>
+                      <button
+                        type="button"
+                        className="account-dropdown-item admin-highlight-item"
+                        onClick={() => {
+                          setView("Admin")
+                          setAccountMenuOpen(false)
+                        }}
+                      >
+                        <span style={{ fontSize: 14 }}>🛡️</span>
+                        <span>Admin Governance Portal</span>
+                        {pendingRegistrationsCount > 0 && (
+                          <span className="admin-dropdown-badge">{pendingRegistrationsCount} PENDING</span>
+                        )}
+                      </button>
                       <div className="account-dropdown-separator" />
                       <button
                         type="button"
@@ -9282,6 +9495,20 @@ function App() {
                     >
                       <Icon name="settings" size={14} />
                       <span>System & Theme Settings</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="account-dropdown-item admin-highlight-item"
+                      onClick={() => {
+                        setView("Admin")
+                        setAccountMenuOpen(false)
+                      }}
+                    >
+                      <span style={{ fontSize: 14 }}>🛡️</span>
+                      <span>Admin Governance Console</span>
+                      {pendingRegistrationsCount > 0 && (
+                        <span className="admin-dropdown-badge">{pendingRegistrationsCount} PENDING</span>
+                      )}
                     </button>
                   </div>
                 )}
@@ -9434,6 +9661,8 @@ function App() {
               )}
             </div>
           </div>
+        </>
+      )}
         </>
       )}
       {authError && (
@@ -9889,52 +10118,68 @@ function App() {
         />
       )}
 
-      {/* Mobile Sticky Bottom Navigation Bar */}
-      <nav className="mobile-bottom-nav" aria-label="Mobile navigation bar">
-        {[
-          { id: "Dashboard", label: "Dashboard", icon: "chart" as const },
-          { id: "Explore", label: "Explore", icon: "trend" as const },
-          { id: "Wearable", label: "Wearable", icon: "activity" as const },
-          { id: "Profile", label: "Profile", icon: "user" as const },
-          { id: "Settings", label: "Settings", icon: "settings" as const },
-        ].map((tab) => {
-          const isActive =
-            view === tab.id || (tab.id === "Dashboard" && view === "FullDashboard")
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              className={`mobile-bottom-nav-item ${isActive ? "active" : ""}`}
-              onClick={() => {
-                setView(tab.id)
-                setMenuOpen(false)
-                setAccountMenuOpen(false)
-                window.scrollTo({ top: 0, behavior: "smooth" })
-              }}
-              aria-label={tab.label}
-              aria-current={isActive ? "page" : undefined}
-            >
-              {isActive && <span className="mobile-bottom-nav-indicator" />}
-              <span className="mobile-bottom-nav-icon-wrap">
-                <Icon name={tab.icon} size={18} />
-              </span>
-              <span className="mobile-bottom-nav-label">{tab.label}</span>
-            </button>
-          )
-        })}
-      </nav>
+      {view === "Admin" && (
+        <AdminPortalPage
+          onExitAdmin={() => setView("Dashboard")}
+          currentTheme={theme}
+          onThemeChange={setTheme}
+        />
+      )}
 
-      <footer>
-        <Logo />
-        <span>SERVERLESS ATHLETIC INTELLIGENCE · BUILT FOR THE NEXT PLAY</span>
-        <small>© 2026 SCOT</small>
-      </footer>
+      {/* Mobile Sticky Bottom Navigation Bar */}
+      {view !== "Admin" && (
+        <nav className="mobile-bottom-nav" aria-label="Mobile navigation bar">
+          {[
+            { id: "Dashboard", label: "Dashboard", icon: "chart" as const },
+            { id: "Explore", label: "Explore", icon: "trend" as const },
+            { id: "Wearable", label: "Wearable", icon: "activity" as const },
+            { id: "Profile", label: "Profile", icon: "user" as const },
+            { id: "Settings", label: "Settings", icon: "settings" as const },
+          ].map((tab) => {
+            const isActive =
+              view === tab.id || (tab.id === "Dashboard" && view === "FullDashboard")
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                className={`mobile-bottom-nav-item ${isActive ? "active" : ""}`}
+                onClick={() => {
+                  setView(tab.id)
+                  setMenuOpen(false)
+                  setAccountMenuOpen(false)
+                  window.scrollTo({ top: 0, behavior: "smooth" })
+                }}
+                aria-label={tab.label}
+                aria-current={isActive ? "page" : undefined}
+              >
+                {isActive && <span className="mobile-bottom-nav-indicator" />}
+                <span className="mobile-bottom-nav-icon-wrap">
+                  <Icon name={tab.icon} size={18} />
+                </span>
+                <span className="mobile-bottom-nav-label">{tab.label}</span>
+              </button>
+            )
+          })}
+        </nav>
+      )}
+
+      {view !== "Admin" && (
+        <footer>
+          <Logo />
+          <span>SERVERLESS ATHLETIC INTELLIGENCE · BUILT FOR THE NEXT PLAY</span>
+          <small>© 2026 SCOT</small>
+        </footer>
+      )}
       {authOpen && (
         <AuthModal
           onClose={() => setAuthOpen(false)}
           onEmailAuth={handleEmailAuth}
           onOAuth={handleOAuth}
           onAuthenticated={completeAuth}
+          onOpenAdmin={() => {
+            setAuthOpen(false)
+            setView("Admin")
+          }}
         />
       )}
       {viewingProfile && (
