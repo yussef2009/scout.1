@@ -1,4 +1,6 @@
 // Admin store for Club & Scout registrations, special codes, and audit logs
+import { supabase, type VerificationRequestRow, recordAdminAuditLog } from "../supabase"
+
 export interface AdminRegistration {
   id: string
   role: "Club" | "Scout"
@@ -16,6 +18,10 @@ export interface AdminRegistration {
   specialCode?: string
   verifiedAt?: string
   notes?: string
+  profileId?: string
+  documentType?: string
+  documentUrl?: string
+  proofFileName?: string
 }
 
 export interface SpecialCodeEntry {
@@ -46,6 +52,8 @@ export const INITIAL_REGISTRATIONS: AdminRegistration[] = [
     benchmark: "Sub-3.2s counter-press transition, 95% passing accuracy in final third",
     submittedAt: "Today, 14:20",
     status: "pending",
+    documentType: "National Federation Club License",
+    proofFileName: "al_ahly_academy_accreditation.pdf",
   },
   {
     id: "REG-2026-SCOUT-412",
@@ -61,6 +69,8 @@ export const INITIAL_REGISTRATIONS: AdminRegistration[] = [
     benchmark: "Evaluating wingers with 75+ cm vertical jump and high reactive agility",
     submittedAt: "Yesterday, 18:45",
     status: "pending",
+    documentType: "FIBA Licensed Evaluator Badge",
+    proofFileName: "fiba_talent_evaluator_94812.png",
   },
   {
     id: "REG-2026-CLUB-104",
@@ -79,6 +89,8 @@ export const INITIAL_REGISTRATIONS: AdminRegistration[] = [
     specialCode: "SCOT-CLUB-VIP",
     verifiedAt: "2 days ago",
     notes: "Official verification passed via Egyptian Basketball Federation credentials.",
+    documentType: "National Club Registration License",
+    proofFileName: "alex_falcons_cert.pdf",
   },
 ]
 
@@ -113,6 +125,58 @@ export function saveAdminRegistrations(regs: AdminRegistration[]): void {
   } catch {}
 }
 
+export async function syncRegistrationsFromSupabase(): Promise<AdminRegistration[]> {
+  try {
+    const { data, error } = await supabase
+      .from("verification_requests")
+      .select("*, profiles(*)")
+      .order("created_at", { ascending: false })
+
+    if (error || !data || data.length === 0) {
+      return getAdminRegistrations()
+    }
+
+    const localList = getAdminRegistrations()
+    const converted: AdminRegistration[] = data.map((row: any) => {
+      const p = row.profiles || {}
+      const timeStr = row.created_at ? new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recently"
+      return {
+        id: row.id,
+        role: (row.role === "Club" || row.role === "Scout") ? row.role : (row.role?.toLowerCase() === "club" ? "Club" : "Scout"),
+        name: row.organization_name || p.full_name || "Applicant Organization",
+        email: p.email || "No email",
+        country: p.country || "Egypt",
+        city: p.city || "Alexandria",
+        sport: p.sport || "Basketball",
+        licenseNumber: row.license_number || p.license_number || undefined,
+        phone: row.phone || p.phone || undefined,
+        benchmark: row.notes || undefined,
+        submittedAt: timeStr,
+        status: row.status === "approved" ? "verified" : row.status === "rejected" ? "rejected" : "pending",
+        notes: row.admin_feedback || undefined,
+        profileId: row.profile_id,
+        documentType: row.document_type || "Accreditation Badge & License",
+        documentUrl: row.document_url || undefined,
+        proofFileName: row.proof_file_name || undefined,
+      }
+    })
+
+    // Merge supabase items with local fallback items (prevent duplicate by id or email)
+    const merged = [...converted]
+    for (const local of localList) {
+      if (!merged.some(m => m.id === local.id || (m.email && m.email === local.email))) {
+        merged.push(local)
+      }
+    }
+
+    saveAdminRegistrations(merged)
+    return merged
+  } catch (err) {
+    console.warn("syncRegistrationsFromSupabase fallback to local:", err)
+    return getAdminRegistrations()
+  }
+}
+
 export function submitClubOrScoutRegistration(app: Omit<AdminRegistration, "id" | "submittedAt" | "status">): AdminRegistration {
   const all = getAdminRegistrations()
   const randomNum = Math.floor(100 + Math.random() * 900)
@@ -125,6 +189,35 @@ export function submitClubOrScoutRegistration(app: Omit<AdminRegistration, "id" 
   }
   const updated = [newReg, ...all]
   saveAdminRegistrations(updated)
+
+  // Asynchronously push to Supabase verification_requests
+  (async () => {
+    try {
+      // Find matching profile if available
+      let profileId = app.profileId
+      if (!profileId && app.email) {
+        const { data } = await supabase.from("profiles").select("id").eq("email", app.email).maybeSingle()
+        if (data?.id) profileId = data.id
+      }
+
+      if (profileId) {
+        await supabase.from("verification_requests").insert({
+          profile_id: profileId,
+          role: app.role,
+          organization_name: app.name,
+          license_number: app.licenseNumber,
+          phone: app.phone,
+          document_type: app.documentType || "Accreditation Badge & License",
+          proof_file_name: app.proofFileName || "credential_proof.pdf",
+          notes: app.benchmark,
+          status: "pending",
+        })
+      }
+    } catch (e) {
+      console.warn("Async Supabase request dispatch ignored:", e)
+    }
+  })()
+
   return newReg
 }
 
@@ -135,7 +228,11 @@ export function generateSpecialCode(role: "Club" | "Scout", entityName?: string)
   return `${prefix}-${randNum}-${letters}`
 }
 
-export function verifyAndApproveRegistration(id: string, notes?: string): { success: boolean; code?: string; reg?: AdminRegistration } {
+export function verifyAndApproveRegistration(
+  id: string,
+  notes?: string,
+  adminEmail?: string
+): { success: boolean; code?: string; reg?: AdminRegistration } {
   const all = getAdminRegistrations()
   const target = all.find((r) => r.id === id)
   if (!target) return { success: false }
@@ -163,11 +260,63 @@ export function verifyAndApproveRegistration(id: string, notes?: string): { succ
     registrationId: id,
   })
 
+  // Sync to Supabase in background
+  (async () => {
+    try {
+      // If id is UUID, update verification_requests
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+      if (isUuid) {
+        await supabase
+          .from("verification_requests")
+          .update({
+            status: "approved",
+            admin_feedback: notes || "Approved by Scot Admin",
+            reviewed_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+      }
+
+      // If target has profileId or we find profile by email, mark is_verified = true
+      let targetProfileId = target.profileId
+      if (!targetProfileId && target.email) {
+        const { data } = await supabase.from("profiles").select("id").eq("email", target.email).maybeSingle()
+        if (data?.id) targetProfileId = data.id
+      }
+
+      if (targetProfileId) {
+        await supabase
+          .from("profiles")
+          .update({
+            is_verified: true,
+            status: "active",
+            role: target.role === "Club" ? "Club" : "Scout",
+          })
+          .eq("id", targetProfileId)
+      }
+
+      await recordAdminAuditLog({
+        action: "APPROVE_ACCREDITATION",
+        target_type: "verification_request",
+        target_id: id,
+        admin_email: adminEmail || "admin@scot.io",
+        details: {
+          organization: target.name,
+          role: target.role,
+          issuedCode,
+          notes,
+        },
+      })
+    } catch (e) {
+      console.warn("Async Supabase approval sync exception:", e)
+    }
+  })()
+
   return { success: true, code: issuedCode, reg: updated.find((r) => r.id === id) }
 }
 
-export function rejectRegistration(id: string, reason?: string): boolean {
+export function rejectRegistration(id: string, reason?: string, adminEmail?: string): boolean {
   const all = getAdminRegistrations()
+  const target = all.find((r) => r.id === id)
   const updated = all.map((r) => {
     if (r.id !== id) return r
     return {
@@ -177,6 +326,38 @@ export function rejectRegistration(id: string, reason?: string): boolean {
     }
   })
   saveAdminRegistrations(updated)
+
+  // Sync to Supabase in background
+  (async () => {
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+      if (isUuid) {
+        await supabase
+          .from("verification_requests")
+          .update({
+            status: "rejected",
+            admin_feedback: reason || "Credentials could not be verified",
+            reviewed_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+      }
+
+      await recordAdminAuditLog({
+        action: "REJECT_ACCREDITATION",
+        target_type: "verification_request",
+        target_id: id,
+        admin_email: adminEmail || "admin@scot.io",
+        details: {
+          organization: target?.name,
+          role: target?.role,
+          reason,
+        },
+      })
+    } catch (e) {
+      console.warn("Async Supabase rejection sync exception:", e)
+    }
+  })()
+
   return true
 }
 
@@ -217,7 +398,6 @@ export function revokeSpecialCode(code: string): void {
   } catch {}
 }
 
-// Check if a code is valid for a given role (combining base codes and admin verified codes)
 export function isValidClubCode(code: string): boolean {
   const clean = code.trim().toUpperCase()
   if (!clean) return false
