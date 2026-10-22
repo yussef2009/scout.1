@@ -50,6 +50,17 @@ export default function AdminPortalPage({
   adminAccount,
   onAdminSignOut,
 }: AdminPortalProps) {
+  const themeClass =
+    currentTheme === "Light"
+      ? "theme-light"
+      : currentTheme === "Midnight"
+        ? "theme-midnight"
+        : currentTheme === "OLED"
+          ? "theme-oled"
+          : currentTheme === "Cyber"
+            ? "theme-cyber"
+            : ""
+
   // Navigation Tabs
   const [activeTab, setActiveTab] = useState<
     "overview" | "members" | "approvals" | "metrics" | "telemetry" | "codes" | "audit"
@@ -1016,7 +1027,7 @@ export default function AdminPortalPage({
   // -------------------------------------------------------------
   if (authLoading) {
     return (
-      <div className="admin-auth-guard-shell">
+      <div className={`admin-auth-guard-shell ${themeClass}`} data-theme={currentTheme.toLowerCase()}>
         <div className="admin-auth-card" style={{ textAlign: "center" }}>
           <div className="admin-auth-crest-wrap">
             <div className="admin-auth-crest">
@@ -1039,7 +1050,7 @@ export default function AdminPortalPage({
   // -------------------------------------------------------------
   if (currentAdminUser && !isAuthorizedAdmin) {
     return (
-      <div className="admin-auth-guard-shell">
+      <div className={`admin-auth-guard-shell ${themeClass}`} data-theme={currentTheme.toLowerCase()}>
         <div className="admin-auth-card restricted-card">
           <div className="admin-auth-crest-wrap">
             <div className="admin-auth-crest restricted">
@@ -1110,7 +1121,7 @@ export default function AdminPortalPage({
   // -------------------------------------------------------------
   if (!isAuthorizedAdmin) {
     return (
-      <div className="admin-auth-guard-shell">
+      <div className={`admin-auth-guard-shell ${themeClass}`} data-theme={currentTheme.toLowerCase()}>
         <div className="admin-auth-card">
           <div className="admin-auth-crest-wrap">
             <div className="admin-auth-crest">
@@ -1192,7 +1203,7 @@ export default function AdminPortalPage({
   // RENDER: Full Scot Admin Command Console
   // -------------------------------------------------------------
   return (
-    <div className="admin-portal-root">
+    <div className={`admin-portal-root ${themeClass}`} data-theme={currentTheme.toLowerCase()}>
       {/* Toast Notification */}
       {toastMessage && (
         <div className="admin-toast-banner" role="alert">
