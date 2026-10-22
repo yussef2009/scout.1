@@ -61,7 +61,7 @@ export default function AdminPortalPage({
   const [currentAdminProfile, setCurrentAdminProfile] = useState<ProfileRow | null>(null)
   const [isAuthorizedAdmin, setIsAuthorizedAdmin] = useState(false)
   const [adminAuthEmail, setAdminAuthEmail] = useState(
-    adminAccount?.email || "yussef.essamabdallah@gmail.com"
+    adminAccount?.email || "yussefessam21@gmail.com"
   )
   const [adminAuthPassword, setAdminAuthPassword] = useState("")
   const [authError, setAuthError] = useState<string | null>(null)
@@ -569,7 +569,7 @@ export default function AdminPortalPage({
   const handleBypassAdminLogin = () => {
     const demoAdminProfile: ProfileRow = {
       id: "0b375a6c-ec66-4e0e-8027-9400fd568ae1",
-      email: "yussef2009vollyball@gmail.com",
+      email: "yussefessam21@gmail.com",
       full_name: "Yussef Essam (Primary Admin)",
       role: "admin",
       sport: "Volleyball",
@@ -583,7 +583,7 @@ export default function AdminPortalPage({
     }
     saveAdminSession({
       id: demoAdminProfile.id,
-      email: demoAdminProfile.email || "yussef2009vollyball@gmail.com",
+      email: demoAdminProfile.email || "yussefessam21@gmail.com",
       password: "admin",
       name: demoAdminProfile.full_name,
       role: "admin",

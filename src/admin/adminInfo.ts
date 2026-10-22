@@ -30,7 +30,7 @@ export interface AdminAccount {
 export const ADMIN_ACCOUNTS: AdminAccount[] = [
   {
     id: "admin-root-01",
-    email: "yussef.essamabdallah@gmail.com",
+    email: "yussefessam21@gmail.com",
     password: "admin", // Administrator password
     name: "Yussef Essam (Primary Admin)",
     role: "admin",
@@ -40,7 +40,7 @@ export const ADMIN_ACCOUNTS: AdminAccount[] = [
   },
   {
     id: "admin-root-02",
-    email: "yussef2009vollyball@gmail.com",
+    email: "yussef.essamabdallah@gmail.com",
     password: "admin",
     name: "Yussef Essam",
     role: "admin",
@@ -50,6 +50,16 @@ export const ADMIN_ACCOUNTS: AdminAccount[] = [
   },
   {
     id: "admin-root-03",
+    email: "yussef2009vollyball@gmail.com",
+    password: "admin",
+    name: "Yussef Essam",
+    role: "admin",
+    sport: "Volleyball",
+    country: "Egypt",
+    city: "Alexandria",
+  },
+  {
+    id: "admin-root-04",
     email: "admin@scot.ai",
     password: "admin", // Secondary admin account
     name: "System Administrator",
