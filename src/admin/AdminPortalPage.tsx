@@ -24,11 +24,21 @@ import {
   fetchAdminAuditLogs,
   recordAdminAuditLog,
 } from "../supabase"
+import {
+  type AdminAccount,
+  getActiveAdminSession,
+  isConfiguredAdminEmail,
+  verifyAdminCredentials,
+  saveAdminSession,
+  clearActiveAdminSession,
+} from "./adminInfo"
 
 interface AdminPortalProps {
   onExitAdmin: () => void
   currentTheme: string
   onThemeChange: (theme: string) => void
+  adminAccount?: AdminAccount | null
+  onAdminSignOut?: () => void
   totalPostsCount?: number
   onModeratePost?: (postId: string) => void
 }
@@ -37,6 +47,8 @@ export default function AdminPortalPage({
   onExitAdmin,
   currentTheme,
   onThemeChange,
+  adminAccount,
+  onAdminSignOut,
 }: AdminPortalProps) {
   // Navigation Tabs
   const [activeTab, setActiveTab] = useState<
@@ -48,7 +60,9 @@ export default function AdminPortalPage({
   const [currentAdminUser, setCurrentAdminUser] = useState<any>(null)
   const [currentAdminProfile, setCurrentAdminProfile] = useState<ProfileRow | null>(null)
   const [isAuthorizedAdmin, setIsAuthorizedAdmin] = useState(false)
-  const [adminAuthEmail, setAdminAuthEmail] = useState("yussef2009vollyball@gmail.com")
+  const [adminAuthEmail, setAdminAuthEmail] = useState(
+    adminAccount?.email || "yussef.essamabdallah@gmail.com"
+  )
   const [adminAuthPassword, setAdminAuthPassword] = useState("")
   const [authError, setAuthError] = useState<string | null>(null)
   const [isAuthSubmitting, setIsAuthSubmitting] = useState(false)
@@ -129,6 +143,32 @@ export default function AdminPortalPage({
   // Initial Auth Check & Role Validation
   // -------------------------------------------------------------
   const evaluateAdminClearance = async (user: any) => {
+    const activeStoredAdmin = adminAccount || getActiveAdminSession()
+    if (activeStoredAdmin) {
+      setIsAuthorizedAdmin(true)
+      setCurrentAdminUser({
+        id: activeStoredAdmin.id,
+        email: activeStoredAdmin.email,
+        role: "admin",
+      })
+      setCurrentAdminProfile({
+        id: activeStoredAdmin.id,
+        email: activeStoredAdmin.email,
+        full_name: activeStoredAdmin.name,
+        role: "admin",
+        sport: activeStoredAdmin.sport || "Volleyball",
+        country: activeStoredAdmin.country || "Egypt",
+        city: activeStoredAdmin.city || "Alexandria",
+        is_verified: true,
+        status: "active",
+        preferences: {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      setAuthLoading(false)
+      return
+    }
+
     if (!user) {
       setIsAuthorizedAdmin(false)
       setCurrentAdminUser(null)
@@ -138,6 +178,9 @@ export default function AdminPortalPage({
     }
 
     try {
+      const userEmail = (user.email || "").toLowerCase()
+      const isConfiguredAdmin = isConfiguredAdminEmail(userEmail)
+
       // Query profiles table for role
       const { data, error } = await supabase
         .from("profiles")
@@ -146,10 +189,7 @@ export default function AdminPortalPage({
         .maybeSingle()
 
       if (error || !data) {
-        // Fallback: check email or user metadata
-        const userEmail = user.email || ""
-        const isOwnerEmail = userEmail === "yussef2009vollyball@gmail.com"
-        if (isOwnerEmail) {
+        if (isConfiguredAdmin) {
           setIsAuthorizedAdmin(true)
           setCurrentAdminUser(user)
           setCurrentAdminProfile({
@@ -176,7 +216,7 @@ export default function AdminPortalPage({
       }
 
       const roleLower = (data.role || "").toLowerCase()
-      const isAdmin = roleLower === "admin" && data.status !== "banned" && data.status !== "suspended"
+      const isAdmin = (roleLower === "admin" || isConfiguredAdmin) && data.status !== "banned" && data.status !== "suspended"
 
       setCurrentAdminUser(user)
       setCurrentAdminProfile(data as ProfileRow)
@@ -193,6 +233,34 @@ export default function AdminPortalPage({
     let mounted = true
 
     const initAuth = async () => {
+      const activeStoredAdmin = adminAccount || getActiveAdminSession()
+      if (activeStoredAdmin) {
+        if (mounted) {
+          setIsAuthorizedAdmin(true)
+          setCurrentAdminUser({
+            id: activeStoredAdmin.id,
+            email: activeStoredAdmin.email,
+            role: "admin",
+          })
+          setCurrentAdminProfile({
+            id: activeStoredAdmin.id,
+            email: activeStoredAdmin.email,
+            full_name: activeStoredAdmin.name,
+            role: "admin",
+            sport: activeStoredAdmin.sport || "Volleyball",
+            country: activeStoredAdmin.country || "Egypt",
+            city: activeStoredAdmin.city || "Alexandria",
+            is_verified: true,
+            status: "active",
+            preferences: {},
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          setAuthLoading(false)
+        }
+        return
+      }
+
       try {
         const { data } = await supabase.auth.getUser()
         if (mounted) {
@@ -446,6 +514,36 @@ export default function AdminPortalPage({
     setIsAuthSubmitting(true)
 
     try {
+      // Check credentials against the admin info configuration file
+      const matched = verifyAdminCredentials(adminAuthEmail, adminAuthPassword)
+      if (matched) {
+        saveAdminSession(matched)
+        const demoProfile: ProfileRow = {
+          id: matched.id,
+          email: matched.email,
+          full_name: matched.name,
+          role: "admin",
+          sport: matched.sport || "Volleyball",
+          country: matched.country || "Egypt",
+          city: matched.city || "Alexandria",
+          is_verified: true,
+          status: "active",
+          preferences: {},
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+        setCurrentAdminProfile(demoProfile)
+        setCurrentAdminUser({
+          id: matched.id,
+          email: matched.email,
+          role: "admin",
+        })
+        setIsAuthorizedAdmin(true)
+        showToast(`Security Clearance Alpha Verified: Welcome ${matched.name}`)
+        setIsAuthSubmitting(false)
+        return
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email: adminAuthEmail.trim(),
         password: adminAuthPassword,
@@ -483,6 +581,13 @@ export default function AdminPortalPage({
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
+    saveAdminSession({
+      id: demoAdminProfile.id,
+      email: demoAdminProfile.email || "yussef2009vollyball@gmail.com",
+      password: "admin",
+      name: demoAdminProfile.full_name,
+      role: "admin",
+    })
     setCurrentAdminProfile(demoAdminProfile)
     setCurrentAdminUser({
       id: demoAdminProfile.id,
@@ -494,11 +599,18 @@ export default function AdminPortalPage({
   }
 
   const handleSignOutAdmin = async () => {
-    await supabase.auth.signOut()
+    clearActiveAdminSession()
+    if (onAdminSignOut) {
+      onAdminSignOut()
+    }
+    try {
+      await supabase.auth.signOut()
+    } catch {}
     setIsAuthorizedAdmin(false)
     setCurrentAdminUser(null)
     setCurrentAdminProfile(null)
     showToast("Signed out of Scot Admin Console")
+    onExitAdmin()
   }
 
   // -------------------------------------------------------------

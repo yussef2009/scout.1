@@ -33,6 +33,15 @@ import {
 import { PerformanceReportPage } from "./reports/PerformanceReportPage"
 import AdminPortalPage from "./admin/AdminPortalPage"
 import {
+  type AdminAccount,
+  ADMIN_ACCOUNTS,
+  verifyAdminCredentials,
+  isConfiguredAdminEmail,
+  getActiveAdminSession,
+  saveAdminSession,
+  clearActiveAdminSession,
+} from "./admin/adminInfo"
+import {
   isValidClubCode,
   isValidScoutCode,
   getAllClubCodes,
@@ -58,6 +67,8 @@ export interface PerformanceReport {
   narrative?: string
   verified: boolean
 }
+
+export type ProfileRecord = PerformanceReport
 
 export interface NotificationItem {
   id: string
@@ -562,13 +573,13 @@ function AuthModal({
   onEmailAuth,
   onOAuth,
   onAuthenticated,
-  onOpenAdmin,
+  onAdminAuthenticated,
 }: {
   onClose: () => void
   onEmailAuth: (payload: AuthPayload) => Promise<boolean>
   onOAuth: (provider: AuthProvider, profile: AuthProfileDraft) => Promise<void>
   onAuthenticated: (mode: AuthMode) => void
-  onOpenAdmin?: () => void
+  onAdminAuthenticated?: (admin: AdminAccount) => void
 }) {
   const [role, setRole] = useState("Player")
   const [mode, setMode] = useState<AuthMode>("Register")
@@ -664,6 +675,17 @@ function AuthModal({
     // Direct sign in
     setBusy(true)
     try {
+      // Check if credentials match administrator info file
+      const matchedAdmin = verifyAdminCredentials(email, password)
+      if (matchedAdmin) {
+        saveAdminSession(matchedAdmin)
+        if (onAdminAuthenticated) {
+          onAdminAuthenticated(matchedAdmin)
+        }
+        onClose()
+        return
+      }
+
       const requiresConfirmation = await onEmailAuth({
         ...profileDraft(),
         email: email.trim(),
@@ -672,6 +694,23 @@ function AuthModal({
       if (requiresConfirmation) {
         setNotice("Check your email to confirm your address, then sign in.")
       } else {
+        if (isConfiguredAdminEmail(email)) {
+          const matched = ADMIN_ACCOUNTS.find(
+            (a) => a.email.toLowerCase() === email.trim().toLowerCase()
+          ) || {
+            id: `admin-${Date.now()}`,
+            email: email.trim(),
+            password: "",
+            name: "Yussef Essam",
+            role: "admin",
+          }
+          saveAdminSession(matched)
+          if (onAdminAuthenticated) {
+            onAdminAuthenticated(matched)
+          }
+          onClose()
+          return
+        }
         onAuthenticated(mode)
       }
     } catch (cause) {
@@ -916,16 +955,6 @@ function AuthModal({
             )}
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
-              {onOpenAdmin && (
-                <button
-                  type="button"
-                  className="primary-button"
-                  style={{ background: "rgba(212, 175, 55, 0.15)", border: "1px solid var(--gold)", color: "var(--gold-bright)" }}
-                  onClick={onOpenAdmin}
-                >
-                  ⚡ OPEN ADMIN CONSOLE (VERIFY & APPROVE APPLICATION)
-                </button>
-              )}
               <button
                 type="button"
                 className="text-button"
@@ -8315,6 +8344,16 @@ function App() {
   const [authError, setAuthError] = useState("")
   const [apiKey, setApiKey] = useState("")
   const [view, setView] = useState("Dashboard")
+  const [activeAdmin, setActiveAdmin] = useState<AdminAccount | null>(() => getActiveAdminSession())
+  const isAdminLoggedIn = Boolean(activeAdmin)
+
+  // Security guard: Ensure unauthenticated users cannot access the Admin view
+  useEffect(() => {
+    if (view === "Admin" && !isAdminLoggedIn) {
+      setView("Dashboard")
+    }
+  }, [view, isAdminLoggedIn])
+
   const [searchOpen, setSearchOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement>(null)
@@ -8937,10 +8976,15 @@ function App() {
   }
 
   const handleSignOut = async () => {
+    clearActiveAdminSession()
+    setActiveAdmin(null)
     setApiKey("")
     try {
       localStorage.removeItem("scoutai_gemini_key")
     } catch {}
+    if (view === "Admin") {
+      setView("Dashboard")
+    }
     if (!supabase) return
     const { error } = await supabase.auth.signOut()
     if (error) setAuthError(`Could not sign out: ${error.message}`)
@@ -9094,26 +9138,28 @@ function App() {
         </nav>
 
         <div className="header-actions">
-          {/* Admin Console trigger */}
-          <button
-            type="button"
-            className={`admin-portal-trigger-btn ${view === "Admin" ? "active" : ""}`}
-            onClick={() => {
-              setView(view === "Admin" ? "Dashboard" : "Admin")
-              setAccountMenuOpen(false)
-              setNotificationsOpen(false)
-              setMenuOpen(false)
-            }}
-            title="Launch Admin Portal (Club & Scout Accreditation)"
-          >
-            <span className="admin-trigger-shield">🛡️</span>
-            <span className="desktop-only">ADMIN CONSOLE</span>
-            {pendingRegistrationsCount > 0 && (
-              <span className="admin-pending-alert-badge">
-                {pendingRegistrationsCount}
-              </span>
-            )}
-          </button>
+          {/* Admin Console trigger - Only displayed when admin is authenticated via adminInfo */}
+          {isAdminLoggedIn && (
+            <button
+              type="button"
+              className={`admin-portal-trigger-btn ${view === "Admin" ? "active" : ""}`}
+              onClick={() => {
+                setView(view === "Admin" ? "Dashboard" : "Admin")
+                setAccountMenuOpen(false)
+                setNotificationsOpen(false)
+                setMenuOpen(false)
+              }}
+              title="Launch Admin Portal (Club & Scout Accreditation)"
+            >
+              <span className="admin-trigger-shield">🛡️</span>
+              <span className="desktop-only">ADMIN CONSOLE</span>
+              {pendingRegistrationsCount > 0 && (
+                <span className="admin-pending-alert-badge">
+                  {pendingRegistrationsCount}
+                </span>
+              )}
+            </button>
+          )}
 
           <button
             type="button"
@@ -9435,20 +9481,22 @@ function App() {
                         <Icon name="settings" size={14} />
                         <span>Account & Model Settings</span>
                       </button>
-                      <button
-                        type="button"
-                        className="account-dropdown-item admin-highlight-item"
-                        onClick={() => {
-                          setView("Admin")
-                          setAccountMenuOpen(false)
-                        }}
-                      >
-                        <span style={{ fontSize: 14 }}>🛡️</span>
-                        <span>Admin Governance Portal</span>
-                        {pendingRegistrationsCount > 0 && (
-                          <span className="admin-dropdown-badge">{pendingRegistrationsCount} PENDING</span>
-                        )}
-                      </button>
+                      {isAdminLoggedIn && (
+                        <button
+                          type="button"
+                          className="account-dropdown-item admin-highlight-item"
+                          onClick={() => {
+                            setView("Admin")
+                            setAccountMenuOpen(false)
+                          }}
+                        >
+                          <span style={{ fontSize: 14 }}>🛡️</span>
+                          <span>Admin Governance Portal</span>
+                          {pendingRegistrationsCount > 0 && (
+                            <span className="admin-dropdown-badge">{pendingRegistrationsCount} PENDING</span>
+                          )}
+                        </button>
+                      )}
                       <div className="account-dropdown-separator" />
                       <button
                         type="button"
@@ -9495,20 +9543,6 @@ function App() {
                     >
                       <Icon name="settings" size={14} />
                       <span>System & Theme Settings</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="account-dropdown-item admin-highlight-item"
-                      onClick={() => {
-                        setView("Admin")
-                        setAccountMenuOpen(false)
-                      }}
-                    >
-                      <span style={{ fontSize: 14 }}>🛡️</span>
-                      <span>Admin Governance Console</span>
-                      {pendingRegistrationsCount > 0 && (
-                        <span className="admin-dropdown-badge">{pendingRegistrationsCount} PENDING</span>
-                      )}
                     </button>
                   </div>
                 )}
@@ -10118,11 +10152,17 @@ function App() {
         />
       )}
 
-      {view === "Admin" && (
+      {view === "Admin" && isAdminLoggedIn && (
         <AdminPortalPage
           onExitAdmin={() => setView("Dashboard")}
           currentTheme={theme}
           onThemeChange={setTheme}
+          adminAccount={activeAdmin}
+          onAdminSignOut={() => {
+            clearActiveAdminSession()
+            setActiveAdmin(null)
+            setView("Dashboard")
+          }}
         />
       )}
 
@@ -10176,9 +10216,10 @@ function App() {
           onEmailAuth={handleEmailAuth}
           onOAuth={handleOAuth}
           onAuthenticated={completeAuth}
-          onOpenAdmin={() => {
-            setAuthOpen(false)
+          onAdminAuthenticated={(admin) => {
+            setActiveAdmin(admin)
             setView("Admin")
+            setAuthOpen(false)
           }}
         />
       )}

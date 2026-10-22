@@ -188,7 +188,7 @@ export function submitClubOrScoutRegistration(app: Omit<AdminRegistration, "id" 
     status: "pending",
   }
   const updated = [newReg, ...all]
-  saveAdminRegistrations(updated)
+  saveAdminRegistrations(updated);
 
   // Asynchronously push to Supabase verification_requests
   (async () => {
@@ -258,7 +258,7 @@ export function verifyAndApproveRegistration(
     issuedAt: "Just now",
     status: "active",
     registrationId: id,
-  })
+  });
 
   // Sync to Supabase in background
   (async () => {
@@ -325,7 +325,7 @@ export function rejectRegistration(id: string, reason?: string, adminEmail?: str
       notes: reason || "Credentials could not be verified with sporting regulatory body.",
     }
   })
-  saveAdminRegistrations(updated)
+  saveAdminRegistrations(updated);
 
   // Sync to Supabase in background
   (async () => {
