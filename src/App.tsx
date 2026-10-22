@@ -9138,29 +9138,6 @@ function App() {
         </nav>
 
         <div className="header-actions">
-          {/* Admin Console trigger - Only displayed when admin is authenticated via adminInfo */}
-          {isAdminLoggedIn && (
-            <button
-              type="button"
-              className={`admin-portal-trigger-btn ${view === "Admin" ? "active" : ""}`}
-              onClick={() => {
-                setView(view === "Admin" ? "Dashboard" : "Admin")
-                setAccountMenuOpen(false)
-                setNotificationsOpen(false)
-                setMenuOpen(false)
-              }}
-              title="Launch Admin Portal (Club & Scout Accreditation)"
-            >
-              <span className="admin-trigger-shield">🛡️</span>
-              <span className="desktop-only">ADMIN CONSOLE</span>
-              {pendingRegistrationsCount > 0 && (
-                <span className="admin-pending-alert-badge">
-                  {pendingRegistrationsCount}
-                </span>
-              )}
-            </button>
-          )}
-
           <button
             type="button"
             className="outline-button desktop-only"
@@ -9481,22 +9458,6 @@ function App() {
                         <Icon name="settings" size={14} />
                         <span>Account & Model Settings</span>
                       </button>
-                      {isAdminLoggedIn && (
-                        <button
-                          type="button"
-                          className="account-dropdown-item admin-highlight-item"
-                          onClick={() => {
-                            setView("Admin")
-                            setAccountMenuOpen(false)
-                          }}
-                        >
-                          <span style={{ fontSize: 14 }}>🛡️</span>
-                          <span>Admin Governance Portal</span>
-                          {pendingRegistrationsCount > 0 && (
-                            <span className="admin-dropdown-badge">{pendingRegistrationsCount} PENDING</span>
-                          )}
-                        </button>
-                      )}
                       <div className="account-dropdown-separator" />
                       <button
                         type="button"
@@ -10154,7 +10115,11 @@ function App() {
 
       {view === "Admin" && isAdminLoggedIn && (
         <AdminPortalPage
-          onExitAdmin={() => setView("Dashboard")}
+          onExitAdmin={() => {
+            clearActiveAdminSession()
+            setActiveAdmin(null)
+            setView("Dashboard")
+          }}
           currentTheme={theme}
           onThemeChange={setTheme}
           adminAccount={activeAdmin}
