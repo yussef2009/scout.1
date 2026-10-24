@@ -1,0 +1,62 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "upload": "Upload & Scan",
+    "matches": "Matches",
+    "players": "Athletes",
+    "compare": "Compare",
+    "settings": "Settings",
+    "admin": "Accreditation",
+    "activeModel": "Active Model",
+    "verifiedTier": "FIFA / Olympic Accredited"
+  },
+  "dashboard": {
+    "title": "Athletic Intelligence Hub",
+    "subtitle": "Computer Vision Biomechanics & Multi-Sport Scouting Engine",
+    "uploadCta": "Upload Match Video",
+    "quickScan": "Quick Scan Player",
+    "statTotalScouts": "Total Dossiers",
+    "statAthletesTracked": "Athletes Tracked",
+    "statAvgGrade": "Average Rating",
+    "statAccuracy": "Vision Accuracy",
+    "recentReports": "Recent Scouting Reports",
+    "selectSport": "Select Discipline"
+  },
+  "upload": {
+    "dropzoneTitle": "Drop match or training footage here",
+    "dropzoneSubtitle": "MP4, MOV, or WebM up to 2GB · Automatic keyframe extraction",
+    "browse": "Browse Local Files",
+    "scanning": "Scanning Players with Vision AI...",
+    "detectedTitle": "Detected Players on Pitch",
+    "detectedSub": "Click any player card or click their bounding box on the video frame",
+    "analyzeBtn": "Generate Tactical Scouting Report",
+    "analyzing": "Synthesizing deep biomechanical and tactical evaluation...",
+    "retryScan": "Retry Scan",
+    "languageSelect": "Report Language"
+  },
+  "report": {
+    "overallRating": "Overall Scouting Grade",
+    "potential": "Developmental Ceiling",
+    "tacticalProfile": "Tactical Profile & Duty",
+    "suitability": "Role Suitability",
+    "strengths": "Observable Strengths",
+    "weaknesses": "Development Areas",
+    "drills": "Recommended Coaching Drills",
+    "narrative": "Comprehensive Scouting Verdict",
+    "kinematics": "Vertical Leap & Hang-Time Kinematics",
+    "hangTime": "Hang Time",
+    "vertical": "Peak Vertical",
+    "landing": "Landing Mechanics",
+    "proComparisons": "Elite Pro Player Comparisons",
+    "downloadPdf": "Download Verified Dossier (PDF)",
+    "exportSocial": "Create 9:16 Social Card",
+    "shareLink": "Copy Public Verified Link"
+  },
+  "common": {
+    "loading": "Loading...",
+    "verified": "Verified",
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back"
+  }
+}

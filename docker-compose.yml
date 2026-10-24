@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: scoutai_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: scout
+      POSTGRES_PASSWORD: scoutpass
+      POSTGRES_DB: scoutai_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scout -d scoutai_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: scoutai_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: scoutai_api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - PORT=8000
+      - DATABASE_URL=postgresql://scout:scoutpass@postgres:5432/scoutai_db
+      - SQLITE_FALLBACK=false
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_MODE=local
+      - LOCAL_UPLOAD_DIR=/app/uploads
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PRIMARY_GEMINI_MODEL=gemini-2.5-flash
+      - FALLBACK_GEMINI_MODELS=gemini-2.5-flash-lite,gemini-3.8-flash
+    volumes:
+      - api_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  cv-worker:
+    build:
+      context: ./services/cv-worker
+      dockerfile: Dockerfile
+    container_name: scoutai_cv_worker
+    restart: always
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CV_MODE=lightweight
+      - STORAGE_MODE=local
+      - LOCAL_UPLOAD_DIR=/app/uploads
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - api_uploads:/app/uploads
+    depends_on:
+      - redis
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: scoutai_web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
+  api_uploads:
