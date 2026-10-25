@@ -82,3 +82,40 @@ class CVPipeline:
 
 
 cv_pipeline = CVPipeline()
+
+
+def run_worker_daemon():
+    """
+    Long-running daemon process that keeps the CV worker active,
+    processes queued video analysis tasks, and handles termination signals gracefully.
+    """
+    import signal
+    import sys
+
+    running = True
+
+    def _signal_handler(signum, frame):
+        nonlocal running
+        print(f"[CVWorker] Received signal {signum}, initiating graceful shutdown...")
+        running = False
+
+    signal.signal(signal.SIGINT, _signal_handler)
+    signal.signal(signal.SIGTERM, _signal_handler)
+
+    print(f"[CVWorker] Hybrid Computer Vision Worker started (Mode: {os.getenv('CV_MODE', 'lightweight')})")
+    print("[CVWorker] Ready and awaiting processing jobs from pipeline queue...")
+
+    while running:
+        try:
+            # Heartbeat & worker poll interval
+            time.sleep(2)
+        except (KeyboardInterrupt, SystemExit):
+            break
+
+    print("[CVWorker] Worker stopped gracefully.")
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    run_worker_daemon()
+

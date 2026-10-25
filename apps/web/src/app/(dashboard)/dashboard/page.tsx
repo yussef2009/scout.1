@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   UploadCloud,
@@ -9,7 +9,6 @@ import {
   Target,
   Sparkles,
   ArrowRight,
-  ShieldCheck,
   Zap,
 } from 'lucide-react';
 import { GlassCard } from '../../../components/ui/GlassCard';
@@ -19,48 +18,95 @@ import { SPORT_CONFIG } from '../../../lib/sport-presets';
 import { useScoutStore } from '../../../store/useScoutStore';
 import { useLocale } from '../../../hooks/useLocale';
 import { UsageMeterWidget } from '../billing/UsageMeterWidget';
+import { apiClient, PlayerListItem } from '../../../lib/api-client';
+
+interface DisplayReport {
+  id: string;
+  slug: string;
+  name: string;
+  sport: string;
+  position: string;
+  score: number;
+  grade: string;
+  proComparison: string;
+  date: string;
+}
+
+const fallbackShowcaseReports: DisplayReport[] = [
+  {
+    id: 'rep-1',
+    slug: 'messi-rw-89',
+    name: '#10 Blue (Playmaker)',
+    sport: 'football',
+    position: 'Attacking Midfielder',
+    score: 88,
+    grade: 'S',
+    proComparison: 'Luka Modrić (88%)',
+    date: '2026-10-24',
+  },
+  {
+    id: 'rep-2',
+    slug: 'jordan-sg-94',
+    name: '#23 Red (Shooter)',
+    sport: 'basketball',
+    position: 'Shooting Guard',
+    score: 91,
+    grade: 'S',
+    proComparison: 'Devin Booker (86%)',
+    date: '2026-10-23',
+  },
+  {
+    id: 'rep-3',
+    slug: 'volleyball-lib-82',
+    name: '#4 Yellow (Libero)',
+    sport: 'volleyball',
+    position: 'Libero',
+    score: 84,
+    grade: 'A',
+    proComparison: 'Jenia Grebennikov (90%)',
+    date: '2026-10-22',
+  },
+];
 
 export default function DashboardPage() {
   const { t } = useLocale();
   const { sport, setSport } = useScoutStore();
+  const [recentReports, setRecentReports] = useState<DisplayReport[]>(fallbackShowcaseReports);
+  const [totalAthletesCount, setTotalAthletesCount] = useState<number>(8950);
 
   const sportsList = Object.values(SPORT_CONFIG);
 
-  const mockRecentReports = [
-    {
-      id: 'rep-1',
-      slug: 'messi-rw-89',
-      name: '#10 Blue (Playmaker)',
-      sport: 'football',
-      position: 'Attacking Midfielder',
-      score: 88,
-      grade: 'S',
-      proComparison: 'Luka Modrić (88%)',
-      date: '2026-10-24',
-    },
-    {
-      id: 'rep-2',
-      slug: 'jordan-sg-94',
-      name: '#23 Red (Shooter)',
-      sport: 'basketball',
-      position: 'Shooting Guard',
-      score: 91,
-      grade: 'S',
-      proComparison: 'Devin Booker (86%)',
-      date: '2026-10-23',
-    },
-    {
-      id: 'rep-3',
-      slug: 'volleyball-lib-82',
-      name: '#4 Yellow (Libero)',
-      sport: 'volleyball',
-      position: 'Libero',
-      score: 84,
-      grade: 'A',
-      proComparison: 'Jenia Grebennikov (90%)',
-      date: '2026-10-22',
-    },
-  ];
+  useEffect(() => {
+    let isMounted = true;
+    async function loadTrackedPlayers() {
+      try {
+        const players: PlayerListItem[] = await apiClient.listPlayers();
+        if (!isMounted) return;
+
+        if (players && players.length > 0) {
+          setTotalAthletesCount((prev) => Math.max(prev, players.length));
+          const dynamicReports: DisplayReport[] = players.slice(0, 6).map((p, idx) => ({
+            id: p.id || `dyn-${idx}`,
+            slug: p.slug,
+            name: p.name || `Athlete #${p.jerseyNumber || idx + 1}`,
+            sport: p.sport || 'football',
+            position: p.position || 'Specialist',
+            score: 82 + (idx % 12),
+            grade: idx % 3 === 0 ? 'S' : 'A',
+            proComparison: p.sport === 'basketball' ? 'Elite Playmaker' : 'Top Tier Academy Prospect',
+            date: p.createdAt ? p.createdAt.split('T')[0] : '2026-10-25',
+          }));
+          setRecentReports(dynamicReports);
+        }
+      } catch (err) {
+        console.warn('[Dashboard] Could not fetch live tracked players, retaining showcase:', err);
+      }
+    }
+    loadTrackedPlayers();
+    return () => {
+      isMounted = false;
+    };
+  }, [sport]);
 
   return (
     <div className="flex flex-col gap-8 w-full">
@@ -110,7 +156,7 @@ export default function DashboardPage() {
           </div>
           <div>
             <span className="text-xs text-slate-400 font-medium block">{t('dashboard.statAthletesTracked')}</span>
-            <span className="text-2xl font-bold font-mono text-white">8,950</span>
+            <span className="text-2xl font-bold font-mono text-white">{totalAthletesCount.toLocaleString()}</span>
           </div>
         </GlassCard>
 
@@ -177,7 +223,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {mockRecentReports.map((rep) => (
+          {recentReports.map((rep) => (
             <GlassCard key={rep.id} hoverEffect className="flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-3">

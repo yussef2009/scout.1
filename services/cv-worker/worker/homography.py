@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 
 try:
     import cv2
@@ -55,6 +55,7 @@ class PitchHomography:
         self,
         bounding_boxes: List[Dict[str, float]],
         fps: float = 25.0,
+        timestamps: Optional[List[float]] = None,
     ) -> Dict[str, Any]:
         """
         Calculates kinematic telemetry from tracked bounding-box trajectory:
@@ -82,10 +83,16 @@ class PitchHomography:
         total_distance_m = 0.0
         speeds_kmh = []
 
-        dt = 1.0 / max(1.0, fps)
+        default_dt = 1.0 / max(1.0, fps)
         for i in range(1, len(foot_positions)):
             x1, y1 = foot_positions[i - 1]
             x2, y2 = foot_positions[i]
+
+            # Calculate actual delta time between samples if timestamps available
+            if timestamps and len(timestamps) == len(foot_positions):
+                dt = max(0.08, timestamps[i] - timestamps[i - 1])
+            else:
+                dt = default_dt
 
             dx_m = (x2 - x1) * self.pitch_length_m
             dy_m = (y2 - y1) * self.pitch_width_m

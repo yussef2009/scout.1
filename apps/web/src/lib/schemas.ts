@@ -81,6 +81,20 @@ export const KinematicsDataSchema = z.object({
   keyBiomechanicalNote: z.string(),
 });
 
+export const PlayingTimeAnalysisSchema = z.object({
+  minutesPlayed: z.string().optional(),
+  percentageOnField: z.number().min(0).max(100).optional(),
+  pointsScoredOrInvolved: z.string().optional(),
+  subStatus: z.string().optional(),
+  exchanges: z.array(z.object({
+    time: z.string(),
+    action: z.enum(['IN', 'OUT']),
+    type: z.string().optional(),
+    detail: z.string().optional(),
+  })).optional(),
+  tacticalImpactSummary: z.string().optional(),
+});
+
 export const ScoutingReportSchema = z.object({
   id: z.string().optional(),
   slug: z.string().optional(),
@@ -90,7 +104,7 @@ export const ScoutingReportSchema = z.object({
   position: z.string(),
   positionCode: z.string(),
   positionProfile: PositionProfileSchema,
-  playingTime: z.any().optional(),
+  playingTime: PlayingTimeAnalysisSchema.optional(),
   playerSummary: z.string(),
   oneLiner: z.string(),
   tags: z.array(z.string()),
@@ -107,6 +121,10 @@ export const ScoutingReportSchema = z.object({
   kinematics: KinematicsDataSchema.nullable().optional(),
   telemetry: PlayerTelemetrySchema.nullable().optional(),
   language: z.enum(['en', 'ar']).optional(),
+  isFallback: z.boolean().optional(),
+  generationSource: z.enum(['gemini_live', 'local_synthesizer']).optional(),
+  modelUsed: z.string().optional(),
+  fallbackReason: z.string().optional(),
   verified: z.boolean().optional(),
   createdAt: z.string().optional(),
 });

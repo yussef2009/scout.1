@@ -5,16 +5,30 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { GlassCard } from '../../../components/ui/GlassCard';
 import { GlassButton } from '../../../components/ui/GlassButton';
-import { ShieldCheck, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { apiClient } from '../../../lib/api-client';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('scout@scoutai.dev');
   const [password, setPassword] = useState('password123');
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push('/dashboard');
+    setErrorMsg(null);
+    setLoading(true);
+
+    try {
+      await apiClient.login({ email, password });
+      router.push('/dashboard');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Authentication failed. Please verify credentials.';
+      setErrorMsg(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -29,6 +43,13 @@ export default function LoginPage() {
           <h2 className="text-2xl font-black text-white">ScoutAI Access Portal</h2>
           <p className="text-xs text-slate-400 mt-1">Multi-Tenant Sports Intelligence & Biomechanics</p>
         </div>
+
+        {errorMsg && (
+          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <div>
@@ -61,8 +82,21 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <GlassButton variant="primary" size="lg" type="submit" className="mt-2 w-full">
-            Enter Scouting Command Hub
+          <GlassButton
+            variant="primary"
+            size="lg"
+            type="submit"
+            disabled={loading}
+            className="mt-2 w-full flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Authenticating...
+              </>
+            ) : (
+              'Enter Scouting Command Hub'
+            )}
           </GlassButton>
         </form>
 

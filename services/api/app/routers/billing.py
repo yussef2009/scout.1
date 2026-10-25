@@ -14,6 +14,7 @@ from ..services.stripe_service import stripe_service
 from ..services.paymob_service import paymob_service
 from ..services.usage_service import usage_service
 from ..dependencies.quota_guard import get_current_org
+from ..config import settings
 
 logger = logging.getLogger("scoutai.billing")
 
@@ -310,7 +311,14 @@ def simulate_upgrade(
 ):
     """
     Developer / QA convenience endpoint to simulate subscription tier changes in dev mode.
+    Forbidden in production environments.
     """
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(
+            status_code=403,
+            detail="Simulated subscription upgrades are forbidden in production environments. Please use certified payment gateways.",
+        )
+
     target_org_id = req.organizationId or org.id
     target_org = db.query(Organization).filter(Organization.id == target_org_id).first()
     if not target_org:

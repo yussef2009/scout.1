@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { GlassCard } from '../../../components/ui/GlassCard';
 import { GlassButton } from '../../../components/ui/GlassButton';
-import { ShieldCheck, Mail, Lock, Building2, User, ArrowRight } from 'lucide-react';
+import { Mail, Lock, Building2, User, AlertCircle, Loader2 } from 'lucide-react';
+import { apiClient } from '../../../lib/api-client';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -13,10 +14,28 @@ export default function RegisterPage() {
   const [academyName, setAcademyName] = useState('Metropolitan Football Academy');
   const [email, setEmail] = useState('director@academy.com');
   const [password, setPassword] = useState('password123');
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push('/dashboard');
+    setErrorMsg(null);
+    setLoading(true);
+
+    try {
+      await apiClient.register({
+        email,
+        password,
+        fullName,
+        organizationName: academyName,
+      });
+      router.push('/dashboard');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Registration failed. Please check details.';
+      setErrorMsg(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -31,6 +50,13 @@ export default function RegisterPage() {
           <h2 className="text-2xl font-black text-white">Register Club / Academy</h2>
           <p className="text-xs text-slate-400 mt-1">Join the FIFA & Olympic Accredited Scouting Network</p>
         </div>
+
+        {errorMsg && (
+          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
         <form onSubmit={handleRegister} className="flex flex-col gap-3.5">
           <div>
@@ -89,8 +115,21 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <GlassButton variant="primary" size="lg" type="submit" className="mt-2 w-full">
-            Complete Organization Accreditation
+          <GlassButton
+            variant="primary"
+            size="lg"
+            type="submit"
+            disabled={loading}
+            className="mt-2 w-full flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Registering Academy...
+              </>
+            ) : (
+              'Complete Organization Accreditation'
+            )}
           </GlassButton>
         </form>
 

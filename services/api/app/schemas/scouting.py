@@ -80,6 +80,12 @@ class ScoutingReportSchema(BaseModel):
     kinematics: Optional[KinematicsData] = Field(default=None, description="Vertical leap and jump biomechanics")
     telemetry: Optional[Dict] = Field(default=None, description="Kinematic and speed telemetry")
     language: Optional[Literal["en", "ar"]] = Field(default="en", description="Report language")
+    isFallback: bool = Field(default=False, description="True if produced by local synthesizer fallback")
+    generationSource: Literal["gemini_live", "local_synthesizer"] = Field(
+        default="gemini_live", description="Source engine of the evaluation report"
+    )
+    modelUsed: Optional[str] = Field(default=None, description="Actual model that generated this report")
+    fallbackReason: Optional[str] = Field(default=None, description="Diagnostic reason if fallback occurred")
 
     @field_validator("overallScore", "potentialRating", mode="before")
     @classmethod

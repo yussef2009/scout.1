@@ -222,11 +222,10 @@ export const PricingTable: React.FC<PricingTableProps> = ({
           window.location.href = res.checkoutUrl;
         }
       }
-    } catch (err: any) {
-      console.error('Checkout error:', err);
-      // Fallback: direct simulation
-      await apiClient.simulateUpgrade(tierId).catch(() => {});
-      if (onUpgradeSuccess) onUpgradeSuccess(tierId);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unable to initiate checkout session.';
+      console.error('[Billing Error] Checkout failed:', err);
+      alert(`Payment Gateway Error: ${msg}. Please verify your card details or select Fawry / Meeza.`);
     } finally {
       setLoadingTier(null);
     }

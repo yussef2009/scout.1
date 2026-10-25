@@ -33,9 +33,15 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS Configuration
+allowed_origins = list(settings.allowed_origins_list)
+if settings.ENVIRONMENT == "development":
+    for local_origin in ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8443", "http://127.0.0.1:8443", "http://localhost:5173"]:
+        if local_origin not in allowed_origins:
+            allowed_origins.append(local_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.ENVIRONMENT == "development" else settings.allowed_origins_list,
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

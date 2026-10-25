@@ -45,12 +45,13 @@ export default function PublicPlayerProfilePage() {
         console.warn('Failed to load direct report, attempting player profile lookup:', err);
         try {
           const profile = await apiClient.getPlayerProfile(slug);
-          if (profile?.latestReport) {
-            setReport(profile.latestReport);
+          if (profile?.latestReport?.slug) {
+            const fullReport = await apiClient.getReport(profile.latestReport.slug);
+            setReport(fullReport);
           } else {
             setError('Athlete dossier not found.');
           }
-        } catch (e: any) {
+        } catch (e: unknown) {
           setError('Athlete dossier not found or link has expired.');
         }
       } finally {

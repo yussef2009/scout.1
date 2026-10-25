@@ -45,7 +45,15 @@ export const useScoutStore = create<ScoutState>((set, get) => ({
   comparisonReport: null,
 
   setSport: (sport: string) => set({ sport }),
-  setVideo: (videoFile, videoUrl) => set({ videoFile, videoUrl, cachedFrames: [], detectedPlayers: [], selectedPlayerIds: [], scoutingReport: null }),
+  setVideo: (videoFile, videoUrl) => {
+    const current = get().videoUrl;
+    if (current && typeof window !== 'undefined' && current.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(current);
+      } catch (_) {}
+    }
+    set({ videoFile, videoUrl, cachedFrames: [], detectedPlayers: [], selectedPlayerIds: [], scoutingReport: null });
+  },
   setCachedFrames: (cachedFrames) => set({ cachedFrames }),
   setIsScanning: (isScanning, scanProgress = '') => set({ isScanning, scanProgress }),
   setIsAnalyzing: (isAnalyzing) => set({ isAnalyzing }),
@@ -75,16 +83,24 @@ export const useScoutStore = create<ScoutState>((set, get) => ({
   setTargetPlayer: (targetPlayer) => set({ targetPlayer }),
   setScoutingReport: (scoutingReport) => set({ scoutingReport }),
   setComparisonReport: (comparisonReport) => set({ comparisonReport }),
-  resetAll: () => set({
-    videoFile: null,
-    videoUrl: null,
-    cachedFrames: [],
-    isScanning: false,
-    isAnalyzing: false,
-    detectedPlayers: [],
-    selectedPlayerIds: [],
-    targetPlayer: null,
-    scoutingReport: null,
-    comparisonReport: null,
-  }),
+  resetAll: () => {
+    const current = get().videoUrl;
+    if (current && typeof window !== 'undefined' && current.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(current);
+      } catch (_) {}
+    }
+    set({
+      videoFile: null,
+      videoUrl: null,
+      cachedFrames: [],
+      isScanning: false,
+      isAnalyzing: false,
+      detectedPlayers: [],
+      selectedPlayerIds: [],
+      targetPlayer: null,
+      scoutingReport: null,
+      comparisonReport: null,
+    });
+  },
 }));

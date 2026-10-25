@@ -21,7 +21,221 @@ export interface GenerateAnalysisPayload {
   videoUrl?: string;
 }
 
+export interface PlayerListItem {
+  id: string;
+  slug: string;
+  name: string;
+  sport?: string;
+  position?: string;
+  jerseyNumber?: string;
+  teamColor?: string;
+  thumbnailUrl?: string;
+  createdAt?: string;
+}
+
+export interface PlayerProfileData {
+  id: string;
+  slug: string;
+  name: string;
+  sport?: string;
+  position?: string;
+  positionCode?: string;
+  jerseyNumber?: string;
+  teamColor?: string;
+  thumbnailUrl?: string;
+  nationality?: string;
+  dateOfBirth?: string;
+  overallScore?: number;
+  overallGrade?: string;
+  potentialRating?: number;
+}
+
+export interface PlayerLatestReport {
+  id: string;
+  slug: string;
+  overallScore: number;
+  overallGrade: string;
+  oneLiner?: string;
+  narrative?: string;
+  radarMetrics?: Record<string, number>;
+  strengths?: string[];
+  weaknesses?: string[];
+  recommendedDrills?: Array<{ title: string; duration: string; focusMetric: string; instructions: string }>;
+  kinematics?: Record<string, unknown>;
+  createdAt?: string;
+}
+
+export interface PlayerMatchHistoryItem {
+  reportId: string;
+  slug: string;
+  overallScore: number;
+  grade: string;
+  position?: string;
+  date: string;
+}
+
+export interface PlayerProfileResponse {
+  player: PlayerProfileData;
+  latestReport: PlayerLatestReport | null;
+  matchHistory: PlayerMatchHistoryItem[];
+}
+
+export interface BillingMeterDetail {
+  used: number;
+  limit: number;
+  remaining: number;
+  percentUsed: number;
+  unit: string;
+  unit_ar: string;
+}
+
+export interface BillingStatusResponse {
+  tier: string;
+  tierName: string;
+  status: string;
+  currency: string;
+  billingCycle: string;
+  quotaMatchesPerMonth: number;
+  matchesUsed: number;
+  matchesRemaining: number;
+  aiReportsLimit: number;
+  aiReportsUsed: number;
+  storageUsedGb: number;
+  maxStorageGb: number;
+  licenseVerified: boolean;
+  accreditationStatus: string;
+  meters: {
+    videoUploads: BillingMeterDetail;
+    videoDurationMinutes: BillingMeterDetail;
+    aiReports: BillingMeterDetail;
+    playersManaged: BillingMeterDetail;
+  };
+  resetDate: string;
+}
+
+export interface SimulateUpgradeResponse {
+  status: string;
+  organizationId: string;
+  subscriptionTier: string;
+  planTier: string;
+  subscriptionStatus: string;
+  usage: Record<string, unknown>;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+}
+
+export interface AuthOrganization {
+  id: string;
+  name: string;
+  tier: string;
+  license?: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: AuthUser;
+  organization: AuthOrganization;
+}
+
+export interface CurrentUserResponse {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  organization: {
+    id: string | null;
+    name: string;
+    tier: string;
+    license?: string;
+  };
+}
+
+// Token storage helpers
+export const getAuthToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('scoutai_auth_token');
+};
+
+export const setAuthToken = (token: string): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('scoutai_auth_token', token);
+};
+
+export const clearAuthToken = (): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('scoutai_auth_token');
+};
+
+const getHeaders = (customHeaders?: HeadersInit): HeadersInit => {
+  const token = getAuthToken();
+  const baseHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    baseHeaders['Authorization'] = `Bearer ${token}`;
+  }
+  return { ...baseHeaders, ...customHeaders };
+};
+
 export const apiClient = {
+  // Authentication
+  async login(payload: { email: string; password: string }): Promise<AuthResponse> {
+    const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Authentication failed (${res.status})`);
+    }
+    const data: AuthResponse = await res.json();
+    if (data.token) {
+      setAuthToken(data.token);
+    }
+    return data;
+  },
+
+  async register(payload: {
+    email: string;
+    password: string;
+    fullName: string;
+    organizationName?: string;
+    role?: string;
+  }): Promise<AuthResponse> {
+    const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Registration failed (${res.status})`);
+    }
+    const data: AuthResponse = await res.json();
+    if (data.token) {
+      setAuthToken(data.token);
+    }
+    return data;
+  },
+
+  async getCurrentUser(): Promise<CurrentUserResponse> {
+    const res = await fetch(`${API_BASE}/api/v1/auth/me`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to fetch current user session (${res.status})`);
+    }
+    return res.json();
+  },
+
+  // Video and Vision Detection
   async detectPlayers(payload: DetectPlayersPayload): Promise<{
     playerCount: number;
     isSinglePlayer: boolean;
@@ -30,7 +244,7 @@ export const apiClient = {
   }> {
     const res = await fetch(`${API_BASE}/api/v1/videos/detect-players`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
@@ -48,7 +262,7 @@ export const apiClient = {
   }> {
     const res = await fetch(`${API_BASE}/api/v1/analysis/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
@@ -61,6 +275,7 @@ export const apiClient = {
   async getReport(slugOrId: string): Promise<ScoutingReport> {
     const res = await fetch(`${API_BASE}/api/v1/analysis/reports/${encodeURIComponent(slugOrId)}`, {
       method: 'GET',
+      headers: getHeaders(),
     });
     if (!res.ok) {
       throw new Error(`Report not found (${res.status})`);
@@ -72,9 +287,11 @@ export const apiClient = {
     return `${API_BASE}/api/v1/analysis/reports/${encodeURIComponent(slugOrId)}/pdf`;
   },
 
-  async getPlayerProfile(slug: string): Promise<any> {
+  // Player Directory & Profiles
+  async getPlayerProfile(slug: string): Promise<PlayerProfileResponse> {
     const res = await fetch(`${API_BASE}/api/v1/players/${encodeURIComponent(slug)}`, {
       method: 'GET',
+      headers: getHeaders(),
     });
     if (!res.ok) {
       throw new Error(`Player not found (${res.status})`);
@@ -82,11 +299,14 @@ export const apiClient = {
     return res.json();
   },
 
-  async listPlayers(sport?: string): Promise<any[]> {
+  async listPlayers(sport?: string): Promise<PlayerListItem[]> {
     const url = sport
       ? `${API_BASE}/api/v1/players?sport=${encodeURIComponent(sport)}`
       : `${API_BASE}/api/v1/players`;
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
     if (!res.ok) return [];
     return res.json();
   },
@@ -101,8 +321,13 @@ export const apiClient = {
     form.append('filename', filename);
     form.append('contentType', 'video/mp4');
 
+    const token = getAuthToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
     const res = await fetch(`${API_BASE}/api/v1/videos/upload-url`, {
       method: 'POST',
+      headers,
       body: form,
     });
     if (!res.ok) {
@@ -120,8 +345,13 @@ export const apiClient = {
     form.append('file', file);
     if (filename) form.append('filename', filename);
 
+    const token = getAuthToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
     const res = await fetch(`${API_BASE}/api/v1/videos/upload-local`, {
       method: 'POST',
+      headers,
       body: form,
     });
     if (!res.ok) {
@@ -130,6 +360,7 @@ export const apiClient = {
     return res.json();
   },
 
+  // Billing & Subscriptions
   async getBillingPlans(): Promise<{
     currencies: string[];
     defaultCurrency: string;
@@ -154,7 +385,9 @@ export const apiClient = {
       badge_ar?: string;
     }>;
   }> {
-    const res = await fetch(`${API_BASE}/api/v1/billing/plans`);
+    const res = await fetch(`${API_BASE}/api/v1/billing/plans`, {
+      headers: getHeaders(),
+    });
     if (!res.ok) throw new Error('Failed to fetch billing plans');
     return res.json();
   },
@@ -171,20 +404,24 @@ export const apiClient = {
     billingPeriod: string;
     resetDate: string;
     meters: {
-      videoUploads: { used: number; limit: number; remaining: number; percentUsed: number; unit: string; unit_ar: string };
-      videoDurationMinutes: { used: number; limit: number; remaining: number; percentUsed: number; unit: string; unit_ar: string };
-      aiReports: { used: number; limit: number; remaining: number; percentUsed: number; unit: string; unit_ar: string };
-      playersManaged: { used: number; limit: number; remaining: number; percentUsed: number; unit: string; unit_ar: string };
+      videoUploads: BillingMeterDetail;
+      videoDurationMinutes: BillingMeterDetail;
+      aiReports: BillingMeterDetail;
+      playersManaged: BillingMeterDetail;
     };
     isQuotaExceeded: boolean;
   }> {
-    const res = await fetch(`${API_BASE}/api/v1/billing/usage`);
+    const res = await fetch(`${API_BASE}/api/v1/billing/usage`, {
+      headers: getHeaders(),
+    });
     if (!res.ok) throw new Error('Failed to fetch billing usage');
     return res.json();
   },
 
-  async getBillingStatus(): Promise<any> {
-    const res = await fetch(`${API_BASE}/api/v1/billing/status`);
+  async getBillingStatus(): Promise<BillingStatusResponse> {
+    const res = await fetch(`${API_BASE}/api/v1/billing/status`, {
+      headers: getHeaders(),
+    });
     if (!res.ok) throw new Error('Failed to fetch billing status');
     return res.json();
   },
@@ -215,7 +452,7 @@ export const apiClient = {
   }> {
     const res = await fetch(`${API_BASE}/api/v1/billing/create-checkout-session`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
@@ -225,14 +462,13 @@ export const apiClient = {
     return res.json();
   },
 
-  async simulateUpgrade(tier: string): Promise<any> {
+  async simulateUpgrade(tier: string): Promise<SimulateUpgradeResponse> {
     const res = await fetch(`${API_BASE}/api/v1/billing/simulate-upgrade`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify({ tier }),
     });
     if (!res.ok) throw new Error('Failed to simulate tier upgrade');
     return res.json();
   },
 };
-

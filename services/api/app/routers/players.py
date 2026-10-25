@@ -4,11 +4,12 @@ from typing import List, Optional
 from ..models.database import get_db
 from ..models.player import Player
 from ..models.report import ScoutingReport
+from ..schemas.player import PlayerListItemSchema, PlayerDetailResponseSchema
 
 router = APIRouter(prefix="/api/v1/players", tags=["Players"])
 
 
-@router.get("/")
+@router.get("/", response_model=List[PlayerListItemSchema])
 def list_players(sport: Optional[str] = None, db: Session = Depends(get_db)):
     """
     Lists players, optionally filtered by sport.
@@ -33,7 +34,7 @@ def list_players(sport: Optional[str] = None, db: Session = Depends(get_db)):
     ]
 
 
-@router.get("/{slug}")
+@router.get("/{slug}", response_model=PlayerDetailResponseSchema)
 def get_player_by_slug(slug: str, db: Session = Depends(get_db)):
     """
     Returns verified longitudinal player profile and historical match reports.

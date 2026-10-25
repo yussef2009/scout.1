@@ -48,8 +48,13 @@ class GeminiService:
         prompt = self._build_scouting_prompt(sport, position, player_context, telemetry, language)
 
         if not self.is_configured():
-            print("[GeminiService] No GEMINI_API_KEY configured; returning high-fidelity simulated report.")
-            return self._generate_mock_report(sport, position, player_context, telemetry, language)
+            print("[GeminiService] No GEMINI_API_KEY configured; returning high-fidelity simulated report (isFallback=True).")
+            mock_rep = self._generate_mock_report(sport, position, player_context, telemetry, language)
+            mock_rep.isFallback = True
+            mock_rep.generationSource = "local_synthesizer"
+            mock_rep.modelUsed = "synthetic-synthesizer-v2"
+            mock_rep.fallbackReason = "GEMINI_API_KEY_NOT_CONFIGURED"
+            return mock_rep
 
         # Resilient Model Fallback Cascade
         last_error = None
@@ -68,6 +73,10 @@ class GeminiService:
 
                     report_data["language"] = language
                     validated = ScoutingReportSchema.model_validate(report_data)
+                    validated.isFallback = False
+                    validated.generationSource = "gemini_live"
+                    validated.modelUsed = model
+                    validated.fallbackReason = None
                     return validated
 
                 except Exception as exc:
@@ -85,7 +94,12 @@ class GeminiService:
                     break
 
         print(f"[GeminiService Cascade Failed] All models failed. Falling back to local synthesizer. Root error: {last_error}")
-        return self._generate_mock_report(sport, position, player_context, telemetry, language)
+        mock_rep = self._generate_mock_report(sport, position, player_context, telemetry, language)
+        mock_rep.isFallback = True
+        mock_rep.generationSource = "local_synthesizer"
+        mock_rep.modelUsed = "synthetic-synthesizer-v2"
+        mock_rep.fallbackReason = f"CASCADE_EXHAUSTED: {str(last_error)[:120]}"
+        return mock_rep
 
     async def detect_players(
         self,
@@ -149,6 +163,8 @@ class GeminiService:
                 config=config,
             ),
         )
+        if not response or not getattr(response, "text", None):
+            raise Exception("Gemini response was empty or blocked by safety filters")
         return json.loads(response.text)
 
     async def _call_sdk_raw(self, model: str, prompt: str, frames_base64: Optional[List[str]]) -> Dict[str, Any]:

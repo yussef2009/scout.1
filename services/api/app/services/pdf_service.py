@@ -1,4 +1,6 @@
 import io
+import json
+import hashlib
 from typing import Dict, Any
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -202,10 +204,20 @@ class PdfService:
         elements.append(drill_table)
         elements.append(Spacer(1, 14))
 
-        # 7. Verification Footer
+        # 7. Authentic Cryptographic Verification Footer
+        canonical_dict = {
+            "overallScore": report.overallScore,
+            "overallGrade": report.overallGrade,
+            "position": report.position,
+            "narrative": report.narrative,
+            "player": player_name,
+        }
+        canonical_str = json.dumps(canonical_dict, sort_keys=True, ensure_ascii=False)
+        sha256_hash = hashlib.sha256(canonical_str.encode("utf-8")).hexdigest().upper()
+
         footer_text = Paragraph(
             "<b>Cryptographic Certification:</b> Verified by ScoutAI 2.0 Engine · Tamper-proof audit hash: "
-            f"SHA256-{abs(hash(report.narrative)):016x} · Generated for Professional Academy Use.",
+            f"<b>SHA256-{sha256_hash[:16]}...{sha256_hash[-8:]}</b> · Generated for Professional Academy Use.",
             subtitle_style,
         )
         elements.append(footer_text)

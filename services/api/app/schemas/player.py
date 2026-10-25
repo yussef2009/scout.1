@@ -49,3 +49,62 @@ class PlayerTelemetrySchema(BaseModel):
     keyEventTimestamps: Optional[List[float]] = Field(
         default_factory=list, description="Seconds timestamps of high-motion action events"
     )
+
+
+class PlayerListItemSchema(BaseModel):
+    id: str
+    slug: str
+    name: str
+    sport: Optional[str] = None
+    position: Optional[str] = None
+    jerseyNumber: Optional[str] = None
+    teamColor: Optional[str] = None
+    thumbnailUrl: Optional[str] = None
+    createdAt: Optional[str] = None
+
+
+class PlayerProfileDataSchema(BaseModel):
+    id: str
+    slug: str
+    name: str
+    sport: Optional[str] = None
+    position: Optional[str] = None
+    positionCode: Optional[str] = None
+    jerseyNumber: Optional[str] = None
+    teamColor: Optional[str] = None
+    thumbnailUrl: Optional[str] = None
+    nationality: Optional[str] = None
+    dateOfBirth: Optional[str] = None
+    overallScore: Optional[int] = None
+    overallGrade: Optional[str] = None
+    potentialRating: Optional[int] = None
+
+
+class PlayerLatestReportSchema(BaseModel):
+    id: str
+    slug: str
+    overallScore: int
+    overallGrade: str
+    oneLiner: Optional[str] = None
+    narrative: Optional[str] = None
+    radarMetrics: Optional[dict] = None
+    strengths: Optional[List[str]] = None
+    weaknesses: Optional[List[str]] = None
+    recommendedDrills: Optional[List[dict]] = None
+    kinematics: Optional[dict] = None
+    createdAt: Optional[str] = None
+
+
+class PlayerMatchHistoryItemSchema(BaseModel):
+    reportId: str
+    slug: str
+    overallScore: int
+    grade: str
+    position: Optional[str] = None
+    date: str
+
+
+class PlayerDetailResponseSchema(BaseModel):
+    player: PlayerProfileDataSchema
+    latestReport: Optional[PlayerLatestReportSchema] = None
+    matchHistory: List[PlayerMatchHistoryItemSchema] = Field(default_factory=list)
