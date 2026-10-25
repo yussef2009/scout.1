@@ -12610,3 +12610,29 @@ html.theme-cyber, body.theme-cyber, main.theme-cyber {
 .theme-light .post-media-hud-container {
   border-color: rgba(0, 0, 0, 0.12) !important;
 }
+
+/* ============================================================
+   BILINGUAL RTL (العربية) SUPPORT
+   ============================================================ */
+html[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+html[dir="rtl"] .sheet-stamp-box {
+  text-align: left;
+}
+
+html[dir="rtl"] .sheet-signatures {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .notif-action-btn,
+html[dir="rtl"] .mobile-tab-link {
+  text-align: right;
+}
+
+html[dir="rtl"] .mobile-tab-link-icon {
+  margin-left: 10px;
+  margin-right: 0;
+}

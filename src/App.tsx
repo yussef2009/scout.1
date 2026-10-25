@@ -31,7 +31,9 @@ import {
   type MediaClip,
 } from "./media/MediaCenterPage"
 import { PerformanceReportPage } from "./reports/PerformanceReportPage"
+import { ScoutVaultModal, type SavedScoutReport } from "./components/ScoutVaultModal"
 import AdminPortalPage from "./admin/AdminPortalPage"
+import PlansPage from "./plans/PlansPage"
 import {
   type AdminAccount,
   ADMIN_ACCOUNTS,
@@ -1509,6 +1511,8 @@ function RolePanel({
   demoMode,
   userName,
   onToggleDemo,
+  userPlan,
+  onOpenPlans,
 }: {
   role: string
   setRole: (role: string) => void
@@ -1516,6 +1520,8 @@ function RolePanel({
   demoMode: boolean
   userName: string
   onToggleDemo: (enabled: boolean) => void
+  userPlan?: string
+  onOpenPlans?: () => void
 }) {
   return (
     <aside className="role-panel">
@@ -1594,7 +1600,34 @@ function RolePanel({
                 <Icon name="bolt" size={16} />
               </div>
               <div>
-                <strong>{userName}</strong>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  <strong>{userName}</strong>
+                  {onOpenPlans && (
+                    <button
+                      type="button"
+                      onClick={onOpenPlans}
+                      title="View Plan & Quotas"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "3px",
+                        padding: "1px 6px",
+                        borderRadius: "9999px",
+                        fontSize: "9px",
+                        fontWeight: 800,
+                        letterSpacing: "0.04em",
+                        background: "linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.2))",
+                        color: "#38bdf8",
+                        border: "1px solid rgba(56, 189, 248, 0.4)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span style={{ color: "#f59e0b" }}>⚡</span>
+                      <span>{userPlan || "PRO ACADEMY"}</span>
+                      <span style={{ fontSize: "8px", opacity: 0.7 }}>›</span>
+                    </button>
+                  )}
+                </div>
                 <span>Personal Athlete Session</span>
               </div>
               <b style={{ fontSize: 13, color: "var(--muted)" }}>STANDBY</b>
@@ -1832,6 +1865,8 @@ function ProfileView({
   onOpenPerformanceReport,
   profileRecords,
   onSaveProfileRecord,
+  userPlan,
+  onOpenPlans,
 }: {
   sport: string
   role: string
@@ -1848,6 +1883,8 @@ function ProfileView({
   onOpenPerformanceReport?: (report?: VideoAnalysisReport | null) => void
   profileRecords?: ProfileRecord[]
   onSaveProfileRecord?: (record: ProfileRecord) => void
+  userPlan?: string
+  onOpenPlans?: () => void
 }) {
   const [videoFile, setVideoFile] = useState<File | null>(null)
   const [videoUrl, setVideoUrl] = useState("")
@@ -2521,7 +2558,37 @@ function ProfileView({
                   ? "SCOUT"
                   : "ATHLETE"}
             </span>
-            <strong>{name}</strong>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", margin: "4px 0" }}>
+              <strong style={{ margin: 0 }}>{name}</strong>
+              <button
+                type="button"
+                onClick={onOpenPlans}
+                className="profile-plan-badge"
+                title="View Subscription Plans & Quotas"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  padding: "2px 8px",
+                  borderRadius: "9999px",
+                  fontSize: "10px",
+                  fontWeight: 800,
+                  fontFamily: "'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif",
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
+                  background: "linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.22))",
+                  color: "#38bdf8",
+                  border: "1px solid rgba(56, 189, 248, 0.45)",
+                  boxShadow: "0 0 10px rgba(56, 189, 248, 0.25)",
+                  cursor: "pointer",
+                  transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                }}
+              >
+                <span style={{ fontSize: "11px", color: "#f59e0b" }}>⚡</span>
+                <span>{userPlan || "PRO ACADEMY"}</span>
+                <span style={{ fontSize: "10px", opacity: 0.75 }}>›</span>
+              </button>
+            </div>
             <small>
               {sport} ·{" "}
               {role === "Player"
@@ -8344,6 +8411,32 @@ function App() {
   const [authError, setAuthError] = useState("")
   const [apiKey, setApiKey] = useState("")
   const [view, setView] = useState("Dashboard")
+  const [lang, setLang] = useState<"en" | "ar">(() => {
+    return (localStorage.getItem("scot_app_lang") as "en" | "ar") || "en"
+  })
+  const [vaultModalOpen, setVaultModalOpen] = useState(false)
+  const [userPlan, setUserPlan] = useState<string>(() => {
+    return localStorage.getItem("scot_user_plan") || "PRO ACADEMY"
+  })
+
+  const handleUpdateUserPlan = (plan: string) => {
+    setUserPlan(plan)
+    localStorage.setItem("scot_user_plan", plan)
+  }
+
+  const toggleLanguage = () => {
+    const nextLang = lang === "en" ? "ar" : "en"
+    setLang(nextLang)
+    localStorage.setItem("scot_app_lang", nextLang)
+    document.documentElement.dir = nextLang === "ar" ? "rtl" : "ltr"
+    document.documentElement.lang = nextLang
+  }
+
+  useEffect(() => {
+    document.documentElement.dir = lang === "ar" ? "rtl" : "ltr"
+    document.documentElement.lang = lang
+  }, [lang])
+
   const [activeAdmin, setActiveAdmin] = useState<AdminAccount | null>(() => getActiveAdminSession())
   const isAdminLoggedIn = Boolean(activeAdmin)
 
@@ -9118,23 +9211,26 @@ function App() {
 
         {/* Desktop + tablet nav */}
         <nav className="desktop-nav" aria-label="Main navigation">
-          {["Dashboard", "Explore", "Wearable", "Profile"].map(
-            (item) => (
-              <button
-                key={item}
-                className={
-                  view === item || (item === "Dashboard" && view === "FullDashboard")
-                    ? "active"
-                    : ""
-                }
-                onClick={() => {
-                  setView(item)
-                }}
-              >
-                {item}
-              </button>
-            ),
-          )}
+          {[
+            { id: "Dashboard", label: lang === "ar" ? "لوحة التحكم" : "Dashboard" },
+            { id: "Explore", label: lang === "ar" ? "استكشاف" : "Explore" },
+            { id: "Wearable", label: lang === "ar" ? "أجهزة الاستشعار" : "Wearable" },
+            { id: "Profile", label: lang === "ar" ? "الملف الرياضي" : "Profile" },
+          ].map((item) => (
+            <button
+              key={item.id}
+              className={
+                view === item.id || (item.id === "Dashboard" && view === "FullDashboard")
+                  ? "active"
+                  : ""
+              }
+              onClick={() => {
+                setView(item.id)
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
         </nav>
 
         <div className="header-actions">
@@ -9143,9 +9239,46 @@ function App() {
             className="outline-button desktop-only"
             style={{ minHeight: 34, padding: "0 12px", gap: 6, fontSize: 9 }}
             onClick={() => setSearchOpen(true)}
-            title="Search clubs and players"
+            title={lang === "ar" ? "بحث الأندية واللاعبين" : "Search clubs and players"}
           >
-            <Icon name="search" size={13} /> SEARCH
+            <Icon name="search" size={13} /> {lang === "ar" ? "بحث" : "SEARCH"}
+          </button>
+
+          <button
+            type="button"
+            className="outline-button desktop-only"
+            style={{
+              minHeight: 34,
+              padding: "0 12px",
+              gap: 6,
+              fontSize: 9,
+              borderColor: "var(--gold-line)",
+              color: "var(--gold-bright)",
+            }}
+            onClick={() => setVaultModalOpen(true)}
+            title={lang === "ar" ? "خزينة الكشاف لسجلات اللاعبين" : "Open Scout Vault player repository"}
+          >
+            <Icon name="shield" size={13} /> {lang === "ar" ? "خزينة الكشاف" : "SCOUT VAULT"}
+          </button>
+
+          <button
+            type="button"
+            className="outline-button"
+            style={{
+              minHeight: 34,
+              padding: "0 10px",
+              gap: 6,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.5px",
+              borderColor: "var(--line)",
+              color: lang === "ar" ? "var(--gold-bright)" : "var(--white)",
+            }}
+            onClick={() => toggleLanguage()}
+            title={lang === "ar" ? "Switch to English" : "التبديل إلى العربية"}
+          >
+            <Icon name="wifi" size={12} />
+            {lang === "ar" ? "عربي" : "EN"}
           </button>
           <span className="role-badge desktop-only">
             <i />{" "}
@@ -9413,9 +9546,39 @@ function App() {
                         <span>{userName.slice(0, 2).toUpperCase()}</span>
                       </div>
                       <div className="account-header-details">
-                        <strong className="account-user-name">
-                          {userName}
-                        </strong>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                          <strong className="account-user-name">
+                            {userName}
+                          </strong>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setView("Plans")
+                              setAccountMenuOpen(false)
+                            }}
+                            className="account-plan-badge"
+                            title="View Subscription Plans & Limits"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "3px",
+                              padding: "2px 7px",
+                              borderRadius: "9999px",
+                              fontSize: "9px",
+                              fontWeight: 800,
+                              letterSpacing: "0.05em",
+                              textTransform: "uppercase",
+                              background: "linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.22))",
+                              color: "#38bdf8",
+                              border: "1px solid rgba(56, 189, 248, 0.45)",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <span style={{ color: "#f59e0b" }}>⚡</span>
+                            <span>{userPlan}</span>
+                            <span style={{ fontSize: "8px", opacity: 0.75 }}>›</span>
+                          </button>
+                        </div>
                         <span className="account-user-role">
                           <i /> {role.toUpperCase()} SESSION
                         </span>
@@ -9435,6 +9598,17 @@ function App() {
                       >
                         <Icon name="user" size={14} />
                         <span>View Profile & Clips</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="account-dropdown-item"
+                        onClick={() => {
+                          setView("Plans")
+                          setAccountMenuOpen(false)
+                        }}
+                      >
+                        <Icon name="bolt" size={14} />
+                        <span>Subscription Plans & Quotas</span>
                       </button>
                       <button
                         type="button"
@@ -9622,11 +9796,34 @@ function App() {
                 className="mobile-tab-action-btn search"
                 onClick={() => {
                   setMenuOpen(false)
+                  setVaultModalOpen(true)
+                }}
+              >
+                <Icon name="shield" size={14} />
+                <span>{lang === "ar" ? "خزينة الكشاف (الملفات المحفوظة)" : "Scout Vault (Saved Dossiers)"}</span>
+              </button>
+
+              <button
+                type="button"
+                className="mobile-tab-action-btn"
+                onClick={() => {
+                  toggleLanguage()
+                }}
+              >
+                <Icon name="wifi" size={14} />
+                <span>{lang === "ar" ? "اللغة: العربية (التبديل إلى English)" : "Language: English (Switch to عربي)"}</span>
+              </button>
+
+              <button
+                type="button"
+                className="mobile-tab-action-btn search"
+                onClick={() => {
+                  setMenuOpen(false)
                   setSearchOpen(true)
                 }}
               >
                 <Icon name="search" size={14} />
-                <span>Search Clubs & Athletes</span>
+                <span>{lang === "ar" ? "بحث الأندية واللاعبين" : "Search Clubs & Athletes"}</span>
               </button>
 
               {authenticated ? (
@@ -9725,17 +9922,19 @@ function App() {
                 <span /> {sport.toUpperCase()}
               </p>
               <h1>
-                Find the edge
+                {lang === "ar" ? "اكتشف الأفضلية" : "Find the edge"}
                 <br />
-                <em>Prove the impact</em>
+                <em>{lang === "ar" ? "أثبت التأثير الرياضي" : "Prove the impact"}</em>
               </h1>
             </div>
             <div className="network-stat">
-              <span>NETWORK SIGNAL</span>
+              <span>{lang === "ar" ? "إشارات الشبكة" : "NETWORK SIGNAL"}</span>
               <strong>{demoMode ? "12,842" : "0"}</strong>
               <small>
-                {demoMode ? "VERIFIED ATHLETES" : "LOCAL ATHLETES TRACKED"}{" "}
-                <b>LIVE</b>
+                {demoMode
+                  ? (lang === "ar" ? "رياضي موثق" : "VERIFIED ATHLETES")
+                  : (lang === "ar" ? "مواهب محلية تحت التتبع" : "LOCAL ATHLETES TRACKED")}{" "}
+                <b>{lang === "ar" ? "مباشر" : "LIVE"}</b>
               </small>
             </div>
           </section>
@@ -9976,6 +10175,8 @@ function App() {
               demoMode={demoMode}
               userName={userName}
               onToggleDemo={toggleDemoMode}
+              userPlan={userPlan}
+              onOpenPlans={() => setView("Plans")}
             />
           </div>
         </div>
@@ -10016,6 +10217,16 @@ function App() {
           }}
           profileRecords={profileRecords}
           onSaveProfileRecord={handleSaveProfileRecord}
+          userPlan={userPlan}
+          onOpenPlans={() => setView("Plans")}
+        />
+      )}
+      {view === "Plans" && (
+        <PlansPage
+          onBack={() => setView("Profile")}
+          currentPlan={userPlan}
+          onSelectPlan={handleUpdateUserPlan}
+          lang={lang}
         />
       )}
       {view === "MediaCenter" && (
@@ -10311,6 +10522,16 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Global Scout Vault Modal */}
+      <ScoutVaultModal
+        isOpen={vaultModalOpen}
+        onClose={() => setVaultModalOpen(false)}
+        onSelectReport={(_saved) => {
+          setVaultModalOpen(false)
+          setView("PerformanceReport")
+        }}
+      />
     </main>
   )
 }

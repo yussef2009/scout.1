@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, UploadCloud, Users, GitCompare, ShieldCheck, Globe, Cpu } from 'lucide-react';
+import { Activity, UploadCloud, Users, GitCompare, ShieldCheck, Globe, Cpu, CreditCard } from 'lucide-react';
 import { useLocale } from '../../hooks/useLocale';
 import { Badge } from '../../components/ui/Badge';
 
@@ -15,6 +15,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard', label: t('nav.dashboard'), icon: <Activity className="w-4 h-4" /> },
     { href: '/upload', label: t('nav.upload'), icon: <UploadCloud className="w-4 h-4" /> },
     { href: '/compare', label: t('nav.compare'), icon: <GitCompare className="w-4 h-4" /> },
+    { href: '/billing', label: t('nav.billing'), icon: <CreditCard className="w-4 h-4" /> },
   ];
 
   return (
@@ -69,8 +70,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
 
-        {/* Right Actions: Accreditation & Language Switcher */}
+        {/* Right Actions: User Profile Pill with Plan Badge, Accreditation & Language Switcher */}
         <div className="flex items-center gap-3">
+          <Link
+            href="/billing"
+            className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-all group cursor-pointer shadow-sm"
+            title={locale === 'ar' ? 'عرض الباقة والاشتراك' : 'Manage Subscription Plan & Quotas'}
+          >
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center text-[10px] font-bold text-white shadow-[0_0_8px_rgba(99,102,241,0.4)]">
+              OK
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-slate-200 group-hover:text-white transition-colors">
+                Omar Khalil
+              </span>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-gradient-to-r from-indigo-500/20 to-cyan-500/20 text-cyan-300 border border-cyan-500/30 group-hover:border-cyan-400 group-hover:shadow-[0_0_10px_rgba(56,189,248,0.3)] transition-all">
+                <span className="text-amber-400">⚡</span>
+                PRO ACADEMY
+                <span className="text-[8px] opacity-70">›</span>
+              </span>
+            </div>
+          </Link>
+
           <Badge variant="emerald" size="sm" icon={<ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />}>
             FIFA Verified
           </Badge>

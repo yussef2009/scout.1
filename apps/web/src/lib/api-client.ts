@@ -129,4 +129,110 @@ export const apiClient = {
     }
     return res.json();
   },
+
+  async getBillingPlans(): Promise<{
+    currencies: string[];
+    defaultCurrency: string;
+    supportedPaymentMethods: Array<{ id: string; name_en: string; name_ar: string; badge: string }>;
+    plans: Array<{
+      id: string;
+      name_en: string;
+      name_ar: string;
+      tagline_en: string;
+      tagline_ar: string;
+      pricing: Record<string, { monthly: number; annual: number; symbol: string }>;
+      limits: {
+        video_uploads_per_month: number;
+        video_duration_minutes: number;
+        ai_reports_per_month: number;
+        players_managed: number;
+      };
+      features_en: string[];
+      features_ar: string[];
+      popular?: boolean;
+      badge_en?: string;
+      badge_ar?: string;
+    }>;
+  }> {
+    const res = await fetch(`${API_BASE}/api/v1/billing/plans`);
+    if (!res.ok) throw new Error('Failed to fetch billing plans');
+    return res.json();
+  },
+
+  async getBillingUsage(): Promise<{
+    organizationId: string;
+    organizationName: string;
+    tier: string;
+    tierNameEn: string;
+    tierNameAr: string;
+    status: string;
+    billingCycle: string;
+    currency: string;
+    billingPeriod: string;
+    resetDate: string;
+    meters: {
+      videoUploads: { used: number; limit: number; remaining: number; percentUsed: number; unit: string; unit_ar: string };
+      videoDurationMinutes: { used: number; limit: number; remaining: number; percentUsed: number; unit: string; unit_ar: string };
+      aiReports: { used: number; limit: number; remaining: number; percentUsed: number; unit: string; unit_ar: string };
+      playersManaged: { used: number; limit: number; remaining: number; percentUsed: number; unit: string; unit_ar: string };
+    };
+    isQuotaExceeded: boolean;
+  }> {
+    const res = await fetch(`${API_BASE}/api/v1/billing/usage`);
+    if (!res.ok) throw new Error('Failed to fetch billing usage');
+    return res.json();
+  },
+
+  async getBillingStatus(): Promise<any> {
+    const res = await fetch(`${API_BASE}/api/v1/billing/status`);
+    if (!res.ok) throw new Error('Failed to fetch billing status');
+    return res.json();
+  },
+
+  async createCheckoutSession(payload: {
+    tier: string;
+    currency: 'EGP' | 'USD';
+    gateway?: 'paymob' | 'stripe' | 'auto';
+    paymentMethod?: 'card' | 'meeza' | 'fawry' | 'wallet';
+    billingCycle?: 'monthly' | 'annual';
+    customerEmail?: string;
+    customerName?: string;
+    customerPhone?: string;
+    successUrl?: string;
+    cancelUrl?: string;
+  }): Promise<{
+    checkoutUrl: string;
+    gateway: string;
+    amount?: number;
+    amountEgp?: number;
+    orderId?: string;
+    sessionId?: string;
+    fawryRefCode?: string;
+    fawryExpiresAt?: string;
+    instructions_en?: string;
+    instructions_ar?: string;
+    simulated?: boolean;
+  }> {
+    const res = await fetch(`${API_BASE}/api/v1/billing/create-checkout-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to initiate checkout session');
+    }
+    return res.json();
+  },
+
+  async simulateUpgrade(tier: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/api/v1/billing/simulate-upgrade`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier }),
+    });
+    if (!res.ok) throw new Error('Failed to simulate tier upgrade');
+    return res.json();
+  },
 };
+

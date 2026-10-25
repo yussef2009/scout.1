@@ -29,6 +29,8 @@ import { SPORT_CONFIG, getPositionProfile } from '../../../lib/sport-presets';
 import { apiClient } from '../../../lib/api-client';
 import { useLocale } from '../../../hooks/useLocale';
 import { DetectedPlayer } from '@scoutai/shared-types';
+import { UpgradeModal } from '../billing/UpgradeModal';
+import { UsageMeterWidget } from '../billing/UsageMeterWidget';
 
 export default function UploadAnalysisPage() {
   const { t, locale } = useLocale();
@@ -52,6 +54,8 @@ export default function UploadAnalysisPage() {
 
   const [copiedLink, setCopiedLink] = useState(false);
   const [reportLang, setReportLang] = useState<'en' | 'ar'>('en');
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [quotaResource, setQuotaResource] = useState('ai_reports');
 
   const sportConfig = SPORT_CONFIG[sport] || SPORT_CONFIG.football;
   const targetPosProfile = getPositionProfile(sport, targetPlayer?.position);
@@ -72,7 +76,13 @@ export default function UploadAnalysisPage() {
       setScoutingReport(res.report);
     } catch (err: any) {
       console.error('Failed to generate report:', err);
-      alert(`Report generation error: ${err.message}`);
+      const msg = err.message || '';
+      if (msg.includes('403') || msg.includes('quota') || msg.includes('QUOTA_EXCEEDED') || msg.includes('limit')) {
+        setQuotaResource('ai_reports');
+        setUpgradeModalOpen(true);
+      } else {
+        alert(`Report generation error: ${err.message}`);
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -121,6 +131,9 @@ export default function UploadAnalysisPage() {
             تقرير عربي معتمد
           </button>
         </div>
+
+        {/* Real-time Upload Quota Meter */}
+        <UsageMeterWidget compact className="hidden sm:block min-w-[200px]" />
       </div>
 
       {/* 1. Upload Dropzone or Video Player */}
@@ -396,6 +409,13 @@ export default function UploadAnalysisPage() {
           </div>
         </div>
       )}
+
+      {/* Quota Exceeded Upgrade Modal */}
+      <UpgradeModal
+        isOpen={upgradeModalOpen}
+        onClose={() => setUpgradeModalOpen(false)}
+        resourceName={quotaResource}
+      />
     </div>
   );
 }

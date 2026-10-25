@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useRef } from "react"
 import { Icon } from "../App"
+import { BoundingBoxOverlay } from "../components/BoundingBoxOverlay"
+import type { DetectedPlayer } from "../video-analysis"
 
 export interface MediaClip {
   id: string
@@ -224,7 +226,46 @@ export function MediaCenterPage({
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedTag, setSelectedTag] = useState("All")
   const [activeClipModal, setActiveClipModal] = useState<MediaClip | null>(null)
+  const [showTrackingOverlay, setShowTrackingOverlay] = useState(true)
+  const [selectedTrackingPlayerId, setSelectedTrackingPlayerId] = useState<string | null>("p1")
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const activeClipPlayers = useMemo<DetectedPlayer[]>(() => {
+    if (!activeClipModal) return []
+    return [
+      {
+        id: "p1",
+        label: `${name} (#11)`,
+        confidence: 0.98,
+        role: "Primary Subject",
+        jerseyNumber: "11",
+        bbox: [160, 240, 820, 560],
+        teamColorHex: "#fbbf24",
+      },
+      {
+        id: "p2",
+        label: "Defender (#4)",
+        confidence: 0.94,
+        role: "Contesting Defender",
+        jerseyNumber: "4",
+        bbox: [210, 570, 790, 840],
+        teamColorHex: "#22d3ee",
+      },
+      {
+        id: "p3",
+        label: "Help Wing (#7)",
+        confidence: 0.89,
+        role: "Perimeter Spacer",
+        jerseyNumber: "7",
+        bbox: [290, 40, 710, 220],
+        teamColorHex: "#818cf8",
+      },
+    ]
+  }, [activeClipModal, name])
+
+  const selectedTrackingPlayer = useMemo(() => {
+    return activeClipPlayers.find((p) => p.id === selectedTrackingPlayerId) || activeClipPlayers[0]
+  }, [activeClipPlayers, selectedTrackingPlayerId])
 
   const tags = ["All", "Hang time", "Vertical", "Contact", "Top Speed", "Release Time"]
 
@@ -450,15 +491,32 @@ export function MediaCenterPage({
                 </span>
                 <h2>{activeClipModal.title}</h2>
               </div>
-              <button
-                className="modal-close-icon"
-                onClick={() => setActiveClipModal(null)}
-              >
-                <Icon name="close" size={18} />
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  type="button"
+                  className={`secondary-button ${showTrackingOverlay ? "active" : ""}`}
+                  style={{
+                    padding: "4px 10px",
+                    fontSize: 11,
+                    minHeight: 28,
+                    borderColor: showTrackingOverlay ? "var(--gold-bright)" : "var(--line)",
+                    color: showTrackingOverlay ? "var(--gold-bright)" : "var(--muted)",
+                  }}
+                  onClick={() => setShowTrackingOverlay(!showTrackingOverlay)}
+                  title="Toggle AI Multi-Player Bounding Box Overlay"
+                >
+                  <Icon name="activity" size={13} /> {showTrackingOverlay ? "AI TRACKING: ON" : "AI TRACKING: OFF"}
+                </button>
+                <button
+                  className="modal-close-icon"
+                  onClick={() => setActiveClipModal(null)}
+                >
+                  <Icon name="close" size={18} />
+                </button>
+              </div>
             </div>
 
-            <div className="media-modal-player-area">
+            <div className="media-modal-player-area" style={{ position: "relative" }}>
               {activeClipModal.videoUrl ? (
                 <video
                   src={activeClipModal.videoUrl}
@@ -467,8 +525,8 @@ export function MediaCenterPage({
                   className="media-modal-video"
                 />
               ) : (
-                <div className="media-modal-freezeframe">
-                  <img src={activeClipModal.image} alt={activeClipModal.title} />
+                <div className="media-modal-freezeframe" style={{ position: "relative", width: "100%", height: 380 }}>
+                  <img src={activeClipModal.image} alt={activeClipModal.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   <div className="freezeframe-overlay">
                     <span className="ai-overlay-tag">
                       <Icon name="shield" size={12} /> BIOMECHANICAL MOTION TRACKING
@@ -478,6 +536,45 @@ export function MediaCenterPage({
                       <span>KINETIC SYMMETRY: 96%</span>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Interactive Multi-Player Bounding Box Overlay */}
+              <BoundingBoxOverlay
+                players={activeClipPlayers}
+                selectedPlayerId={selectedTrackingPlayerId}
+                onSelectPlayer={(p) => setSelectedTrackingPlayerId(p.id)}
+                visible={showTrackingOverlay}
+              />
+
+              {/* Real-time Target Tracking HUD */}
+              {showTrackingOverlay && selectedTrackingPlayer && (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 12,
+                    left: 14,
+                    background: "rgba(10, 14, 23, 0.88)",
+                    backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(251, 191, 36, 0.35)",
+                    borderRadius: 8,
+                    padding: "6px 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    fontSize: 11,
+                    color: "#fff",
+                    zIndex: 30,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px #22c55e" }} />
+                    <strong style={{ color: "var(--gold-bright)" }}>{selectedTrackingPlayer.label}</strong>
+                  </div>
+                  <span style={{ color: "var(--muted)" }}>|</span>
+                  <span>{selectedTrackingPlayer.role}</span>
+                  <span style={{ color: "var(--muted)" }}>|</span>
+                  <span style={{ color: "#22d3ee", fontFamily: "var(--mono)" }}>CONF: {Math.round(selectedTrackingPlayer.confidence * 100)}%</span>
                 </div>
               )}
             </div>

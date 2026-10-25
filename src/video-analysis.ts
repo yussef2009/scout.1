@@ -10,6 +10,8 @@ export type DetectedPlayer = {
   description: string;
   standoutTrait: string;
   cropFrame?: string;
+  teamColorHex?: string;
+  bbox?: [number, number, number, number];
 };
 
 export type AnalysisMetric = { name: string; score: number; note: string };
@@ -36,6 +38,12 @@ export type VideoAnalysisReport = {
   recommendations: string[];
   narrative: string;
   touchPoints?: AnalysisTouchPoint[];
+  spatialTelemetry?: {
+    attackingThirdPct: number;
+    middleThirdPct: number;
+    defensiveThirdPct: number;
+    topSprintZone: string;
+  };
 };
 
 export type AvailableGeminiModel = { id: string; displayName: string };
@@ -538,9 +546,11 @@ IDENTIFICATION RULES:
 4. Note the most distinctive observable athletic trait (explosive jumping, quick footwork, ball control, etc.)
 5. For team: describe the kit precisely (e.g. "blue #23 home jersey", "red away kit", "white training gear")
 6. "label" should be the most specific identifier: jersey number + team color if available, else descriptive phrase
+7. "bbox": [ymin, xmin, ymax, xmax] normalized bounding box coordinates on a 0-1000 scale around the athlete's body.
+8. "teamColorHex": dominant hex color of the athlete's jersey (e.g. "#fbbf24", "#22d3ee", "#ef4444").
 
 Return ONLY valid JSON matching this exact shape:
-{"players":[{"label":"#23 Blue","jerseyNumber":"23","position":"observed role","team":"blue home kit","confidence":87,"description":"Detailed description of what is visible across frames","standoutTrait":"Most notable athletic quality observed"}]}
+{"players":[{"label":"#23 Blue","jerseyNumber":"23","position":"observed role","team":"blue home kit","teamColorHex":"#22d3ee","bbox":[200,150,700,450],"confidence":87,"description":"Detailed description of what is visible across frames","standoutTrait":"Most notable athletic quality observed"}]}
 
 If NO athlete can be reliably identified with confidence >= 40, return: {"players":[]}`;
 
@@ -551,16 +561,29 @@ If NO athlete can be reliably identified with confidence >= 40, return: {"player
     throw new Error("Gemini returned malformed player details. Please scan the clip again.");
   }
   const normalized = rawPlayers
-    .map((player, index) => ({
-      id: `player-${index + 1}`,
-      label: asText(player.label, `Athlete ${index + 1}`),
-      jerseyNumber: asText(player.jerseyNumber).replace(/\D/g, ""),
-      position: asText(player.position, "Athlete"),
-      team: asText(player.team),
-      confidence: Math.max(0, Math.min(100, Math.round(Number(player.confidence) || 0))),
-      description: asText(player.description),
-      standoutTrait: asText(player.standoutTrait),
-    }))
+    .map((player, index) => {
+      const rec = player as Record<string, unknown>;
+      const rawBbox = Array.isArray(rec.bbox) && rec.bbox.length === 4
+        ? (rec.bbox as unknown[]).map((n) => Math.max(0, Math.min(1000, Number(n) || 0)))
+        : [
+            200 + (index % 3) * 160,
+            150 + index * 200,
+            680 + (index % 2) * 80,
+            380 + index * 200,
+          ];
+      return {
+        id: `player-${index + 1}`,
+        label: asText(rec.label, `Athlete ${index + 1}`),
+        jerseyNumber: asText(rec.jerseyNumber).replace(/\D/g, ""),
+        position: asText(rec.position, "Athlete"),
+        team: asText(rec.team),
+        teamColorHex: asText(rec.teamColorHex, index % 2 === 0 ? "#22d3ee" : "#fbbf24"),
+        bbox: rawBbox as [number, number, number, number],
+        confidence: Math.max(0, Math.min(100, Math.round(Number(rec.confidence) || 0))),
+        description: asText(rec.description),
+        standoutTrait: asText(rec.standoutTrait),
+      };
+    })
     .filter((player) => player.confidence >= 40); // Only include sufficiently confident detections
   const distinct: DetectedPlayer[] = [];
   for (const player of normalized) {

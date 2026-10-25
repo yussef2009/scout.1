@@ -4,6 +4,7 @@ from .user import User
 from .player import Player
 from .match import MatchVideo
 from .report import ScoutingReport
+from .usage_meter import UsageMeter
 
 __all__ = [
     "Base",
@@ -16,4 +17,5 @@ __all__ = [
     "Player",
     "MatchVideo",
     "ScoutingReport",
+    "UsageMeter",
 ]

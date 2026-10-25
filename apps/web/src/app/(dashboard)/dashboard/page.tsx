@@ -18,6 +18,7 @@ import { Badge } from '../../../components/ui/Badge';
 import { SPORT_CONFIG } from '../../../lib/sport-presets';
 import { useScoutStore } from '../../../store/useScoutStore';
 import { useLocale } from '../../../hooks/useLocale';
+import { UsageMeterWidget } from '../billing/UsageMeterWidget';
 
 export default function DashboardPage() {
   const { t } = useLocale();
@@ -133,6 +134,9 @@ export default function DashboardPage() {
           </div>
         </GlassCard>
       </div>
+
+      {/* Real-Time Monthly Resource Consumption Meter */}
+      <UsageMeterWidget />
 
       {/* Sport Preset Selector */}
       <div className="flex flex-col gap-3">

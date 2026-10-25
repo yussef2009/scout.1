@@ -1,6 +1,9 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Icon, ScoreRing, Logo } from "../App"
 import type { VideoAnalysisReport, DetectedPlayer } from "../video-analysis"
+import { PitchHeatmap2D } from "../components/PitchHeatmap2D"
+import { SocialHighlightCard9x16 } from "../components/SocialHighlightCard9x16"
+import { ScoutVaultModal, type SavedScoutReport } from "../components/ScoutVaultModal"
 
 interface PerformanceReportPageProps {
   onBack: () => void
@@ -27,6 +30,8 @@ export function PerformanceReportPage({
 }: PerformanceReportPageProps) {
   const [copiedLink, setCopiedLink] = useState(false)
   const [showCustomizeModal, setShowCustomizeModal] = useState(false)
+  const [showSocialCard, setShowSocialCard] = useState(false)
+  const [showVaultModal, setShowVaultModal] = useState(false)
 
   // Customization Options State
   const [reportTitle, setReportTitle] = useState(
@@ -97,6 +102,54 @@ export function PerformanceReportPage({
   const narrative =
     report?.narrative ??
     "Omar demonstrates division-one athleticism with standout vertical displacement and exceptional hang time. His reactive strength index places him in the 96th percentile among regional prospects. Rebound transition and foot strike mechanics indicate elite tendon elasticity and explosive athletic ceiling."
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("scot_player_vault")
+      const list = stored ? JSON.parse(stored) : []
+      const currentId = `vault-${sport.toLowerCase()}-${athleteName.toLowerCase().replace(/\s+/g, "-")}`
+      const exists = list.some(
+        (item: any) =>
+          item.id === currentId ||
+          (item.athleteName === athleteName && item.sport === sport),
+      )
+      if (!exists) {
+        const newEntry = {
+          id: currentId,
+          athleteName,
+          sport,
+          position: role,
+          date: issueDate,
+          score: overallScore,
+          grade: overallGrade,
+          report: report || {
+            overallScore,
+            overallGrade,
+            playerSummary: narrative,
+            strengths,
+            areasToImprove,
+            recommendations,
+          },
+        }
+        localStorage.setItem(
+          "scot_player_vault",
+          JSON.stringify([newEntry, ...list]),
+        )
+      }
+    } catch {}
+  }, [
+    athleteName,
+    sport,
+    role,
+    overallScore,
+    overallGrade,
+    issueDate,
+    narrative,
+    report,
+    strengths,
+    areasToImprove,
+    recommendations,
+  ])
 
   const handleCopyLink = () => {
     navigator.clipboard?.writeText(window.location.href)
@@ -173,6 +226,28 @@ export function PerformanceReportPage({
               <Icon name="play" size={14} /> View Analyzed Footage
             </button>
           )}
+          <button
+            className="secondary-button"
+            onClick={() => setShowSocialCard(true)}
+            style={{
+              borderColor: "rgba(168, 85, 247, 0.5)",
+              color: "#d8b4fe",
+            }}
+            title="Generate high-resolution 1080x1920 social highlight card"
+          >
+            <Icon name="bolt" size={14} /> 9:16 Story Card
+          </button>
+          <button
+            className="secondary-button"
+            onClick={() => setShowVaultModal(true)}
+            style={{
+              borderColor: "var(--gold-line)",
+              color: "var(--gold-bright)",
+            }}
+            title="Open saved athlete performance records in Scout Vault"
+          >
+            <Icon name="shield" size={14} /> Scout Vault
+          </button>
           <button
             className="secondary-button"
             onClick={() => setShowCustomizeModal(true)}
@@ -496,6 +571,22 @@ export function PerformanceReportPage({
             )}
           </div>
         )}
+
+        {/* 2D Tactical Pitch / Court Heatmap & Action Zones */}
+        <PitchHeatmap2D
+          sport={sport}
+          athleteName={athleteName}
+          position={role}
+          attackingThird={report?.spatialTelemetry?.attackingThirdPct ?? 46}
+          middleThird={report?.spatialTelemetry?.middleThirdPct ?? 36}
+          defensiveThird={report?.spatialTelemetry?.defensiveThirdPct ?? 18}
+          topSprintZone={
+            report?.spatialTelemetry?.topSprintCorridor ??
+            (sport.toLowerCase().includes("foot")
+              ? "Right Wing & Attacking Overlap"
+              : "Perimeter Wing & Low Paint")
+          }
+        />
 
         {/* Official Certification Footer */}
         {(showQrCode || showSignatures) && (
@@ -832,6 +923,27 @@ export function PerformanceReportPage({
           </div>
         </div>
       )}
+
+      {/* 9:16 Vertical Social Card Exporter Modal */}
+      <SocialHighlightCard9x16
+        athleteName={athleteName}
+        sport={sport}
+        position={role}
+        overallScore={overallScore}
+        overallGrade={overallGrade}
+        strengths={strengths}
+        isOpen={showSocialCard}
+        onClose={() => setShowSocialCard(false)}
+      />
+
+      {/* Scout Vault Modal */}
+      <ScoutVaultModal
+        isOpen={showVaultModal}
+        onClose={() => setShowVaultModal(false)}
+        onSelectReport={(_saved) => {
+          setShowVaultModal(false)
+        }}
+      />
     </div>
   )
 }

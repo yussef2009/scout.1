@@ -3,10 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from ..models.database import get_db
+from ..models.organization import Organization
 from ..models.report import ScoutingReport
 from ..models.player import Player
 from ..services.gemini_service import gemini_service
 from ..services.pdf_service import pdf_service
+from ..services.usage_service import usage_service
+from ..dependencies.quota_guard import require_ai_analysis_quota
 from ..schemas.analysis import GenerateAnalysisRequest, GenerateAnalysisResponse
 from ..schemas.scouting import ScoutingReportSchema
 
@@ -14,7 +17,11 @@ router = APIRouter(prefix="/api/v1/analysis", tags=["Analysis"])
 
 
 @router.post("/generate", response_model=GenerateAnalysisResponse)
-async def generate_analysis(req: GenerateAnalysisRequest, db: Session = Depends(get_db)):
+async def generate_analysis(
+    req: GenerateAnalysisRequest,
+    db: Session = Depends(get_db),
+    org: Organization = Depends(require_ai_analysis_quota),
+):
     """
     Orchestrates full tactical analysis using Gemini with Structured Outputs and saves report permanently to DB.
     """
@@ -89,6 +96,9 @@ async def generate_analysis(req: GenerateAnalysisRequest, db: Session = Depends(
     db.add(db_report)
     db.commit()
     db.refresh(db_report)
+
+    # Increment monthly AI scouting reports usage meter
+    usage_service.increment_usage(db, org.id, "ai_reports", amount=1)
 
     # Attach ID and slug to output schema
     report_dict = report_schema.model_dump()
