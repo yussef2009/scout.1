@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { GlassCard } from '../../../components/ui/GlassCard';
 import { MultiPlayerCompare } from '../../../components/comparison/MultiPlayerCompare';
-import { GitCompare, Sparkles, UserCheck, RefreshCw } from 'lucide-react';
+import { GitCompare, Sparkles, UploadCloud, RefreshCw, ArrowRight } from 'lucide-react';
 import { ScoutingReport } from '@scoutai/shared-types';
 import { apiClient, PlayerListItem } from '../../../lib/api-client';
 
@@ -153,59 +154,65 @@ export default function ComparePage() {
             <GitCompare className="w-7 h-7 text-indigo-400" />
             <span>Multi-Player Head-to-Head Comparison</span>
           </h1>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-slate-300 mt-0.5">
             Compare tactical radar footprints, direct metric deltas, and role suitability
           </p>
         </div>
 
-        {loading && (
-          <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-3 py-1.5 rounded-full">
+        {loading ? (
+          <div className="flex items-center gap-2 text-xs font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-800/60 px-3 py-1.5 rounded-full">
             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
             <span>Updating Biometrics...</span>
           </div>
+        ) : (
+          <Link
+            href="/upload"
+            className="touch-target-44 flex items-center gap-2 text-xs font-semibold text-indigo-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 px-3.5 py-1.5 rounded-xl transition-all"
+          >
+            <UploadCloud className="w-4 h-4 text-cyan-400" />
+            <span>Analyze New Match</span>
+          </Link>
         )}
       </div>
 
       {/* Interactive Player Pickers */}
-      {playersList.length > 0 && (
-        <GlassCard className="p-4 flex flex-col sm:flex-row items-center gap-4">
-          <div className="flex-1 w-full">
-            <label className="text-xs font-mono text-indigo-400 font-semibold block mb-1">
-              SELECT PLAYER 1:
-            </label>
-            <select
-              value={selectedSlugA}
-              onChange={(e) => handleSelectPlayerA(e.target.value)}
-              className="w-full py-2 px-3 rounded-xl bg-white/[0.04] border border-white/10 text-sm text-white focus:outline-none focus:border-indigo-500"
-            >
-              <option value="demo-a">Mateo Rossi (#8 Blue) — Box-to-Box CM</option>
-              {playersList.map((p) => (
-                <option key={`a-${p.slug}`} value={p.slug}>
-                  {p.name} ({p.position || p.sport})
-                </option>
-              ))}
-            </select>
-          </div>
+      <GlassCard className="p-5 flex flex-col sm:flex-row items-center gap-4">
+        <div className="flex-1 w-full">
+          <label className="text-xs font-mono text-indigo-400 font-bold block mb-1.5">
+            SUBJECT 1 (PRIMARY):
+          </label>
+          <select
+            value={selectedSlugA}
+            onChange={(e) => handleSelectPlayerA(e.target.value)}
+            className="w-full min-h-[44px] py-2.5 px-3.5 rounded-xl bg-[#0b132b] border border-white/15 text-sm text-white focus:outline-none focus:border-indigo-500 font-medium cursor-pointer"
+          >
+            <option value="demo-a">Mateo Rossi (#8 Blue) — Box-to-Box CM (Demonstration)</option>
+            {playersList.map((p) => (
+              <option key={`a-${p.slug}`} value={p.slug}>
+                {p.name} ({p.position || p.sport})
+              </option>
+            ))}
+          </select>
+        </div>
 
-          <div className="flex-1 w-full">
-            <label className="text-xs font-mono text-cyan-400 font-semibold block mb-1">
-              SELECT PLAYER 2:
-            </label>
-            <select
-              value={selectedSlugB}
-              onChange={(e) => handleSelectPlayerB(e.target.value)}
-              className="w-full py-2 px-3 rounded-xl bg-white/[0.04] border border-white/10 text-sm text-white focus:outline-none focus:border-cyan-500"
-            >
-              <option value="demo-b">Tariq Al-Mansoor (#5 Red) — Holding CDM</option>
-              {playersList.map((p) => (
-                <option key={`b-${p.slug}`} value={p.slug}>
-                  {p.name} ({p.position || p.sport})
-                </option>
-              ))}
-            </select>
-          </div>
-        </GlassCard>
-      )}
+        <div className="flex-1 w-full">
+          <label className="text-xs font-mono text-cyan-400 font-bold block mb-1.5">
+            SUBJECT 2 (COMPARISON):
+          </label>
+          <select
+            value={selectedSlugB}
+            onChange={(e) => handleSelectPlayerB(e.target.value)}
+            className="w-full min-h-[44px] py-2.5 px-3.5 rounded-xl bg-[#0b132b] border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-500 font-medium cursor-pointer"
+          >
+            <option value="demo-b">Tariq Al-Mansoor (#5 Red) — Holding CDM (Demonstration)</option>
+            {playersList.map((p) => (
+              <option key={`b-${p.slug}`} value={p.slug}>
+                {p.name} ({p.position || p.sport})
+              </option>
+            ))}
+          </select>
+        </div>
+      </GlassCard>
 
       <MultiPlayerCompare
         reportA={reportA}

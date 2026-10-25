@@ -83,9 +83,10 @@ export const VideoUploader: React.FC = () => {
       });
 
       setDetectedPlayers(res.players);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Scan error:', err);
-      setErrorMsg(err.message || 'Player detection failed. You can still proceed to analysis.');
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMsg(msg || 'Player detection failed. You can still proceed to analysis.');
     } finally {
       setIsScanning(false);
     }
@@ -111,7 +112,7 @@ export const VideoUploader: React.FC = () => {
         className={`relative border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 ${
           isDragging
             ? 'border-indigo-400 bg-indigo-500/10 scale-[1.01]'
-            : 'border-white/15 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/30'
+            : 'border-white/15 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/30'
         }`}
       >
         <input
@@ -130,7 +131,7 @@ export const VideoUploader: React.FC = () => {
         </div>
 
         <h3 className="text-xl font-bold text-white mb-2">{t('upload.dropzoneTitle')}</h3>
-        <p className="text-sm text-slate-400 max-w-md mb-6">{t('upload.dropzoneSubtitle')}</p>
+        <p className="text-sm text-slate-300 max-w-md mb-6">{t('upload.dropzoneSubtitle')}</p>
 
         <GlassButton variant="primary" size="md" icon={<Video className="w-4 h-4" />}>
           {t('upload.browse')}

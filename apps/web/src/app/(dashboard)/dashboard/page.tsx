@@ -111,7 +111,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-8 w-full">
       {/* Hero Welcome Banner */}
-      <div className="relative rounded-3xl p-8 md:p-10 overflow-hidden border border-indigo-500/30 bg-gradient-to-r from-indigo-950/70 via-slate-900/80 to-[#070b18] shadow-2xl">
+      <div className="relative rounded-3xl p-6 sm:p-8 md:p-10 overflow-hidden border border-indigo-500/30 bg-gradient-to-r from-indigo-950/80 via-slate-900/90 to-[#070b18] shadow-2xl">
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="max-w-2xl">
             <div className="flex items-center gap-2 mb-3">
@@ -125,7 +125,7 @@ export default function DashboardPage() {
             <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight leading-tight mb-3">
               {t('dashboard.title')}
             </h1>
-            <p className="text-sm md:text-base text-slate-300 leading-relaxed">
+            <p className="text-sm md:text-base text-slate-200 leading-relaxed">
               {t('dashboard.subtitle')}
             </p>
           </div>
@@ -140,42 +140,42 @@ export default function DashboardPage() {
 
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <GlassCard className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+        <GlassCard className="flex items-center gap-4 p-5">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
             <Target className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs text-slate-400 font-medium block">{t('dashboard.statTotalScouts')}</span>
+            <span className="text-xs text-slate-300 font-semibold block">{t('dashboard.statTotalScouts')}</span>
             <span className="text-2xl font-bold font-mono text-white">1,428</span>
           </div>
         </GlassCard>
 
-        <GlassCard className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+        <GlassCard className="flex items-center gap-4 p-5">
+          <div className="w-12 h-12 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
             <Users className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs text-slate-400 font-medium block">{t('dashboard.statAthletesTracked')}</span>
+            <span className="text-xs text-slate-300 font-semibold block">{t('dashboard.statAthletesTracked')}</span>
             <span className="text-2xl font-bold font-mono text-white">{totalAthletesCount.toLocaleString()}</span>
           </div>
         </GlassCard>
 
-        <GlassCard className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+        <GlassCard className="flex items-center gap-4 p-5">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
             <TrendingUp className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs text-slate-400 font-medium block">{t('dashboard.statAvgGrade')}</span>
+            <span className="text-xs text-slate-300 font-semibold block">{t('dashboard.statAvgGrade')}</span>
             <span className="text-2xl font-bold font-mono text-white">82.4 / A</span>
           </div>
         </GlassCard>
 
-        <GlassCard className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+        <GlassCard className="flex items-center gap-4 p-5">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
             <Zap className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs text-slate-400 font-medium block">{t('dashboard.statAccuracy')}</span>
+            <span className="text-xs text-slate-300 font-semibold block">{t('dashboard.statAccuracy')}</span>
             <span className="text-2xl font-bold font-mono text-white">99.4%</span>
           </div>
         </GlassCard>
@@ -188,7 +188,7 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-3">
         <h3 className="text-lg font-bold text-white flex items-center gap-2">
           <span>{t('dashboard.selectSport')}</span>
-          <span className="text-xs font-mono text-slate-400 font-normal">(10 Olympic & Pro Disciplines)</span>
+          <span className="text-xs font-mono text-slate-300 font-normal">(10 Olympic & Pro Disciplines)</span>
         </h3>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -198,10 +198,10 @@ export default function DashboardPage() {
               <button
                 key={s.key}
                 onClick={() => setSport(s.key)}
-                className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all text-center cursor-pointer ${
+                className={`touch-target-44 flex flex-col items-center justify-center p-4 min-h-[92px] rounded-2xl border transition-all text-center cursor-pointer ${
                   isSelected
-                    ? 'border-indigo-500 bg-indigo-600/20 shadow-[0_0_20px_rgba(99,102,241,0.3)] text-white scale-[1.02]'
-                    : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/20 text-slate-300'
+                    ? 'border-indigo-500 bg-indigo-600/25 shadow-[0_0_20px_rgba(99,102,241,0.3)] text-white scale-[1.02]'
+                    : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 text-slate-200'
                 }`}
               >
                 <span className="text-3xl mb-1.5">{s.emoji}</span>
@@ -218,38 +218,38 @@ export default function DashboardPage() {
           <h3 className="text-lg font-bold text-white">{t('dashboard.recentReports')}</h3>
           <Link href="/upload" className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
             <span>Scan New Player</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <ArrowRight className="w-3.5 h-3.5 rtl-flip" />
           </Link>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {recentReports.map((rep) => (
-            <GlassCard key={rep.id} hoverEffect className="flex flex-col justify-between">
+            <GlassCard key={rep.id} hoverEffect className="flex flex-col justify-between p-5">
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <Badge variant={rep.grade === 'S' ? 'emerald' : 'cyan'} size="sm">
                     GRADE {rep.grade}
                   </Badge>
-                  <span className="text-xs font-mono text-slate-400">{rep.date}</span>
+                  <span className="text-xs font-mono text-slate-300">{rep.date}</span>
                 </div>
 
                 <h4 className="text-base font-bold text-white mb-1">{rep.name}</h4>
-                <p className="text-xs text-slate-400 mb-2">
+                <p className="text-xs text-slate-300 mb-2">
                   {rep.position} · Rating: <span className="font-mono text-indigo-400 font-bold">{rep.score}/100</span>
                 </p>
 
-                <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 text-xs text-slate-300 mb-4">
-                  <span className="text-amber-400 font-medium block text-[11px] mb-0.5">Comparable Pro:</span>
+                <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/5 text-xs text-slate-200 mb-4">
+                  <span className="text-amber-400 font-semibold block text-[11px] mb-0.5">Comparable Pro:</span>
                   <span>{rep.proComparison}</span>
                 </div>
               </div>
 
               <Link
                 href={`/p/${rep.slug}`}
-                className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-center text-xs font-semibold text-white transition-all flex items-center justify-center gap-1.5"
+                className="touch-target-44 w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-center text-xs font-semibold text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <span>View Full Tactical Dossier</span>
-                <ArrowRight className="w-3.5 h-3.5 text-cyan-400" />
+                <ArrowRight className="w-3.5 h-3.5 text-cyan-400 rtl-flip" />
               </Link>
             </GlassCard>
           ))}

@@ -9,7 +9,7 @@ import { Badge } from '../../components/ui/Badge';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { locale, setLocale, t } = useLocale();
+  const { locale, setLocale, t, isRtl } = useLocale();
 
   const navItems = [
     { href: '/dashboard', label: t('nav.dashboard'), icon: <Activity className="w-4 h-4" /> },
@@ -19,13 +19,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ];
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col pb-20 md:pb-0" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* Top Navbar */}
-      <header className="sticky top-0 z-50 h-18 border-b border-white/10 bg-[#070b18]/85 backdrop-blur-xl px-6 flex items-center justify-between">
+      <header className="sticky top-0 z-50 h-18 border-b border-white/10 bg-[#070b18]/85 backdrop-blur-xl px-4 md:px-8 flex items-center justify-between">
         {/* Brand Logo & Crest */}
         <div className="flex items-center gap-4">
           <Link href="/dashboard" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-0.5 shadow-[0_0_20px_rgba(99,102,241,0.5)]">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-0.5 shadow-[0_0_20px_rgba(99,102,241,0.5)] shrink-0">
               <div className="w-full h-full bg-[#070b18] rounded-[10px] flex items-center justify-center font-black text-transparent bg-clip-text bg-gradient-to-tr from-indigo-400 to-cyan-300 text-lg">
                 S2
               </div>
@@ -49,7 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        {/* Center Nav Links */}
+        {/* Center Desktop Nav Links */}
         <nav className="hidden md:flex items-center gap-1 bg-white/[0.03] border border-white/10 rounded-2xl p-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
@@ -57,7 +57,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                className={`touch-target-44 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
                   isActive
                     ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-[0_0_16px_rgba(99,102,241,0.4)]'
                     : 'text-slate-300 hover:text-white hover:bg-white/5'
@@ -71,7 +71,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
 
         {/* Right Actions: User Profile Pill with Plan Badge, Accreditation & Language Switcher */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           <Link
             href="/billing"
             className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-all group cursor-pointer shadow-sm"
@@ -84,10 +84,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="text-xs font-semibold text-slate-200 group-hover:text-white transition-colors">
                 Omar Khalil
               </span>
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-gradient-to-r from-indigo-500/20 to-cyan-500/20 text-cyan-300 border border-cyan-500/30 group-hover:border-cyan-400 group-hover:shadow-[0_0_10px_rgba(56,189,248,0.3)] transition-all">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-gradient-to-r from-indigo-500/20 to-cyan-500/20 text-cyan-300 border border-cyan-500/30 group-hover:border-cyan-400 transition-all">
                 <span className="text-amber-400">⚡</span>
-                PRO ACADEMY
-                <span className="text-[8px] opacity-70">›</span>
+                PRO
               </span>
             </div>
           </Link>
@@ -99,7 +98,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Language Switcher */}
           <button
             onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200 transition-all cursor-pointer"
+            className="touch-target-44 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200 transition-all cursor-pointer"
             title="Toggle English / العربية"
           >
             <Globe className="w-3.5 h-3.5 text-cyan-400" />
@@ -109,7 +108,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </header>
 
       {/* Main Content Viewport */}
-      <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full">{children}</main>
+      <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">{children}</main>
+
+      {/* Pitch-Side Mobile Bottom Navigation Bar (44px touch targets) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-16 bg-[#070b18]/95 backdrop-blur-2xl border-t border-white/10 flex items-center justify-around px-2">
+        {navItems.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`touch-target-44 flex flex-col items-center justify-center gap-1 flex-1 py-1 rounded-xl transition-all ${
+                isActive ? 'text-indigo-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <div className={`${isActive ? 'p-1 rounded-lg bg-indigo-500/20' : ''}`}>
+                {item.icon}
+              </div>
+              <span className="text-[10px] leading-tight">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }
