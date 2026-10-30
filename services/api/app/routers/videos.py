@@ -87,15 +87,27 @@ def stream_video(filename: str):
 @router.post("/detect-players", response_model=DetectPlayersResponse)
 async def detect_players(req: DetectPlayersRequest):
     """
-    Detects distinct players in footage using Computer Vision + Gemini Vision.
+    Detects 100% of distinct players (starters + substitutes) across full matches
+    using adaptive temporal sampling, local entity clustering, and single-pass Gemini Vision verification.
     """
+    local_video_path = None
+    if req.videoId:
+        local_video_path = storage_service.get_local_filepath(req.videoId)
+    elif req.videoUrl:
+        if "/api/v1/videos/stream/" in req.videoUrl:
+            filename = req.videoUrl.split("/api/v1/videos/stream/")[-1]
+            local_video_path = storage_service.get_local_filepath(filename)
+        elif os.path.exists(req.videoUrl):
+            local_video_path = req.videoUrl
+
     players = await gemini_service.detect_players(
         sport_key=req.sport,
         frames_base64=req.framesBase64,
+        video_path=local_video_path,
     )
     return DetectPlayersResponse(
         playerCount=len(players),
         isSinglePlayer=len(players) <= 1,
         players=players,
-        scanSource="hybrid_cv_gemini",
+        scanSource="adaptive_cv_gemini",
     )

@@ -3,6 +3,7 @@ from .detector import detector, PlayerDetector
 from .tracker import tracker, PlayerTracker
 from .homography import pitch_homography, PitchHomography
 from .smart_sampler import smart_sampler, SmartSampler
+from .clusterer import player_clusterer, PlayerClusterer
 
 __all__ = [
     "cv_pipeline",
@@ -15,4 +16,6 @@ __all__ = [
     "PitchHomography",
     "smart_sampler",
     "SmartSampler",
+    "player_clusterer",
+    "PlayerClusterer",
 ]

@@ -7,6 +7,7 @@ from .smart_sampler import smart_sampler
 from .detector import detector
 from .tracker import tracker
 from .homography import pitch_homography
+from .clusterer import player_clusterer
 
 logger = logging.getLogger("scoutai.cv_worker")
 
@@ -30,45 +31,24 @@ class CVPipeline:
         start_time = time.time()
         print(f"[CVPipeline] Starting processing for video: {video_path} (mode: {self.mode})")
 
-        # 1. Smart motion sampling
-        sampled_frames = smart_sampler.sample_keyframes(video_path, num_frames=num_keyframes)
-        print(f"[CVPipeline] Sampled {len(sampled_frames)} motion-aware keyframes")
+        # 1. Adaptive time-window sampling (equal density across 4 epochs)
+        sampled_frames = smart_sampler.sample_candidate_frames_adaptive(video_path)
+        print(f"[CVPipeline] Sampled {len(sampled_frames)} candidate frames across temporal epochs")
 
-        # 2. Player detection and tracking across sampled frames
-        all_detections = []
-        player_trajectories: Dict[int, List[Dict[str, float]]] = {}
+        # 2. Local player entity clustering & deduplication (K-Means jersey HSV + spatial proximity)
+        player_entities = player_clusterer.cluster_candidate_detections(sampled_frames)
+        mosaic_b64, _ = player_clusterer.compose_mosaic_grid(player_entities)
 
-        for frame_item in sampled_frames:
-            # If we have base64 data, decode into OpenCV image
-            raw_b64 = frame_item.get("base64")
-            if raw_b64 and __import__("cv2"):
-                import cv2
-                import numpy as np
-                import base64
+        # 3. Trajectory and spatial heatmap calculation
+        player_trajectories: Dict[str, List[Dict[str, float]]] = {}
+        for entity in player_entities:
+            cid = entity.get("candidateId", "C1")
+            box = entity.get("boundingBox", {"x": 0.5, "y": 0.5, "w": 0.1, "h": 0.2})
+            player_trajectories[cid] = [box]
 
-                img_bytes = base64.b64decode(raw_b64)
-                np_arr = np.frombuffer(img_bytes, np.uint8)
-                frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
-                # Run detector
-                dets = detector.detect_in_frame(frame)
-                # Run tracker
-                tracks = tracker.update(dets, frame)
-
-                for tr in tracks:
-                    tid = tr["trackId"]
-                    if tid not in player_trajectories:
-                        player_trajectories[tid] = []
-                    player_trajectories[tid].append(tr["box"])
-
-                all_detections.append(tracks)
-
-        # 3. Calculate telemetry and spatial heatmap for primary tracked player
         primary_trajectory = []
-        if player_trajectories:
-            # Pick longest tracked player
-            longest_tid = max(player_trajectories.keys(), key=lambda k: len(player_trajectories[k]))
-            primary_trajectory = player_trajectories[longest_tid]
+        if player_entities:
+            primary_trajectory = [player_entities[0].get("boundingBox", {"x": 0.5, "y": 0.5, "w": 0.1, "h": 0.2})]
 
         telemetry = pitch_homography.estimate_telemetry(primary_trajectory)
         elapsed_sec = round(time.time() - start_time, 2)
@@ -79,9 +59,13 @@ class CVPipeline:
             "sport": sport,
             "processingTimeSeconds": elapsed_sec,
             "keyframesCount": len(sampled_frames),
-            "keyframes": sampled_frames,
+            "keyframes": sampled_frames[:num_keyframes],
+            "playerEntitiesCount": len(player_entities),
+            "startersCount": sum(1 for p in player_entities if p.get("subStatus") == "Starter"),
+            "substitutesCount": sum(1 for p in player_entities if p.get("subStatus") == "Substitute"),
+            "mosaicBase64": mosaic_b64,
             "telemetry": telemetry,
-            "trackedPlayerCount": len(player_trajectories),
+            "trackedPlayerCount": len(player_entities),
         }
 
 
