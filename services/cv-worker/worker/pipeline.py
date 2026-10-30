@@ -94,6 +94,7 @@ def run_worker_daemon():
     redis_client = None
 
     try:
+        # pyrefly: ignore[missing-import]
         import redis
         client = redis.from_url(redis_url, socket_timeout=3, socket_connect_timeout=3)
         client.ping()
