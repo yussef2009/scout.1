@@ -304,68 +304,83 @@ export const SPORT_CONFIG: Record<string, SportConfig> = {
     name: 'Volleyball',
     emoji: '🏐',
     metrics: [
-      'Kill % (Attack)',
-      'Pass Rating (0–3)',
-      'Block Efficiency',
-      'Setting Accuracy',
-      'Digging',
-      'Vertical Jump',
+      'True Attack Efficiency (Eff_A)',
+      'Pass Rating (eSO)',
+      'Block Touch & Stuff Efficiency',
+      'Setting & Distribution',
+      'Digging & Platform Stability',
+      'Vertical Jump Apex',
       'Serve Effectiveness',
-      'Positioning',
+      'Court Positioning & Transition',
     ],
-    radarLabels: ['Kill%', 'Pass Rating', 'Block', 'Setting', 'Dig', 'Jump'],
-    benchmarkSource: 'Data Volley (Genius Sports), FIVB TSG',
+    radarLabels: ['Attack (Eff_A)', 'Reception (eSO)', 'Block Touch', 'Serve (ACE%)', 'Dig/Set', 'Kinematic Leap'],
+    benchmarkSource: 'Data Volley 4 (Genius Sports), FIVB VIS Standard',
     hasKinematics: true,
-    position: 'Setter / Libero / Spiker',
+    position: 'Outside Hitter / Opposite / Middle Blocker / Setter / Libero',
     positions: [
-      {
-        code: 'SET',
-        label: 'Setter',
-        category: 'Playmaker',
-        primaryMetrics: ['Setting Accuracy', 'Positioning', 'Pass Rating (0–3)', 'Serve Effectiveness', 'Vertical Jump'],
-        tacticalNotes: 'Setting accuracy %, tempo deception, second-tempo distribution, court spatial awareness',
-      },
       {
         code: 'OH',
         label: 'Outside Hitter',
         category: 'Attacker',
-        primaryMetrics: ['Kill % (Attack)', 'Vertical Jump', 'Pass Rating (0–3)', 'Serve Effectiveness', 'Digging'],
-        tacticalNotes: 'Approach step acceleration, kill %, out-of-system terminal hitting, primary serve-receive',
-      },
-      {
-        code: 'WS',
-        label: 'Wing Spiker',
-        category: 'Attacker',
-        primaryMetrics: ['Kill % (Attack)', 'Vertical Jump', 'Serve Effectiveness', 'Block Efficiency', 'Digging'],
-        tacticalNotes: 'Explosive approach from wings, kill % from left/right antenna, serve-receive support',
-      },
-      {
-        code: 'MB',
-        label: 'Middle Blocker',
-        category: 'Frontcourt',
-        primaryMetrics: ['Block Efficiency', 'Kill % (Attack)', 'Vertical Jump', 'Positioning', 'Serve Effectiveness'],
-        tacticalNotes: 'Block touch rate, lateral read-and-react, quick slide attack, closing seam transitions',
+        primaryMetrics: ['True Attack Efficiency (Eff_A)', 'Pass Rating (eSO)', 'Digging & Platform Stability', 'Block Touch & Stuff Efficiency', 'Serve Effectiveness'],
+        tacticalNotes: 'Primary serve-receive anchor (eSO >= 0.61 target), terminal kill efficiency (Eff_A), approach penultimate step length (1.30-1.65x), high-ball transition kill %',
+        weights: { attack: 0.35, pass: 0.30, dig_set: 0.15, block: 0.10, serve: 0.10 },
       },
       {
         code: 'OPP',
         label: 'Opposite Hitter',
         category: 'Attacker',
-        primaryMetrics: ['Kill % (Attack)', 'Block Efficiency', 'Vertical Jump', 'Serve Effectiveness', 'Positioning'],
-        tacticalNotes: 'Heavy right-side kill %, high-ball terminal finishing, perimeter block wall presence',
+        primaryMetrics: ['True Attack Efficiency (Eff_A)', 'Serve Effectiveness', 'Block Touch & Stuff Efficiency', 'Digging & Platform Stability', 'Vertical Jump Apex'],
+        tacticalNotes: 'Heavy terminal point scorer, right-side out-of-system attack volume (Eff_A), perimeter block wall presence, break-point serve scoring',
+        weights: { attack: 0.55, serve: 0.15, block: 0.15, dig_set: 0.15, pass: 0.00 },
+      },
+      {
+        code: 'MB',
+        label: 'Middle Blocker',
+        category: 'Frontcourt',
+        primaryMetrics: ['Block Touch & Stuff Efficiency', 'True Attack Efficiency (Eff_A)', 'Serve Effectiveness', 'Digging & Platform Stability', 'Vertical Jump Apex'],
+        tacticalNotes: 'Lateral read-and-react block penetration (>= 15cm over net), 1st-tempo A/C quick slide attack (Q: 0.25-0.45s), closing antenna seams',
+        weights: { block: 0.50, attack: 0.30, serve: 0.10, dig_set: 0.10, pass: 0.00 },
+      },
+      {
+        code: 'SET',
+        label: 'Setter',
+        category: 'Playmaker',
+        primaryMetrics: ['Setting & Distribution', 'Serve Effectiveness', 'Block Touch & Stuff Efficiency', 'Digging & Platform Stability', 'True Attack Efficiency (Eff_A)'],
+        tacticalNotes: 'Setter target box delivery, tempo orchestration (Q/T/M/H), second-tempo dump deception, transition floor leadership',
+        weights: { dig_set: 0.65, serve: 0.15, block: 0.15, attack: 0.05, pass: 0.00 },
+      },
+      {
+        code: 'S',
+        label: 'Setter',
+        category: 'Playmaker',
+        primaryMetrics: ['Setting & Distribution', 'Serve Effectiveness', 'Block Touch & Stuff Efficiency', 'Digging & Platform Stability', 'True Attack Efficiency (Eff_A)'],
+        tacticalNotes: 'Setter target box delivery, tempo orchestration (Q/T/M/H), second-tempo dump deception, transition floor leadership',
+        weights: { dig_set: 0.65, serve: 0.15, block: 0.15, attack: 0.05, pass: 0.00 },
       },
       {
         code: 'LIB',
         label: 'Libero',
         category: 'Defense',
-        primaryMetrics: ['Pass Rating (0–3)', 'Digging', 'Positioning', 'Serve Effectiveness', 'Setting Accuracy'],
-        tacticalNotes: 'Pass rating efficiency (target 2.5+), dig platform stability, contrasting jersey required by rules',
+        primaryMetrics: ['Pass Rating (eSO)', 'Digging & Platform Stability', 'Court Positioning & Transition', 'Setting & Distribution'],
+        tacticalNotes: 'Elite serve-receive eSO (benchmark >= 0.61), defensive split-step timing (+-33ms), contrasting kit compliance, second-ball out-of-system setting',
+        weights: { pass: 0.55, dig_set: 0.45, attack: 0.00, block: 0.00, serve: 0.00 },
+      },
+      {
+        code: 'L',
+        label: 'Libero',
+        category: 'Defense',
+        primaryMetrics: ['Pass Rating (eSO)', 'Digging & Platform Stability', 'Court Positioning & Transition', 'Setting & Distribution'],
+        tacticalNotes: 'Elite serve-receive eSO (benchmark >= 0.61), defensive split-step timing (+-33ms), contrasting kit compliance, second-ball out-of-system setting',
+        weights: { pass: 0.55, dig_set: 0.45, attack: 0.00, block: 0.00, serve: 0.00 },
       },
       {
         code: 'DS',
         label: 'Defensive Specialist',
         category: 'Defense',
-        primaryMetrics: ['Digging', 'Pass Rating (0–3)', 'Serve Effectiveness', 'Positioning', 'Setting Accuracy'],
+        primaryMetrics: ['Digging & Platform Stability', 'Pass Rating (eSO)', 'Serve Effectiveness', 'Court Positioning & Transition'],
         tacticalNotes: 'Back-row defensive substitution, serve-receive platform quality, covering deep court digs',
+        weights: { pass: 0.50, dig_set: 0.40, serve: 0.10, attack: 0.00, block: 0.00 },
       },
     ],
   },
@@ -768,13 +783,14 @@ export function getSportKinematicsHints(sportKey: string): string {
 
   const sportNotes: Record<string, string> = {
     volleyball: `
-━━━ VOLLEYBALL JUMP KINEMATICS (FIVB Standard) ━━━
-• Approach Phase: observe 3-step or 4-step approach rhythm, penultimate step length, last-step brake force.
-• Takeoff Quality: both feet together (block) vs. single-leg dominant plant (attack). Rate 0–100.
-• Peak Vertical: estimate hip-center elevation relative to the net / antenna as reference.
-• Hang Time: count frames between last ground contact and first landing contact; estimate duration.
-• Landing Mechanics: check knee flexion at landing (optimal: 30–45°). Flag stiff-knee landings as high-risk.
-• Block Reach Height: estimate fist clearance above net for middle blocker evaluations.`,
+━━━ VOLLEYBALL JUMP & EVENT KINEMATICS (FIVB / DataVolley Standard) ━━━
+• Approach Phase: measure penultimate stride ratio (target: 1.30–1.65x leg length) and center of mass lowering (>= 12% drop).
+• Braking Plant Angle: lead foot internal plant angle (optimal: 30°–45° inward toward setter; flag < 15° as drift/net violation risk).
+• Arm Draw Kinematics: humerus abduction angle (optimal: 90°–110°), elbow draw height relative to shoulder (elbow y >= shoulder y), X-Factor hip-shoulder separation >= 30°.
+• Peak Vertical Displacement: estimate hip-center clearance at spike/block apex. Rate takeoff quality 0–100.
+• Defensive Split-Step: pre-hop timing delta vs opponent contact (target: ±33 ms), base of support >= 1.4x shoulder width, knee flexion 115°–140°.
+• Block Penetration: wrist penetration >= 15 cm over net plane, forward shoulder-wrist pike >= 15°.
+• Landing Mechanics: bilateral force dissipation, knee flexion 30°–45°. Flag stiff-knee landings (< 20°) as injury risk.`,
     basketball: `
 ━━━ BASKETBALL VERTICAL JUMP KINEMATICS (NBA Second Spectrum Standard) ━━━
 • Identify jump types: standing vertical, approach vertical (off one or two feet), contest jump.
@@ -839,4 +855,69 @@ LIBERO IDENTIFICATION (MANDATORY RULE):
     default:
       return '';
   }
+}
+
+// ==========================================
+// VOLLEYBALL DATA VOLLEY 4 & MODULE D / E RULES
+// ==========================================
+
+export const VOLLEYBALL_POSITION_WEIGHTS = {
+  OH: { attack: 0.35, pass: 0.30, dig_set: 0.15, block: 0.10, serve: 0.10 },
+  OPP: { attack: 0.55, serve: 0.15, block: 0.15, dig_set: 0.15, pass: 0.00 },
+  MB: { block: 0.50, attack: 0.30, serve: 0.10, dig_set: 0.10, pass: 0.00 },
+  S: { dig_set: 0.65, serve: 0.15, block: 0.15, attack: 0.05, pass: 0.00 },
+  SET: { dig_set: 0.65, serve: 0.15, block: 0.15, attack: 0.05, pass: 0.00 },
+  L: { pass: 0.55, dig_set: 0.45, attack: 0.00, block: 0.00, serve: 0.00 },
+  LIB: { pass: 0.55, dig_set: 0.45, attack: 0.00, block: 0.00, serve: 0.00 },
+  DS: { pass: 0.50, dig_set: 0.40, serve: 0.10, attack: 0.00, block: 0.00 },
+} as const;
+
+export const VOLLEYBALL_EXPECTED_SIDEOUT_WEIGHTS = {
+  '#': 0.70, // Perfect pass into Setter Target Box
+  '+': 0.62, // Positive pass
+  '!': 0.53, // Medium pass (middle quick eliminated)
+  '-': 0.40, // Poor / high ball only
+  '/': 0.18, // Overpass directly over net
+  '=': 0.00, // Direct error / unplayable
+} as const;
+
+export const VOLLEYBALL_BASELINE_EFF_BY_BLOCKERS = {
+  0: 0.75,
+  1: 0.48,
+  2: 0.26,
+  3: 0.08,
+} as const;
+
+export function calculateVolleyballCompositeRating(
+  positionCode: string,
+  metrics: {
+    attack?: number;
+    pass?: number;
+    block?: number;
+    serve?: number;
+    dig_set?: number;
+  },
+  means?: Record<string, number>,
+  stds?: Record<string, number>,
+): number {
+  const normPos = (positionCode || 'OH').toUpperCase().trim();
+  const weights = (VOLLEYBALL_POSITION_WEIGHTS as Record<string, Record<string, number>>)[normPos]
+    || VOLLEYBALL_POSITION_WEIGHTS.OH;
+
+  const mu = means || { attack: 50.0, pass: 50.0, block: 50.0, serve: 50.0, dig_set: 50.0 };
+  const sigma = stds || { attack: 12.0, pass: 12.0, block: 12.0, serve: 12.0, dig_set: 12.0 };
+
+  const values = Object.values(metrics).filter((v): v is number => typeof v === 'number');
+  const isPrecomputedZ = !means && values.length > 0 && values.every((v) => Math.abs(v) <= 6.0);
+
+  let zSum = 0.0;
+  for (const [skill, w] of Object.entries(weights)) {
+    if (w <= 0) continue;
+    const val = metrics[skill as keyof typeof metrics] ?? (isPrecomputedZ ? 0.0 : 50.0);
+    const z = isPrecomputedZ ? val : (val - (mu[skill] ?? 50.0)) / Math.max(1.0, sigma[skill] ?? 12.0);
+    zSum += w * z;
+  }
+
+  const rawRating = 75.0 + 10.0 * zSum;
+  return Math.round(Math.max(0.0, Math.min(100.0, rawRating)) * 10) / 10;
 }

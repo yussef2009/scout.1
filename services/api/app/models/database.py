@@ -128,13 +128,22 @@ def run_migrations():
 
         if "scouting_reports" in existing_tables:
             report_columns = {col["name"] for col in inspector.get_columns("scouting_reports")}
-            if "org_id" not in report_columns:
-                with engine.connect() as conn:
-                    try:
-                        conn.execute(text("ALTER TABLE scouting_reports ADD COLUMN org_id VARCHAR(36)"))
-                        conn.commit()
-                    except Exception as ddl_err:
-                        logger.debug(f"[Migration] Column org_id on scouting_reports already exists or failed: {ddl_err}")
+            new_report_cols = [
+                ("org_id", "VARCHAR(36)"),
+                ("executive_summary", "TEXT"),
+                ("tactical_profile", "TEXT"),
+                ("volleyball_metrics", "JSON"),
+                ("volleyball_events", "JSON"),
+                ("dvw_strings", "JSON"),
+            ]
+            with engine.connect() as conn:
+                for col_name, col_type in new_report_cols:
+                    if col_name not in report_columns:
+                        try:
+                            conn.execute(text(f"ALTER TABLE scouting_reports ADD COLUMN {col_name} {col_type}"))
+                            conn.commit()
+                        except Exception as ddl_err:
+                            logger.debug(f"[Migration] Column {col_name} on scouting_reports already exists or failed: {ddl_err}")
 
     except Exception as e:
         logger.warning(f"[Migration Warning] Auto-migration check encountered: {e}")

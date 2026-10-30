@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Response, BackgroundTasks, status
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from ..models.database import get_db, SessionLocal
 from ..models.organization import Organization
 from ..models.report import ScoutingReport
@@ -14,6 +14,7 @@ from ..services.usage_service import usage_service
 from ..dependencies.quota_guard import require_ai_analysis_quota
 from ..schemas.analysis import GenerateAnalysisRequest, GenerateAnalysisResponse
 from ..schemas.scouting import ScoutingReportSchema
+from ..schemas.volleyball import VolleyballScoutingReport
 
 logger = logging.getLogger("scoutai.analysis")
 
@@ -42,6 +43,7 @@ async def generate_analysis(
         frames_base64=req.framesBase64,
         language=req.language,
     )
+    is_vb = isinstance(report_schema, VolleyballScoutingReport)
 
     # Generate unique shareable slug
     player_slug_part = "athlete"
@@ -73,6 +75,8 @@ async def generate_analysis(
                 db.add(player_record)
                 db.flush()
 
+        is_vb = isinstance(report_schema, VolleyballScoutingReport)
+
         # Save scouting report with organization ownership
         db_report = ScoutingReport(
             slug=shareable_slug,
@@ -98,6 +102,11 @@ async def generate_analysis(
             pro_comparisons=[p.model_dump() for p in report_schema.proComparisons],
             kinematics=report_schema.kinematics.model_dump() if report_schema.kinematics else None,
             telemetry=telemetry_dict,
+            executive_summary=getattr(report_schema, "executiveSummary", None),
+            tactical_profile=getattr(report_schema, "tacticalProfile", None),
+            volleyball_metrics=report_schema.volleyballMetrics.model_dump() if (is_vb and report_schema.volleyballMetrics) else None,
+            volleyball_events=[e.model_dump() for e in report_schema.volleyballEvents] if is_vb else None,
+            dvw_strings=report_schema.dvwStrings if is_vb else None,
             language=req.language,
             verified=True,
         )
@@ -123,7 +132,10 @@ async def generate_analysis(
     report_dict["id"] = db_report.id
     report_dict["slug"] = db_report.slug
     report_dict["createdAt"] = db_report.created_at.isoformat()
-    final_report = ScoutingReportSchema.model_validate(report_dict)
+    if is_vb:
+        final_report = VolleyballScoutingReport.model_validate(report_dict)
+    else:
+        final_report = ScoutingReportSchema.model_validate(report_dict)
 
     return GenerateAnalysisResponse(
         report=final_report,
@@ -134,7 +146,7 @@ async def generate_analysis(
     )
 
 
-@router.get("/reports/{slug_or_id}", response_model=ScoutingReportSchema)
+@router.get("/reports/{slug_or_id}", response_model=Union[VolleyballScoutingReport, ScoutingReportSchema])
 def get_report(slug_or_id: str, db: Session = Depends(get_db)):
     """
     Retrieves a persisted scouting report by unique slug or ID.
@@ -148,35 +160,48 @@ def get_report(slug_or_id: str, db: Session = Depends(get_db)):
     if not report:
         raise HTTPException(status_code=404, detail="Scouting report not found")
 
-    return ScoutingReportSchema(
-        id=report.id,
-        slug=report.slug,
-        overallScore=report.overall_score,
-        overallGrade=report.overall_grade,
-        potentialRating=report.potential_rating,
-        position=report.position,
-        positionCode=report.position_code or "",
-        positionProfile=report.position_profile or {},
-        playingTime=report.playing_time or None,
-        playerSummary=report.player_summary or "",
-        oneLiner=report.one_liner or "",
-        tags=report.tags or [],
-        metrics=report.metrics or [],
-        radarMetrics=report.radar_metrics or {},
-        executiveSummary=f"Verified ScoutAI report for {report.position}",
-        tacticalProfile="Disciplined positional execution",
-        strengths=report.strengths or [],
-        weaknesses=report.weaknesses or [],
-        recommendedDrills=report.recommended_drills or [],
-        narrative=report.narrative,
-        proComparisons=report.pro_comparisons or [],
-        comparableProPlayer=(report.pro_comparisons[0]["name"] if report.pro_comparisons else None),
-        kinematics=report.kinematics,
-        telemetry=report.telemetry,
-        language=report.language or "en",
-        verified=report.verified,
-        createdAt=report.created_at.isoformat() if report.created_at else None,
-    )
+    is_vb = (report.sport == "volleyball") or bool(report.volleyball_metrics or report.volleyball_events)
+
+    rep_data = {
+        "id": report.id,
+        "slug": report.slug,
+        "createdAt": report.created_at.isoformat() if report.created_at else None,
+        "overallScore": report.overall_score,
+        "overallGrade": report.overall_grade,
+        "potentialRating": report.potential_rating,
+        "position": report.position,
+        "positionCode": report.position_code or "",
+        "positionProfile": report.position_profile or {},
+        "playingTime": report.playing_time or None,
+        "playerSummary": report.player_summary or "",
+        "oneLiner": report.one_liner or "",
+        "tags": report.tags or [],
+        "metrics": report.metrics or [],
+        "radarMetrics": report.radar_metrics or {},
+        "executiveSummary": report.executive_summary or f"Verified ScoutAI report for {report.position}",
+        "tacticalProfile": report.tactical_profile or "Disciplined positional execution",
+        "strengths": report.strengths or [],
+        "weaknesses": report.weaknesses or [],
+        "recommendedDrills": report.recommended_drills or [],
+        "narrative": report.narrative,
+        "proComparisons": report.pro_comparisons or [],
+        "comparableProPlayer": (report.pro_comparisons[0]["name"] if report.pro_comparisons else None),
+        "kinematics": report.kinematics,
+        "telemetry": report.telemetry,
+        "language": report.language or "en",
+        "verified": report.verified,
+    }
+
+    if is_vb:
+        if report.volleyball_metrics:
+            rep_data["volleyballMetrics"] = report.volleyball_metrics
+        if report.volleyball_events:
+            rep_data["volleyballEvents"] = report.volleyball_events
+        if report.dvw_strings:
+            rep_data["dvwStrings"] = report.dvw_strings
+        return VolleyballScoutingReport.model_validate(rep_data)
+
+    return ScoutingReportSchema.model_validate(rep_data)
 
 
 @router.get("/reports/{slug_or_id}/pdf")

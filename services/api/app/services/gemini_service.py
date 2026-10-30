@@ -3,12 +3,27 @@ import sys
 import json
 import time
 import asyncio
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from pydantic import BaseModel, Field
 from ..config import settings
 from ..schemas.scouting import ScoutingReportSchema
 from ..schemas.player import DetectedPlayerSchema
 from ..schemas.sports import get_sport_config
+from ..schemas.volleyball import (
+    VolleyballScoutingReport,
+    VolleyballEvent,
+    VolleyballBiomechanicalMetrics,
+    VolleyballPositionMetrics,
+    VolleyballSkill,
+    VolleyballEvaluation,
+    VolleyballTempo,
+    VolleyballSubZone,
+    VolleyballSpatialCoordinates,
+    calculate_true_attack_efficiency,
+    calculate_pass_expected_sideout,
+    calculate_block_adjusted_efficiency,
+    calculate_composite_rating,
+)
 
 try:
     from google import genai
@@ -69,9 +84,13 @@ class GeminiService:
         language: str = "en",
     ) -> ScoutingReportSchema:
         """
-        Generates a validated ScoutingReportSchema using Gemini with an automatic model fallback cascade.
+        Generates a validated ScoutingReportSchema (or VolleyballScoutingReport) using Gemini
+        with an automatic model fallback cascade.
         """
         sport = get_sport_config(sport_key)
+        is_volleyball = (sport.get("key") == "volleyball") or ("volleyball" in str(sport_key).lower())
+        target_schema = VolleyballScoutingReport if is_volleyball else ScoutingReportSchema
+
         prompt = self._build_scouting_prompt(sport, position, player_context, telemetry, language)
 
         if not self.is_configured():
@@ -90,7 +109,7 @@ class GeminiService:
             for attempt in range(2):
                 try:
                     if self.client:
-                        report_data = await self._call_sdk(model, prompt, frames_base64)
+                        report_data = await self._call_sdk(model, prompt, frames_base64, response_schema=target_schema)
                     else:
                         report_data = await self._call_rest_api(model, prompt, frames_base64)
 
@@ -99,7 +118,7 @@ class GeminiService:
                         report_data = json.loads(report_data)
 
                     report_data["language"] = language
-                    validated = ScoutingReportSchema.model_validate(report_data)
+                    validated = target_schema.model_validate(report_data)
                     validated.isFallback = False
                     validated.generationSource = "gemini_live"
                     validated.modelUsed = model
@@ -335,7 +354,13 @@ class GeminiService:
             raise Exception("Gemini response was empty or blocked by safety filters")
         return PlayerRosterResponse.model_validate_json(response.text)
 
-    async def _call_sdk(self, model: str, prompt: str, frames_base64: Optional[List[str]]) -> Dict[str, Any]:
+    async def _call_sdk(
+        self,
+        model: str,
+        prompt: str,
+        frames_base64: Optional[List[str]],
+        response_schema: Any = None,
+    ) -> Dict[str, Any]:
         parts = []
         if frames_base64:
             for b64 in frames_base64[:8]:  # send up to 8 keyframes
@@ -350,7 +375,7 @@ class GeminiService:
         config = types.GenerateContentConfig(
             temperature=0.1,
             response_mime_type="application/json",
-            response_schema=ScoutingReportSchema,
+            response_schema=response_schema or ScoutingReportSchema,
         )
 
         loop = asyncio.get_event_loop()
@@ -430,6 +455,7 @@ class GeminiService:
         language: str,
     ) -> str:
         sport_name = sport.get("name", "Football")
+        is_volleyball = (sport.get("key") == "volleyball") or ("volleyball" in sport_name.lower())
         metrics = sport.get("metrics", [])
         pos_label = position or sport.get("position", "Athlete")
 
@@ -440,19 +466,48 @@ class GeminiService:
         if language == "ar":
             lang_instruction = "Generate the entire report in high-level professional sports Arabic (العربية الفصحى الرياضية), including tactical profile, strengths, weaknesses, recommended drills, and pro player comparisons."
 
-        return f"""You are a FIFA/Olympic accredited senior sports analyst and technical scout.
+        volleyball_spec = ""
+        schema_target = "ScoutingReport schema"
+        if is_volleyball:
+            schema_target = "VolleyballScoutingReport schema with volleyballMetrics, volleyballEvents, volleyballBiomechanics, and dvwStrings"
+            volleyball_spec = """
+VOLLEYBALL TACTICAL CODING & BIOMECHANICAL SPECIFICATION (DataVolley 4 & FIVB VIS Standard):
+1. Event Stream Grammar (Module B):
+   Construct standard Data Volley 4 syntax for key rally actions:
+   [Team *|a][PlayerNum][Skill S|R|E|A|B|D|F][Tempo Q|T|M|H|O][Evaluation #|+|\!|-|/|=][StartZone 1-9][EndZone 1-9][SubZone A-D]
+   - Tempo: Q (Quick 0.25-0.45s), T (Tense 0.50-0.85s), M (Medium 0.75-0.90s), H (High >0.90s), O (Overpass)
+2. Deterministic 6-Grade Evaluation Rubric (Module C):
+   - Serve (S): # Ace, + Positive (forces out-of-system), ! Medium (setter pulled off net), - Negative (in-system pass), = Service Error
+   - Reception (R): # Perfect pass into Setter Target Box (x:[5.2,6.8m], y:[0.5,1.8m]), + Positive (1.5-3.0m), ! Medium (2.8-4.5m), - Poor (>4.5m), / Overpass across net, = Error
+   - Attack (A): # Kill, + Positive (opponent freeball), ! Rebound/Cover, - Poor (opponent in-system dig), / Stuffed Block, = Error
+   - Block (B): # Stuff kill, + Positive soft block, ! Rebound to opponent, - Deflected out of system, / Net fault, = Tool/Block Out
+   - Dig (D): # Perfect to target box, + Positive front court, ! Playable high ball, - Emergency overpass, = Error
+3. Core Mathematical Indicators (Module D):
+   - True Attack Efficiency: Eff_A = (A# - (A= + A/)) / NA (Benchmark: Elite > 0.35)
+   - Pass Expected Sideout: Pass eSO = (0.70*R# + 0.62*R+ + 0.53*R! + 0.40*R- + 0.18*R/ + 0.00*R=) / NR (Elite benchmark >= 0.61)
+   - Block-Adjusted Hitter Efficiency (BAE) against baseline blockers (0: 0.75, 1: 0.48, 2: 0.26, 3: 0.08)
+   - Composite Player Rating (0-100) using position weights: OH (A:35%, R:30%, D/E:15%, B:10%, S:10%), OPP (A:55%, S:15%, B:15%, D/E:15%), MB (B:50%, A:30%, S:10%, D/E:10%), S (D/E:65%, S:15%, B:15%, A:5%), L (R:55%, D/E:45%)
+4. Biomechanical Pose Kinematics (Module E):
+   - Penultimate Stride Ratio: stride distance / leg length (Optimal: 1.30 - 1.65 with >= 12% COM drop)
+   - Plant Foot Braking Angle: optimal 30° - 45° inward toward setter; flag < 15° as net drift risk
+   - Hitting Arm Draw: abduction 90° - 110°, elbow draw height y >= shoulder y, X-Factor hip-shoulder separation >= 30°
+   - Defensive Split-Step: timing delta within ±33 ms of opponent contact, base of support >= 1.4x shoulder width
+   - Block Penetration: wrist depth >= 15 cm across net plane, forward shoulder-wrist pike >= 15°
+"""
+
+        return f"""You are a FIFA/Olympic/FIVB accredited senior sports analyst and technical scout.
 Sport: {sport_name}
 {target_str}
 {telemetry_str}
 Language Directive: {lang_instruction}
-
+{volleyball_spec}
 Conduct a rigorous, data-driven biomechanical and tactical evaluation.
 Target Metrics to evaluate: {', '.join(metrics)}.
 Overall Score must be an integer from 1 to 100 strictly calibrated to modern professional standards.
 Overall Grade must be one of: "S" (85+), "A" (70-84), "B" (55-69), "C" (40-54), "D" (<40).
 Identify 3-4 distinct observable strengths and 2-3 specific developmental areas.
 Provide 3 tailored coaching drills with explicit duration, targeted metric, and step-by-step instructions.
-Return strictly valid JSON adhering to the ScoutingReport schema."""
+Return strictly valid JSON adhering to the {schema_target}."""
 
     def _build_detection_prompt(self, sport: dict, frame_count: int) -> str:
         sport_name = sport.get("name", "Football")
@@ -494,7 +549,328 @@ Return strictly JSON with the key "players" containing the complete list of play
         player_context: Optional[dict],
         telemetry: Optional[dict],
         language: str,
-    ) -> ScoutingReportSchema:
+    ) -> Union[ScoutingReportSchema, VolleyballScoutingReport]:
+        is_volleyball = (sport.get("key") == "volleyball") or ("volleyball" in str(sport.get("name", "")).lower())
+        if is_volleyball:
+            vb_pos_label = position or (player_context.get("position") if player_context else None) or "Outside Hitter"
+            vb_pos_code = (player_context.get("positionCode") if player_context else None) or "OH"
+            vb_jersey = (player_context.get("jerseyNumber") if player_context else None) or "14"
+
+            vb_metrics_list = [
+                {
+                    "name": "True Attack Efficiency (Eff_A)",
+                    "score": 89,
+                    "note": "0.412 Eff_A against 2-man closed blocks. High wrist snap into deep corner zone 5."
+                    if language != "ar"
+                    else "كفاءة هجومية فعلية 0.412 ضد حائط صد ثنائي مع دوران متقدم للمعصم نحو المنطقة 5.",
+                },
+                {
+                    "name": "Pass Expected Sideout (Pass eSO)",
+                    "score": 86,
+                    "note": "0.685 Pass eSO across 22 receptions. Controlled drop-step platform into Setter Box."
+                    if language != "ar"
+                    else "معدل الحيازة الهجومية المتوقعة 0.685 عبر 22 استقبالاً بدقة منصة موجهة لمنطقة الإعداد.",
+                },
+                {
+                    "name": "Penultimate Stride Dynamics",
+                    "score": 92,
+                    "note": "1.48x leg length stride ratio, delivering rapid horizontal-to-vertical force transfer."
+                    if language != "ar"
+                    else "نسبة خطوة ما قبل الارتقاء 1.48 من طول الساق مع تحويل حركي فائق السرعة من الأفقي للعمودي.",
+                },
+                {
+                    "name": "Plant Foot Braking",
+                    "score": 88,
+                    "note": "38° inward plant braking angle toward setter target box, completely arresting drift."
+                    if language != "ar"
+                    else "زاوية كبح قدم الارتكاز 38 درجة للداخل باتجاه المعد لمنع الانزلاق للأمام نحو الشبكة.",
+                },
+                {
+                    "name": "Arm-Trunk Kinematics",
+                    "score": 90,
+                    "note": "102° arm-trunk abduction with high elbow draw above shoulder plane."
+                    if language != "ar"
+                    else "زاوية إبعاد الذراع عن الجذع 102 درجة مع سحب المرفق أعلى من مستوى الكتف لحماية المفصل.",
+                },
+            ]
+
+            vb_radar = {
+                "attack": 89.0,
+                "pass": 86.0,
+                "block": 78.0,
+                "serve": 84.0,
+                "dig_set": 82.0,
+            }
+
+            vb_events = [
+                VolleyballEvent(
+                    match_id="VNL2025-USA-JPN",
+                    set=1,
+                    rally_id=1,
+                    rotation=1,
+                    dvw_string=f"*{vb_jersey}SM#16C",
+                    player_id=vb_jersey,
+                    skill=VolleyballSkill.SERVE,
+                    tempo=VolleyballTempo.MEDIUM,
+                    evaluation=VolleyballEvaluation.PERFECT,
+                    expected_sideout_value=0.70,
+                    spatial=VolleyballSpatialCoordinates(
+                        start_zone=1,
+                        end_zone=6,
+                        end_subzone=VolleyballSubZone.BACK_LEFT,
+                        start_xy_meters=(8.0, 8.8),
+                        end_xy_meters=(4.5, 7.5),
+                    ),
+                    biomechanics=VolleyballBiomechanicalMetrics(
+                        contact_height_m=3.42,
+                        penultimate_stride_ratio=1.48,
+                        plant_foot_angle_deg=38.5,
+                    ),
+                ),
+                VolleyballEvent(
+                    match_id="VNL2025-USA-JPN",
+                    set=1,
+                    rally_id=2,
+                    rotation=2,
+                    dvw_string="a07RM+16B",
+                    player_id="07",
+                    skill=VolleyballSkill.RECEPTION,
+                    tempo=VolleyballTempo.MEDIUM,
+                    evaluation=VolleyballEvaluation.POSITIVE,
+                    expected_sideout_value=0.62,
+                    spatial=VolleyballSpatialCoordinates(
+                        start_zone=6,
+                        end_zone=2,
+                        end_subzone=VolleyballSubZone.FRONT_RIGHT,
+                        start_xy_meters=(4.5, 7.0),
+                        end_xy_meters=(6.0, 1.2),
+                    ),
+                ),
+                VolleyballEvent(
+                    match_id="VNL2025-USA-JPN",
+                    set=1,
+                    rally_id=2,
+                    rotation=2,
+                    dvw_string=f"*{vb_jersey}AQ#41D~H2",
+                    player_id=vb_jersey,
+                    skill=VolleyballSkill.ATTACK,
+                    tempo=VolleyballTempo.QUICK,
+                    evaluation=VolleyballEvaluation.PERFECT,
+                    expected_sideout_value=0.70,
+                    biomechanics=VolleyballBiomechanicalMetrics(
+                        contact_height_m=3.45,
+                        penultimate_stride_ratio=1.52,
+                        plant_foot_angle_deg=39.0,
+                        hip_shoulder_separation_deg=44.0,
+                        arm_trunk_abduction_deg=104.0,
+                        elbow_above_shoulder=True,
+                    ),
+                ),
+                VolleyballEvent(
+                    match_id="VNL2025-USA-JPN",
+                    set=1,
+                    rally_id=3,
+                    rotation=3,
+                    dvw_string="*11BH#32A",
+                    player_id="11",
+                    skill=VolleyballSkill.BLOCK,
+                    tempo=VolleyballTempo.HIGH,
+                    evaluation=VolleyballEvaluation.PERFECT,
+                    expected_sideout_value=0.70,
+                    biomechanics=VolleyballBiomechanicalMetrics(
+                        block_penetration_cm=18.5,
+                    ),
+                ),
+            ]
+
+            vb_biomech = VolleyballBiomechanicalMetrics(
+                contact_height_m=3.45,
+                penultimate_stride_ratio=1.50,
+                plant_foot_angle_deg=38.5,
+                hip_shoulder_separation_deg=44.0,
+                split_step_timing_delta_ms=18.0,
+                arm_trunk_abduction_deg=104.0,
+                elbow_above_shoulder=True,
+                block_penetration_cm=18.5,
+            )
+
+            vb_pos_metrics = VolleyballPositionMetrics(
+                true_attack_efficiency=0.412,
+                pass_expected_sideout=0.685,
+                block_adjusted_efficiency=0.380,
+                kill_percentage=54.2,
+                ace_percentage=12.5,
+                dig_success_rate=78.0,
+                composite_player_rating=88.5,
+            )
+
+            dvw_strings = [
+                f"*{vb_jersey}SM#16C",
+                "a07RM+16B",
+                f"*{vb_jersey}AQ#41D~H2",
+                "*11BH#32A",
+                "a05DQ=15A",
+            ]
+
+            if language == "ar":
+                return VolleyballScoutingReport(
+                    overallScore=88,
+                    overallGrade="S",
+                    potentialRating=94,
+                    position=vb_pos_label,
+                    positionCode=vb_pos_code,
+                    positionProfile={
+                        "roleName": "ضارب مركز 4 ومستقبل رئيسي (P2 Receiver)",
+                        "roleSuitability": 92,
+                        "tacticalDuty": "المستقبل الرئيسي في تشكيل الـ 3 لاعبين، الهجوم الحاسم من أطراف الشبكة والمنطقة الخلفية Pipe في الكرات غير المنتظمة.",
+                        "keyMetrics": ["True Attack Efficiency", "Pass eSO", "Penultimate Stride", "Plant Braking Angle", "Arm Abduction"],
+                    },
+                    playingTime={
+                        "minutesPlayed": "الأشواط 1-4 (82 دقيقة)",
+                        "percentageOnField": 95,
+                        "pointsScoredOrInvolved": "18 نقطة هجومية، إرسالان ساحقان، 3 حوائط صد (23 نقطة إجمالية)",
+                        "subStatus": "أساسي دائم · ركيزة التدوير P2",
+                        "exchanges": [],
+                        "tacticalImpactSummary": "ثبات ممتاز في خط الاستقبال أمام إرسالات القفز القوية مع تحويل 52% من الكرات العالية الصعبة إلى نقاط مباشرة.",
+                    },
+                    playerSummary="ضارب جناح بمستوى دولي يجمع بين ديناميكية الارتقاء واستقرار منصة الاستقبال",
+                    oneLiner="مهاجم أطراف حاسم بنسبة كفاءة حقيقية عالية (0.412) واستقبال متقن تحت الضغط العالي.",
+                    tags=["مستقبل رئيسي P2", "كفاءة هجومية عالية", "كبح ارتكاز متفوق", "استغلال حائط الصد", "معايير VNL"],
+                    metrics=vb_metrics_list,
+                    radarMetrics=vb_radar,
+                    executiveSummary="تقرير كشفي متقدم لكرة الطائرة متوافق مع كود Data Volley 4 والمعايير الكينماتيكية للاتحاد الدولي FIVB.",
+                    tacticalProfile="التمركز في المنطقة 4 مع هجوم قطري دقيق نحو الزاوية 5 وهجوم سريع من الأنبوب الخلفي في الدوران P2.",
+                    strengths=[
+                        "نسبة خطوة ما قبل الارتقاء 1.48 مع كبح ارتكاز بزاوية 38° يحول الزخم إلى ارتقاء بارتفاع ملامسة 3.42م",
+                        "كفاءة هجومية فعلية 0.412 مع استغلال أطراف حائط الصد الخارجي (Tooling)",
+                        "توجيه منضبط لمنصة الاستقبال نحو صندوق المعد (5.8م، 1.1م من الشبكة) محققاً 0.685 Pass eSO",
+                    ],
+                    weaknesses=[
+                        "تأخر طفيف في التمركز الدفاعي عند التحول السريع للكرات القصيرة خلف حائط الصد في المنطقة 6",
+                        "الحاجة لزيادة اختراق اليدين لحيز الخصم في حائط الصد الجانبي (12 سم حالياً مقابل المستهدف 15 سم)",
+                    ],
+                    recommendedDrills=[
+                        {
+                            "title": "تدريب استقبال الإرسال فائق السرعة داخل صندوق المعد",
+                            "duration": "20 دقيقة يومياً",
+                            "focusMetric": "Pass Expected Sideout (eSO)",
+                            "instructions": "استقبال إرسالات قفز قوية مع ثبات مبكر للمنصة وتوجيه الكرة للمنطقة المحددة [5.2-6.8م، 0.5-1.8م].",
+                        },
+                        {
+                            "title": "تمارين كبح الارتكاز والخطوة قبل الأخيرة (Penultimate Stride)",
+                            "duration": "15 دقيقة، 3 مرات أسبوعياً",
+                            "focusMetric": "Penultimate Stride Ratio",
+                            "instructions": "الانطلاق بخطوة تعادل 1.45 من طول الساق مع تدوير قدم الارتكاز 35° للداخل والارتقاء دون لمس خط المنتصف.",
+                        },
+                        {
+                            "title": "الهجوم على أطراف حائط الصد للكرات العالية (Wipe & Tool)",
+                            "duration": "25 دقيقة مرتين أسبوعياً",
+                            "focusMetric": "True Attack Efficiency (Eff_A)",
+                            "instructions": "ضرب الكرات العالية المعقدة نحو الأطراف الخارجية لحائط الصد باتجاه الهوائي أو خارج الملعب.",
+                        },
+                    ],
+                    narrative="يُظهر هذا الرياضي نضجاً ميكانيكياً حيوياً وانضباطاً تكتيكياً رفيعاً يتطابق مع متطلبات الكرة الطائرة الدولية الحديثة. تتميز خطوات الاقتراب بالانسيابية والتسارع المدروس، مما يتيح له الوصول لأقصى نقطة ملامسة مع الحفاظ على سلامة أوتار الركبة. وفي الاستقبال، يُبدي هدوءاً وثباتاً عالياً في منصة التمرير.",
+                    proComparisons=[
+                        {"name": "Earvin N'Gapeth", "similarity": "88%", "reason": "ذكاء فائق في ضرب أطراف حائط الصد وتغيير سرعة الضربة", "emoji": "🇫🇷"},
+                        {"name": "Wilfredo León", "similarity": "84%", "reason": "قوة انفجارية في خطوة ما قبل الارتقاء وارتفاع ملامسة شاهق فوق الشبكة", "emoji": "🇵🇱"},
+                    ],
+                    comparableProPlayer="Earvin N'Gapeth",
+                    kinematics={
+                        "hangTimeSeconds": 0.74,
+                        "peakVerticalCm": 88,
+                        "takeoffQualityScore": 93,
+                        "landingMechanicsRating": "Optimal",
+                        "groundContactTimeMs": 124,
+                        "keyBiomechanicalNote": "خطوة ارتقاء مثالية (1.48) مع كبح زاوية 38° وهبوط ثنائي متوازن ممتص للصدمات.",
+                    },
+                    telemetry=telemetry or {"topSpeedKmh": 24.2, "distanceCoveredMeters": 3200.0, "sprintCount": 42},
+                    volleyballMetrics=vb_pos_metrics,
+                    volleyballEvents=vb_events,
+                    volleyballBiomechanics=vb_biomech,
+                    dvwStrings=dvw_strings,
+                    language="ar",
+                    verified=True,
+                )
+
+            return VolleyballScoutingReport(
+                overallScore=88,
+                overallGrade="S",
+                potentialRating=94,
+                position=vb_pos_label,
+                positionCode=vb_pos_code,
+                positionProfile={
+                    "roleName": "P2 Primary Passing Outside Hitter",
+                    "roleSuitability": 92,
+                    "tacticalDuty": "Primary receiver in 3-man passing seam (Zones 5/6), terminal out-of-system pipe and high-ball hitter.",
+                    "keyMetrics": ["True Attack Efficiency", "Pass eSO", "Penultimate Stride", "Plant Braking Angle", "Arm Abduction"],
+                },
+                playingTime={
+                    "minutesPlayed": "Sets 1-4 (82 mins)",
+                    "percentageOnField": 95,
+                    "pointsScoredOrInvolved": "18 Kills, 2 Aces, 3 Stuff Blocks (23 Total Pts)",
+                    "subStatus": "Starter · P2 Rotation Anchor",
+                    "exchanges": [],
+                    "tacticalImpactSummary": "Controlled the primary passing seam under aggressive hybrid jump serves; converted 52% of high-ball out-of-system sets.",
+                },
+                playerSummary="World-Class Outside Hitter with Dynamic Penultimate Stride and Elite Pass Platform Stability",
+                oneLiner="High-efficiency terminal wing attacker with disciplined +/# passing reception in high-stress rotations.",
+                tags=["P2 Receiver", "High True Eff_A", "Explosive Plant Braking", "Tooling Specialist", "VNL Caliber"],
+                metrics=vb_metrics_list,
+                radarMetrics=vb_radar,
+                executiveSummary="Forensic volleyball scouting analysis aligned with Data Volley 4 coding and FIVB kinematic standards. Displays elite ceiling for top professional leagues (VNL / SuperLega).",
+                tacticalProfile="Operates primarily from Zone 4 with high-seam attack tendencies into Zone 5 deep corners. Excellent platform angle deflection on 115+ km/h jump serves.",
+                strengths=[
+                    "Penultimate stride ratio of 1.48x with 38° inward plant foot braking, converting horizontal momentum to 3.42m contact height",
+                    "High-efficiency attack out of system (0.412 Eff_A) with deliberate block tooling off outside blocker hands",
+                    "Calibrated platform presentation into Setter Target Box (x: 5.8m, y: 1.1m from net), yielding 0.685 Pass eSO",
+                ],
+                weaknesses=[
+                    "Occasional late transition on quick middle back-row sets when caught deep in Zone 6",
+                    "Needs more aggressive hand penetration across the net on middle slide closeouts (currently 12cm penetration vs 15cm target)",
+                ],
+                recommendedDrills=[
+                    {
+                        "title": "Target Box Pass Precision Under Velocity",
+                        "duration": "20 mins daily",
+                        "focusMetric": "Pass Expected Sideout (eSO)",
+                        "instructions": "Receive high-velocity jump serves targeted at seams; maintain early platform lock angling ball into Setter Target Box [5.2-6.8m, 0.5-1.8m].",
+                    },
+                    {
+                        "title": "Penultimate Stride & Plant Braking Drill",
+                        "duration": "15 mins 3x/week",
+                        "focusMetric": "Penultimate Stride Ratio",
+                        "instructions": "Approach marks with 1.45x leg length stride and 35° inward foot turn; jump without forward net contact or center-line fault.",
+                    },
+                    {
+                        "title": "High-Ball Wipe & Block Tooling Progression",
+                        "duration": "25 mins 2x/week",
+                        "focusMetric": "True Attack Efficiency (Eff_A)",
+                        "instructions": "Attack tight out-of-system balls against two tall blockers by aiming at pinky/outer hand edges into referee stand or antennas.",
+                    },
+                ],
+                narrative="Athlete demonstrates elite biomechanical efficiency and modern tactical awareness required for international volleyball competition. Their penultimate stride and plant foot braking mechanics maximize vertical kinetic conversion while protecting the patellar tendon. In reception, their early platform alignment and consistent midline tracking maintain in-system offensive options even under heavy service pressure.",
+                proComparisons=[
+                    {"name": "Earvin N'Gapeth", "similarity": "88%", "reason": "Exceptional wrist control, deceptive block wipe techniques, and high-IQ ball placement", "emoji": "🇫🇷"},
+                    {"name": "Wilfredo León", "similarity": "84%", "reason": "Explosive penultimate stride power and high vertical contact point above the tape", "emoji": "🇵🇱"},
+                ],
+                comparableProPlayer="Earvin N'Gapeth",
+                kinematics={
+                    "hangTimeSeconds": 0.74,
+                    "peakVerticalCm": 88,
+                    "takeoffQualityScore": 93,
+                    "landingMechanicsRating": "Optimal",
+                    "groundContactTimeMs": 124,
+                    "keyBiomechanicalNote": "Elite penultimate stride ratio (1.48) with 38° inward plant foot braking and bilateral balanced landing.",
+                },
+                telemetry=telemetry or {"topSpeedKmh": 24.2, "distanceCoveredMeters": 3200.0, "sprintCount": 42},
+                volleyballMetrics=vb_pos_metrics,
+                volleyballEvents=vb_events,
+                volleyballBiomechanics=vb_biomech,
+                dvwStrings=dvw_strings,
+                language="en",
+                verified=True,
+            )
+
         pos_label = position or (player_context.get("position") if player_context else None) or "Central Midfielder"
         pos_code = player_context.get("positionCode") if player_context else "CM"
 
@@ -671,6 +1047,277 @@ Return strictly JSON with the key "players" containing the complete list of play
         )
 
     def _generate_mock_players(self, sport: dict) -> List[DetectedPlayerSchema]:
+        is_volleyball = (sport.get("key") == "volleyball") or ("volleyball" in str(sport.get("name", "")).lower())
+        if is_volleyball:
+            return [
+                DetectedPlayerSchema(
+                    id="P1",
+                    trackId=1,
+                    label="#9 Blue (Outside Hitter)",
+                    jerseyNumber="9",
+                    team="Team A (Near)",
+                    teamColorHex="#2563eb",
+                    position="Outside Hitter",
+                    positionCode="OH",
+                    roleCategory="Attacker",
+                    confidence=96,
+                    description="Near court left-side primary passer and wing hitter operating in Zone 4",
+                    standoutTrait="Explosive penultimate stride and high-seam attack",
+                    emoji="🏐",
+                    playingTime="Sets 1-4 (Active 96%)",
+                    pointsOrScore="18 Kills / 2 Aces",
+                    subStatus="Starter / On Court",
+                    boundingBox={"x": 0.22, "y": 0.58, "w": 0.11, "h": 0.36},
+                ),
+                DetectedPlayerSchema(
+                    id="P2",
+                    trackId=2,
+                    label="#12 Blue (Middle Blocker)",
+                    jerseyNumber="12",
+                    team="Team A (Near)",
+                    teamColorHex="#2563eb",
+                    position="Middle Blocker",
+                    positionCode="MB",
+                    roleCategory="Specialist",
+                    confidence=94,
+                    description="Near court central zone 3 blocker, running quick 1-balls (Q tempo)",
+                    standoutTrait="Penetrating hand depth across net and quick transition",
+                    emoji="🧱",
+                    playingTime="Front Row Rotations",
+                    pointsOrScore="5 Stuff Blocks / 8 Kills",
+                    subStatus="Starter / On Court",
+                    boundingBox={"x": 0.46, "y": 0.52, "w": 0.12, "h": 0.40},
+                ),
+                DetectedPlayerSchema(
+                    id="P3",
+                    trackId=3,
+                    label="#1 Blue (Setter)",
+                    jerseyNumber="1",
+                    team="Team A (Near)",
+                    teamColorHex="#2563eb",
+                    position="Setter",
+                    positionCode="S",
+                    roleCategory="Specialist",
+                    confidence=95,
+                    description="Near court floor general orchestrating tempo from Zone 2 target box",
+                    standoutTrait="Neutral hand positioning disguising back-row sets",
+                    emoji="🎯",
+                    playingTime="All Rotations (100%)",
+                    pointsOrScore="48 Assists / 2 Dumps",
+                    subStatus="Starter / On Court",
+                    boundingBox={"x": 0.62, "y": 0.50, "w": 0.10, "h": 0.35},
+                ),
+                DetectedPlayerSchema(
+                    id="P4",
+                    trackId=4,
+                    label="#18 Blue (Opposite)",
+                    jerseyNumber="18",
+                    team="Team A (Near)",
+                    teamColorHex="#2563eb",
+                    position="Opposite",
+                    positionCode="OPP",
+                    roleCategory="Attacker",
+                    confidence=93,
+                    description="Heavy wing attacker operating out of Zone 2 and back-row Zone 1",
+                    standoutTrait="Powerful line attack with high contact point",
+                    emoji="💥",
+                    playingTime="All Rotations (92%)",
+                    pointsOrScore="22 Kills / 3 Aces",
+                    subStatus="Starter / On Court",
+                    boundingBox={"x": 0.76, "y": 0.56, "w": 0.11, "h": 0.37},
+                ),
+                DetectedPlayerSchema(
+                    id="P5",
+                    trackId=5,
+                    label="#4 Blue (Outside Hitter)",
+                    jerseyNumber="4",
+                    team="Team A (Near)",
+                    teamColorHex="#2563eb",
+                    position="Outside Hitter",
+                    positionCode="OH",
+                    roleCategory="Attacker",
+                    confidence=91,
+                    description="Near court secondary receiver, disciplined in Zone 6 defensive coverage",
+                    standoutTrait="Consistent platform angle on sharp angle hits",
+                    emoji="🛡️",
+                    playingTime="Sets 1-4 (88%)",
+                    pointsOrScore="11 Kills / 14 Digs",
+                    subStatus="Starter / On Court",
+                    boundingBox={"x": 0.38, "y": 0.68, "w": 0.10, "h": 0.34},
+                ),
+                DetectedPlayerSchema(
+                    id="P6",
+                    trackId=6,
+                    label="#10 Yellow (Libero)",
+                    jerseyNumber="10",
+                    team="Team A (Near)",
+                    teamColorHex="#eab308",
+                    position="Libero",
+                    positionCode="L",
+                    roleCategory="Specialist",
+                    confidence=97,
+                    description="Near court defensive anchor in contrasting yellow kit, controlling seam receptions",
+                    standoutTrait="Split-step anticipation and pancake recovery",
+                    emoji="⚡",
+                    playingTime="Back Row Rotations",
+                    pointsOrScore="19 Perfect Passes / 16 Digs",
+                    subStatus="Starter / On Court",
+                    boundingBox={"x": 0.52, "y": 0.72, "w": 0.09, "h": 0.32},
+                ),
+                DetectedPlayerSchema(
+                    id="P7",
+                    trackId=7,
+                    label="#7 Red (Outside Hitter)",
+                    jerseyNumber="7",
+                    team="Team B (Far)",
+                    teamColorHex="#dc2626",
+                    position="Outside Hitter",
+                    positionCode="OH",
+                    roleCategory="Attacker",
+                    confidence=90,
+                    description="Far court left-side primary attacker across the net in Zone 4",
+                    standoutTrait="Sharp cross-court cut shots past the block",
+                    emoji="🏐",
+                    playingTime="Sets 1-4 (94%)",
+                    pointsOrScore="16 Kills / 1 Ace",
+                    subStatus="Starter / On Court",
+                    boundingBox={"x": 0.74, "y": 0.28, "w": 0.08, "h": 0.26},
+                ),
+                DetectedPlayerSchema(
+                    id="P8",
+                    trackId=8,
+                    label="#11 Red (Middle Blocker)",
+                    jerseyNumber="11",
+                    team="Team B (Far)",
+                    teamColorHex="#dc2626",
+                    position="Middle Blocker",
+                    positionCode="MB",
+                    roleCategory="Specialist",
+                    confidence=89,
+                    description="Far court center net defender, timing block commits against quick attacks",
+                    standoutTrait="Lateral swing block closing speed",
+                    emoji="🧱",
+                    playingTime="Front Row Rotations",
+                    pointsOrScore="4 Stuff Blocks",
+                    subStatus="Starter / On Court",
+                    boundingBox={"x": 0.50, "y": 0.25, "w": 0.09, "h": 0.28},
+                ),
+                DetectedPlayerSchema(
+                    id="P9",
+                    trackId=9,
+                    label="#5 Red (Setter)",
+                    jerseyNumber="5",
+                    team="Team B (Far)",
+                    teamColorHex="#dc2626",
+                    position="Setter",
+                    positionCode="S",
+                    roleCategory="Specialist",
+                    confidence=91,
+                    description="Far court setter running high-tempo pipe offense",
+                    standoutTrait="Accurate jump setting from off the net",
+                    emoji="🎯",
+                    playingTime="All Rotations (100%)",
+                    pointsOrScore="42 Assists",
+                    subStatus="Starter / On Court",
+                    boundingBox={"x": 0.36, "y": 0.24, "w": 0.08, "h": 0.25},
+                ),
+                DetectedPlayerSchema(
+                    id="P10",
+                    trackId=10,
+                    label="#14 Red (Opposite)",
+                    jerseyNumber="14",
+                    team="Team B (Far)",
+                    teamColorHex="#dc2626",
+                    position="Opposite",
+                    positionCode="OPP",
+                    roleCategory="Attacker",
+                    confidence=92,
+                    description="Far court primary scorer attacking from Zone 2 and back-row",
+                    standoutTrait="Heavy jump serve touching 118 km/h",
+                    emoji="💥",
+                    playingTime="All Rotations (95%)",
+                    pointsOrScore="20 Kills / 4 Aces",
+                    subStatus="Starter / On Court",
+                    boundingBox={"x": 0.20, "y": 0.29, "w": 0.08, "h": 0.26},
+                ),
+                DetectedPlayerSchema(
+                    id="P11",
+                    trackId=11,
+                    label="#3 Red (Outside Hitter)",
+                    jerseyNumber="3",
+                    team="Team B (Far)",
+                    teamColorHex="#dc2626",
+                    position="Outside Hitter",
+                    positionCode="OH",
+                    roleCategory="Attacker",
+                    confidence=88,
+                    description="Far court passing outside hitter in Zone 5/6",
+                    standoutTrait="Deep corner float serve targeting seams",
+                    emoji="🏐",
+                    playingTime="Sets 1-4 (86%)",
+                    pointsOrScore="9 Kills / 2 Aces",
+                    subStatus="Starter / On Court",
+                    boundingBox={"x": 0.60, "y": 0.18, "w": 0.07, "h": 0.24},
+                ),
+                DetectedPlayerSchema(
+                    id="P12",
+                    trackId=12,
+                    label="#2 White (Libero)",
+                    jerseyNumber="2",
+                    team="Team B (Far)",
+                    teamColorHex="#f8fafc",
+                    position="Libero",
+                    positionCode="L",
+                    roleCategory="Specialist",
+                    confidence=93,
+                    description="Far court defensive libero in contrasting white kit",
+                    standoutTrait="Platform rebound control on hard-driven spikes",
+                    emoji="⚡",
+                    playingTime="Back Row Rotations",
+                    pointsOrScore="15 Digs / 12 Passes",
+                    subStatus="Starter / On Court",
+                    boundingBox={"x": 0.44, "y": 0.16, "w": 0.07, "h": 0.23},
+                ),
+                DetectedPlayerSchema(
+                    id="P13",
+                    trackId=13,
+                    label="#8 Blue (Serving Sub)",
+                    jerseyNumber="8",
+                    team="Team A (Near)",
+                    teamColorHex="#2563eb",
+                    position="Defensive Specialist",
+                    positionCode="DS",
+                    roleCategory="Specialist",
+                    confidence=87,
+                    description="Near court tactical serving substitute brought on late in Sets 2 & 4",
+                    standoutTrait="Aggressive tactical float serve forcing out-of-system passes",
+                    emoji="🎯",
+                    playingTime="Late Set Substitutions",
+                    pointsOrScore="1 Ace / 4 Pressure Serves",
+                    subStatus="Substitute / Rotational",
+                    boundingBox={"x": 0.88, "y": 0.70, "w": 0.09, "h": 0.33},
+                ),
+                DetectedPlayerSchema(
+                    id="P14",
+                    trackId=14,
+                    label="#16 Red (Back-Row Sub)",
+                    jerseyNumber="16",
+                    team="Team B (Far)",
+                    teamColorHex="#dc2626",
+                    position="Defensive Specialist",
+                    positionCode="DS",
+                    roleCategory="Specialist",
+                    confidence=86,
+                    description="Far court back-row defensive specialist substituting for MB in Zone 1",
+                    standoutTrait="Low posture digging on tip coverage",
+                    emoji="🛡️",
+                    playingTime="Late Set Substitutions",
+                    pointsOrScore="5 Digs",
+                    subStatus="Substitute / Rotational",
+                    boundingBox={"x": 0.12, "y": 0.20, "w": 0.07, "h": 0.23},
+                ),
+            ]
+
         return [
             DetectedPlayerSchema(
                 id="P1",

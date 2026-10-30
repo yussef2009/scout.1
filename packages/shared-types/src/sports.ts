@@ -17,6 +17,7 @@ export interface SportPosition {
   category: string;
   primaryMetrics: string[];
   tacticalNotes: string;
+  weights?: Record<string, number>;
 }
 
 export interface SportConfig {

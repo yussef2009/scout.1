@@ -1,6 +1,7 @@
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 from pydantic import BaseModel, Field
 from .scouting import ScoutingReportSchema
+from .volleyball import VolleyballScoutingReport
 from .player import DetectedPlayerSchema, PlayerTelemetrySchema
 
 
@@ -31,7 +32,7 @@ class GenerateAnalysisRequest(BaseModel):
 
 
 class GenerateAnalysisResponse(BaseModel):
-    report: ScoutingReportSchema
+    report: Union[VolleyballScoutingReport, ScoutingReportSchema]
     reportId: str
     shareableSlug: str
     shareableUrl: str
