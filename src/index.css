@@ -9211,6 +9211,78 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
   border-color: rgba(56, 189, 248, 0.3) !important;
 }
 
+/* Nano Banana High-Contrast Flagship Theme */
+.official-report-sheet.sheet-theme-nano-banana {
+  background: #08090C !important;
+  border: 1px solid rgba(255, 225, 0, 0.28) !important;
+  box-shadow: 0 0 45px -5px rgba(255, 225, 0, 0.22), 0 20px 60px rgba(0, 0, 0, 0.8) !important;
+  color: #f1f5f9 !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-top-header {
+  border-bottom: 2px solid #FFE100 !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-lab-title strong {
+  color: #FFE100 !important;
+  text-shadow: 0 0 16px rgba(255, 225, 0, 0.35) !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-lab-title span {
+  color: #F59E0B !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-athlete-card,
+.official-report-sheet.sheet-theme-nano-banana .sheet-specs-strip,
+.official-report-sheet.sheet-theme-nano-banana .sheet-metric-card,
+.official-report-sheet.sheet-theme-nano-banana .sheet-col-box,
+.official-report-sheet.sheet-theme-nano-banana .sheet-narrative-card {
+  background: rgba(16, 20, 30, 0.82) !important;
+  border-color: rgba(255, 225, 0, 0.18) !important;
+  backdrop-filter: blur(14px) !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-athlete-card:hover,
+.official-report-sheet.sheet-theme-nano-banana .sheet-metric-card:hover {
+  border-color: rgba(255, 225, 0, 0.45) !important;
+  box-shadow: 0 8px 25px -5px rgba(255, 225, 0, 0.16) !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-athlete-name {
+  background: linear-gradient(135deg, #FFE100 0%, #F59E0B 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .stamp-verified-label {
+  background: rgba(255, 225, 0, 0.15) !important;
+  border: 1px solid rgba(255, 225, 0, 0.4) !important;
+  color: #FFE100 !important;
+  box-shadow: 0 0 14px rgba(255, 225, 0, 0.25) !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-kicker {
+  color: #FFE100 !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-metric-val {
+  color: #FFE100 !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-metric-bar div {
+  background: linear-gradient(90deg, #FFE100 0%, #F59E0B 100%) !important;
+  box-shadow: 0 0 10px rgba(255, 225, 0, 0.4) !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-score-label strong {
+  color: #FFE100 !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-section-title {
+  color: #FFE100 !important;
+}
+
+
 /* ==========================================================================
    THEME SYNCHRONIZATION & HIGH-CONTRAST ENGINE
    Fixes visibility issues across Light, Midnight, OLED, and Cyber themes

@@ -182,10 +182,26 @@ def get_report(slug_or_id: str, db: Session = Depends(get_db)):
 @router.get("/reports/{slug_or_id}/pdf")
 def export_report_pdf(slug_or_id: str, db: Session = Depends(get_db)):
     """
-    Generates and downloads a branded scouting dossier PDF.
+    Generates and downloads a branded scouting dossier PDF in the Nano Banana multi-sport style.
     """
+    db_report = (
+        db.query(ScoutingReport)
+        .filter((ScoutingReport.slug == slug_or_id) | (ScoutingReport.id == slug_or_id))
+        .first()
+    )
+    if not db_report:
+        raise HTTPException(status_code=404, detail="Scouting report not found")
+
     report_schema = get_report(slug_or_id, db)
-    pdf_bytes = pdf_service.generate_scouting_pdf(report_schema, player_name=report_schema.playerSummary[:30])
+    player_name = (
+        f"{db_report.player.first_name} {db_report.player.last_name}".strip()
+        if db_report.player and (db_report.player.first_name or db_report.player.last_name)
+        else (report_schema.playerSummary[:30] if report_schema.playerSummary else "Athlete")
+    )
+    sport_name = (db_report.sport or "Soccer").capitalize()
+    pdf_bytes = pdf_service.generate_scouting_pdf(
+        report_schema, player_name=player_name, sport=sport_name
+    )
 
     return Response(
         content=pdf_bytes,

@@ -31,3 +31,7 @@ class Player(Base):
     # Relationships
     organization = relationship("Organization", back_populates="players")
     scouting_reports = relationship("ScoutingReport", back_populates="player", cascade="all, delete-orphan", passive_deletes=True)
+
+    @property
+    def name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip()

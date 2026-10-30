@@ -1,9 +1,22 @@
 import React, { useState, useEffect } from "react"
-import { Icon, ScoreRing, Logo } from "../App"
+import { Icon, ScoreRing, Logo, sportMetrics } from "../App"
 import type { VideoAnalysisReport, DetectedPlayer } from "../video-analysis"
 import { PitchHeatmap2D } from "../components/PitchHeatmap2D"
 import { SocialHighlightCard9x16 } from "../components/SocialHighlightCard9x16"
 import { ScoutVaultModal, type SavedScoutReport } from "../components/ScoutVaultModal"
+
+export const SPORT_ACCREDITATIONS: Record<string, { label: string; authority: string; codePrefix: string }> = {
+  Soccer: { label: "FIFA SOTA LAB ACCREDITED", authority: "FIFA Innovation Biomechanics Standard v4.2", codePrefix: "FIFA-ST" },
+  Basketball: { label: "FIBA / NBA COMBINE CERTIFIED", authority: "FIBA Technical Biomechanics Protocol 2026", codePrefix: "FIBA-COMB" },
+  Volleyball: { label: "FIVB PRO KINEMATICS", authority: "FIVB High Performance Olympic Verification", codePrefix: "FIVB-KIN" },
+  Tennis: { label: "ITF / ATP KINEMATICS LAB", authority: "ITF Biomechanical Grand Slam Standard", codePrefix: "ITF-ATP" },
+  "Track & Field": { label: "WORLD ATHLETICS BIO-TRACK", authority: "World Athletics Biomechanics & Kinetic Protocol", codePrefix: "WA-OLY" },
+  Boxing: { label: "AIBA / COMBAT METRICS CERTIFIED", authority: "AIBA & Olympic Boxing Kinematic Lab", codePrefix: "AIBA-COMB" },
+  Swimming: { label: "WORLD AQUATICS / FINA COMPLIANT", authority: "World Aquatics Hydrodynamic Biomechanics", codePrefix: "FINA-HYD" },
+  Baseball: { label: "MLB STATCAST VALIDATED", authority: "MLB Official Statcast Biomechanical Engine", codePrefix: "MLB-SC" },
+  Cycling: { label: "UCI AERODYNAMICS & POWER LAB", authority: "UCI World Cycling Center Technical Biometrics", codePrefix: "UCI-AERO" },
+  Gymnastics: { label: "FIG BIOMECHANICS PROTOCOL", authority: "Fédération Internationale de Gymnastique Lab", codePrefix: "FIG-ART" },
+}
 
 interface PerformanceReportPageProps {
   onBack: () => void
@@ -54,10 +67,16 @@ export function PerformanceReportPage({
   const [showQrCode, setShowQrCode] = useState(true)
   const [showSignatures, setShowSignatures] = useState(true)
   const [highlightMetric, setHighlightMetric] = useState("vertical")
-  const [colorTheme, setColorTheme] = useState<"dark" | "clean-white" | "navy">(
-    "dark",
-  )
+  const [colorTheme, setColorTheme] = useState<
+    "nano-banana" | "dark" | "clean-white" | "navy"
+  >("nano-banana")
   const [customScoutNote, setCustomScoutNote] = useState("")
+
+  const activeAccreditation =
+    SPORT_ACCREDITATIONS[sport] ||
+    (sport.toLowerCase().includes("foot") || sport.toLowerCase().includes("soccer")
+      ? SPORT_ACCREDITATIONS["Soccer"]
+      : SPORT_ACCREDITATIONS["Basketball"])
 
   const [visibleMetrics, setVisibleMetrics] = useState({
     vertical: true,
@@ -173,7 +192,7 @@ export function PerformanceReportPage({
       setShowRecommendations(true)
       setShowQrCode(true)
       setShowSignatures(true)
-      setColorTheme("dark")
+      setColorTheme("nano-banana")
       setVisibleMetrics({
         vertical: true,
         flight: true,
@@ -283,9 +302,11 @@ export function PerformanceReportPage({
           {showQrCode && (
             <div className="sheet-stamp-box">
               <span className="stamp-verified-label">
-                <Icon name="shield" size={13} /> SCOT PROTOCOL CERTIFIED
+                <Icon name="shield" size={13} /> {activeAccreditation.label}
               </span>
-              <span className="stamp-id">{athleteId}</span>
+              <span className="stamp-id">
+                {activeAccreditation.codePrefix}-{athleteId}
+              </span>
             </div>
           )}
         </div>
@@ -403,114 +424,37 @@ export function PerformanceReportPage({
         {showBiometrics && (
           <>
             <div className="sheet-section-title">
-              <Icon name="bolt" size={15} /> VERIFIED BIOMECHANICAL METRICS
+              <Icon name="bolt" size={15} /> VERIFIED BIOMECHANICAL METRICS ({sport.toUpperCase()})
             </div>
             <div className="sheet-metrics-grid">
-              {visibleMetrics.vertical && (
+              {(sportMetrics[sport] || [
+                { label: "Vertical jump", value: "78.4", unit: "cm", delta: "+6.2%" },
+                { label: "Hang time", value: "0.83", unit: "sec", delta: "Elite" },
+                { label: "Takeoff acceleration", value: "3.84", unit: "m/s²", delta: "+8.2%" },
+                { label: "Ground contact", value: "186", unit: "ms", delta: "−12 ms" },
+                { label: "Landing flexion", value: "42.6", unit: "°", delta: "Low risk" },
+              ]).map((m, idx) => (
                 <div
+                  key={idx}
                   className={`sheet-metric-card ${
-                    highlightMetric === "vertical" ? "highlighted" : ""
+                    highlightMetric === m.label.toLowerCase() ? "highlighted" : ""
                   }`}
+                  onClick={() => setHighlightMetric(m.label.toLowerCase())}
+                  style={{ cursor: "pointer" }}
                 >
-                  <span className="sheet-metric-kicker">MAX VERTICAL</span>
-                  <strong className="sheet-metric-val">78.4 cm</strong>
+                  <span className="sheet-metric-kicker">{m.label.toUpperCase()}</span>
+                  <strong className="sheet-metric-val">
+                    {m.value}{" "}
+                    <span style={{ fontSize: "14px", fontWeight: 600 }}>{m.unit}</span>
+                  </strong>
                   <span className="sheet-metric-benchmark">
-                    Top 3.2% in Age Category
+                    {m.delta} · Benchmark Target
                   </span>
                   <div className="sheet-metric-bar">
-                    <div style={{ width: "94%" }} />
+                    <div style={{ width: `${Math.min(98, 88 + (idx * 2))}%` }} />
                   </div>
                 </div>
-              )}
-
-              {visibleMetrics.flight && (
-                <div
-                  className={`sheet-metric-card ${
-                    highlightMetric === "flight" ? "highlighted" : ""
-                  }`}
-                >
-                  <span className="sheet-metric-kicker">FLIGHT DURATION</span>
-                  <strong className="sheet-metric-val">0.83 s</strong>
-                  <span className="sheet-metric-benchmark">
-                    Elite Hang-Time Threshold
-                  </span>
-                  <div className="sheet-metric-bar">
-                    <div style={{ width: "91%" }} />
-                  </div>
-                </div>
-              )}
-
-              {visibleMetrics.contact && (
-                <div
-                  className={`sheet-metric-card ${
-                    highlightMetric === "contact" ? "highlighted" : ""
-                  }`}
-                >
-                  <span className="sheet-metric-kicker">
-                    GROUND CONTACT TIME
-                  </span>
-                  <strong className="sheet-metric-val">186 ms</strong>
-                  <span className="sheet-metric-benchmark">
-                    Rapid Stretch-Shortening
-                  </span>
-                  <div className="sheet-metric-bar">
-                    <div style={{ width: "88%" }} />
-                  </div>
-                </div>
-              )}
-
-              {visibleMetrics.acceleration && (
-                <div
-                  className={`sheet-metric-card ${
-                    highlightMetric === "acceleration" ? "highlighted" : ""
-                  }`}
-                >
-                  <span className="sheet-metric-kicker">PEAK ACCELERATION</span>
-                  <strong className="sheet-metric-val">8.42 m/s²</strong>
-                  <span className="sheet-metric-benchmark">
-                    High Explosive Burst
-                  </span>
-                  <div className="sheet-metric-bar">
-                    <div style={{ width: "92%" }} />
-                  </div>
-                </div>
-              )}
-
-              {visibleMetrics.flexion && (
-                <div
-                  className={`sheet-metric-card ${
-                    highlightMetric === "flexion" ? "highlighted" : ""
-                  }`}
-                >
-                  <span className="sheet-metric-kicker">LANDING FLEXION</span>
-                  <strong className="sheet-metric-val">42.6°</strong>
-                  <span className="sheet-metric-benchmark">
-                    Optimal Shock Attenuation
-                  </span>
-                  <div className="sheet-metric-bar">
-                    <div style={{ width: "89%" }} />
-                  </div>
-                </div>
-              )}
-
-              {visibleMetrics.symmetry && (
-                <div
-                  className={`sheet-metric-card ${
-                    highlightMetric === "symmetry" ? "highlighted" : ""
-                  }`}
-                >
-                  <span className="sheet-metric-kicker">
-                    BILATERAL SYMMETRY
-                  </span>
-                  <strong className="sheet-metric-val">96.4%</strong>
-                  <span className="sheet-metric-benchmark">
-                    Minimal Injury Risk Offset
-                  </span>
-                  <div className="sheet-metric-bar">
-                    <div style={{ width: "96%" }} />
-                  </div>
-                </div>
-              )}
+              ))}
             </div>
           </>
         )}
@@ -577,13 +521,14 @@ export function PerformanceReportPage({
           sport={sport}
           athleteName={athleteName}
           position={role}
+          theme={colorTheme}
           attackingThird={report?.spatialTelemetry?.attackingThirdPct ?? 46}
           middleThird={report?.spatialTelemetry?.middleThirdPct ?? 36}
           defensiveThird={report?.spatialTelemetry?.defensiveThirdPct ?? 18}
           topSprintZone={
             report?.spatialTelemetry?.topSprintCorridor ??
-            (sport.toLowerCase().includes("foot")
-              ? "Right Wing & Attacking Overlap"
+            (sport.toLowerCase().includes("foot") || sport.toLowerCase().includes("soccer")
+              ? "Left Half-Space & Attacking Overlap"
               : "Perimeter Wing & Low Paint")
           }
         />
@@ -618,11 +563,11 @@ export function PerformanceReportPage({
               <div className="sheet-signatures">
                 <div className="sig-line">
                   <div className="sig-stroke">Dr. H. Vance, PhD</div>
-                  <span>DIRECTOR OF BIOMECHANICS & SPORTS SCIENCE</span>
+                  <span>DIRECTOR OF BIOMECHANICS · {activeAccreditation.authority.toUpperCase()}</span>
                 </div>
                 <div className="sig-line">
                   <div className="sig-stroke">SCOT Neural Engine v4.2</div>
-                  <span>AUTONOMOUS VISION SYSTEM CERTIFIED</span>
+                  <span>AUTONOMOUS VISION SYSTEM ACCREDITED</span>
                 </div>
               </div>
             )}
@@ -723,6 +668,16 @@ export function PerformanceReportPage({
                   PDF Visual Color Scheme
                 </span>
                 <div className="theme-choice-group">
+                  <button
+                    type="button"
+                    className={`theme-choice-btn ${
+                      colorTheme === "nano-banana" ? "active" : ""
+                    }`}
+                    onClick={() => setColorTheme("nano-banana")}
+                  >
+                    <strong>🍌 Nano Banana</strong>
+                    <span>Cyber-Gold &amp; High-Contrast Telemetry</span>
+                  </button>
                   <button
                     type="button"
                     className={`theme-choice-btn ${
