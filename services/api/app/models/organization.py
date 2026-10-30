@@ -1,8 +1,12 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, DateTime
 from sqlalchemy.orm import relationship
 from .database import Base
+
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 
 class Organization(Base):
@@ -27,12 +31,16 @@ class Organization(Base):
     paymob_customer_id = Column(String(100), nullable=True, index=True)
     paymob_order_id = Column(String(100), nullable=True)
 
-    # Billing Period Dates
-    current_period_start = Column(DateTime, nullable=True)
-    current_period_end = Column(DateTime, nullable=True)
+    # Billing Period Dates (Timezone-aware UTC)
+    current_period_start = Column(DateTime(timezone=True), nullable=True)
+    current_period_end = Column(DateTime(timezone=True), nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now, index=True)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
-    # Relationship to monthly usage meters
+    # Relationships with explicit cascading actions
+    users = relationship("User", back_populates="organization", cascade="all, delete-orphan")
+    players = relationship("Player", back_populates="organization", cascade="all, delete-orphan")
+    match_videos = relationship("MatchVideo", back_populates="organization", cascade="all, delete-orphan")
+    scouting_reports = relationship("ScoutingReport", back_populates="organization", cascade="all, delete-orphan")
     usage_meters = relationship("UsageMeter", back_populates="organization", cascade="all, delete-orphan")

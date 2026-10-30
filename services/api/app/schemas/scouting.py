@@ -57,6 +57,9 @@ class PlayingTimeAnalysis(BaseModel):
 
 
 class ScoutingReportSchema(BaseModel):
+    id: Optional[str] = Field(default=None, description="Report unique identifier")
+    slug: Optional[str] = Field(default=None, description="Shareable URL slug")
+    createdAt: Optional[str] = Field(default=None, description="Creation timestamp ISO")
     overallScore: int = Field(..., ge=0, le=100, description="Composite scouting score from 0 to 100")
     overallGrade: Literal["S", "A", "B", "C", "D"] = Field(..., description="Letter tier grade")
     potentialRating: Optional[int] = Field(default=85, ge=0, le=100, description="Projected developmental ceiling 0-100")

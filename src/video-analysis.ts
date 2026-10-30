@@ -4,14 +4,15 @@ export type DetectedPlayer = {
   id: string;
   label: string;
   jerseyNumber: string;
-  position: string;
-  team: string;
+  position?: string;
+  team?: string;
   confidence: number;
-  description: string;
-  standoutTrait: string;
+  description?: string;
+  standoutTrait?: string;
   cropFrame?: string;
   teamColorHex?: string;
   bbox?: [number, number, number, number];
+  role?: string;
 };
 
 export type AnalysisMetric = { name: string; score: number; note: string };
@@ -43,6 +44,7 @@ export type VideoAnalysisReport = {
     middleThirdPct: number;
     defensiveThirdPct: number;
     topSprintZone: string;
+    topSprintCorridor?: string;
   };
 };
 
@@ -589,7 +591,7 @@ If NO athlete can be reliably identified with confidence >= 40, return: {"player
   for (const player of normalized) {
     const duplicate = distinct.find((candidate) =>
       player.label.trim().toLowerCase() === candidate.label.trim().toLowerCase()
-      || (player.jerseyNumber && player.team && player.jerseyNumber === candidate.jerseyNumber
+      || (player.jerseyNumber && player.team && candidate.team && player.jerseyNumber === candidate.jerseyNumber
         && player.team.trim().toLowerCase() === candidate.team.trim().toLowerCase()),
     );
     if (!duplicate) distinct.push(player);

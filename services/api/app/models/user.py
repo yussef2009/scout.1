@@ -1,7 +1,12 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from .database import Base
+
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 
 class User(Base):
@@ -12,7 +17,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(100), nullable=False)
     role = Column(String(50), default="scout")  # scout, coach, analyst, admin
-    org_id = Column(String(36), ForeignKey("organizations.id"), nullable=True)
+    org_id = Column(String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
 
     # Subscription and Payment fields
     subscription_tier = Column(String(50), default="PRO", nullable=False)  # FREE, STARTER, PRO, ACADEMY, ENTERPRISE
@@ -22,5 +27,8 @@ class User(Base):
     billing_cycle = Column(String(20), default="monthly", nullable=False)  # monthly, annual
     currency = Column(String(10), default="EGP", nullable=False)  # EGP, USD
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now, index=True)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    # Relationship back to Organization
+    organization = relationship("Organization", back_populates="users")

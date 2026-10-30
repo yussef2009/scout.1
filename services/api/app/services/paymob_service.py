@@ -5,7 +5,7 @@ import logging
 import random
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 import httpx
 from ..config import settings
@@ -58,7 +58,7 @@ class PaymobService:
 
         order_id = random.randint(10000000, 99999999)
         fawry_ref_code = "".join([str(random.randint(0, 9)) for _ in range(10)]) if payment_method == "fawry" else None
-        expires_at = (datetime.utcnow() + timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S UTC")
+        expires_at = (datetime.now(timezone.utc) + timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S UTC")
 
         base_web_url = settings.FRONTEND_URL
         s_url = success_url or f"{base_web_url}/billing/success?order_id={order_id}&gateway=paymob&tier={norm_tier}&method={payment_method}"
@@ -235,11 +235,10 @@ class PaymobService:
             hashlib.sha512,
         ).hexdigest()
 
-        is_valid = hmac.compare_digest(calculated_hmac.lower(), received_hmac.lower())
-        if not is_valid and self._is_mock:
-            # Allow developer test simulation if using test mock secret
-            return True
-        return is_valid
+        if not received_hmac:
+            return False
+
+        return hmac.compare_digest(calculated_hmac.lower(), received_hmac.lower())
 
     def calculate_test_hmac(self, obj: Dict[str, Any]) -> str:
         """Helper to generate a valid HMAC SHA512 for unit/integration tests."""

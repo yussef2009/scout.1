@@ -1,7 +1,12 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, JSON, Text, Boolean
+from sqlalchemy.orm import relationship
 from .database import Base
+
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 
 class ScoutingReport(Base):
@@ -9,9 +14,10 @@ class ScoutingReport(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     slug = Column(String(100), unique=True, nullable=False, index=True)
-    match_id = Column(String(36), ForeignKey("match_videos.id"), nullable=True)
-    player_id = Column(String(36), ForeignKey("players.id"), nullable=True)
-    sport = Column(String(50), nullable=False, default="football")
+    org_id = Column(String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    match_id = Column(String(36), ForeignKey("match_videos.id", ondelete="SET NULL"), nullable=True, index=True)
+    player_id = Column(String(36), ForeignKey("players.id", ondelete="CASCADE"), nullable=True, index=True)
+    sport = Column(String(50), nullable=False, default="football", index=True)
     position = Column(String(50), nullable=False)
     position_code = Column(String(20), nullable=True)
     overall_score = Column(Integer, nullable=False)
@@ -33,5 +39,10 @@ class ScoutingReport(Base):
     telemetry = Column(JSON, nullable=True)
     language = Column(String(10), default="en")
     verified = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now, index=True)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    # Relationships
+    organization = relationship("Organization", back_populates="scouting_reports")
+    player = relationship("Player", back_populates="scouting_reports")
+    match_video = relationship("MatchVideo", back_populates="scouting_reports")

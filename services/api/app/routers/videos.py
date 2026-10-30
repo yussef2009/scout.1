@@ -1,6 +1,8 @@
 import os
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+import logging
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, status
 from fastapi.responses import FileResponse
+from starlette.concurrency import run_in_threadpool
 from typing import Optional, List
 from sqlalchemy.orm import Session
 
@@ -12,6 +14,8 @@ from ..services.usage_service import usage_service
 from ..dependencies.quota_guard import require_video_upload_quota
 from ..schemas.analysis import DetectPlayersRequest, DetectPlayersResponse
 from ..schemas.player import DetectedPlayerSchema
+
+logger = logging.getLogger("scoutai.videos")
 
 router = APIRouter(prefix="/api/v1/videos", tags=["Videos"])
 
@@ -37,14 +41,27 @@ async def upload_local_video(
     db: Session = Depends(get_db),
 ):
     """
-    Handles direct multipart file upload in local development mode with quota verification and usage metering.
+    Handles multipart file upload in local development mode with quota verification,
+    offloading synchronous disk I/O and DB writes to a background worker threadpool.
     """
     target_name = filename or file.filename or "uploaded_video.mp4"
     content = await file.read()
-    saved_name = storage_service.save_local_file(target_name, content)
 
-    # Increment monthly video upload usage meter
-    usage_service.increment_usage(db, org.id, "video_uploads", amount=1)
+    # Offload blocking disk write to threadpool
+    saved_name = await run_in_threadpool(storage_service.save_local_file, target_name, content)
+
+    # Offload atomic usage increment to threadpool
+    def _record_usage():
+        try:
+            return usage_service.increment_usage(db, org.id, "video_uploads", amount=1)
+        except Exception as e:
+            logger.error(f"[Video Upload] Failed to record video upload usage: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database error recording usage quota.",
+            )
+
+    await run_in_threadpool(_record_usage)
 
     return {
         "status": "success",
@@ -58,12 +75,13 @@ async def upload_local_video(
 @router.get("/stream/{filename}")
 def stream_video(filename: str):
     """
-    Streams local video files.
+    Streams local video files with strict path traversal prevention.
     """
-    path = storage_service.get_local_filepath(filename)
+    safe_basename = os.path.basename(filename)
+    path = storage_service.get_local_filepath(safe_basename)
     if not path or not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Video file not found")
-    return FileResponse(path, media_type="video/mp4", filename=filename)
+    return FileResponse(path, media_type="video/mp4", filename=safe_basename)
 
 
 @router.post("/detect-players", response_model=DetectPlayersResponse)

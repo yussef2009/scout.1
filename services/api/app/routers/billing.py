@@ -1,10 +1,11 @@
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from ..models.database import get_db
 from ..models.organization import Organization
@@ -19,6 +20,10 @@ from ..config import settings
 logger = logging.getLogger("scoutai.billing")
 
 router = APIRouter(prefix="/api/v1/billing", tags=["Billing & Quotas"])
+
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 
 class CreateCheckoutSessionRequest(BaseModel):
@@ -113,8 +118,14 @@ def create_checkout_session(
     org: Organization = Depends(get_current_org),
 ):
     """
-    Generates checkout sessions for Stripe or Paymob based on user location & currency preference.
+    Generates checkout sessions for Stripe or Paymob with multi-tenant verification.
     """
+    if req.organizationId and req.organizationId != org.id and settings.ENVIRONMENT == "production":
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Cannot initialize checkout session for another organization.",
+        )
+
     target_org_id = req.organizationId or org.id
     target_org = db.query(Organization).filter(Organization.id == target_org_id).first() or org
 
@@ -166,7 +177,7 @@ def create_checkout_session(
 @router.post("/webhook/stripe")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     """
-    Handles Stripe subscription lifecycle events (invoice.payment_succeeded, customer.subscription.deleted, etc.).
+    Handles Stripe subscription lifecycle events inside explicit transaction boundaries.
     """
     payload_bytes = await request.body()
     sig_header = request.headers.get("stripe-signature", "")
@@ -182,42 +193,51 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 
     logger.info(f"[Stripe Webhook] Received event: {event_type}")
 
-    if event_type in ("checkout.session.completed", "invoice.payment_succeeded"):
-        meta = data_object.get("metadata", {})
-        org_id = meta.get("org_id") or data_object.get("client_reference_id")
-        tier = meta.get("tier", "PRO")
-        customer_id = data_object.get("customer")
-        subscription_id = data_object.get("subscription")
+    def _process_stripe_event():
+        try:
+            if event_type in ("checkout.session.completed", "invoice.payment_succeeded"):
+                meta = data_object.get("metadata", {})
+                org_id = meta.get("org_id") or data_object.get("client_reference_id")
+                tier = meta.get("tier", "PRO")
+                customer_id = data_object.get("customer")
+                subscription_id = data_object.get("subscription")
 
-        org = None
-        if org_id:
-            org = db.query(Organization).filter(Organization.id == org_id).first()
-        elif customer_id:
-            org = db.query(Organization).filter(Organization.stripe_customer_id == customer_id).first()
+                org = None
+                if org_id:
+                    org = db.query(Organization).filter(Organization.id == org_id).first()
+                elif customer_id:
+                    org = db.query(Organization).filter(Organization.stripe_customer_id == customer_id).first()
 
-        if org:
-            org.subscription_tier = normalize_tier(tier)
-            org.plan_tier = org.subscription_tier.lower()
-            org.subscription_status = "ACTIVE"
-            if customer_id:
-                org.stripe_customer_id = customer_id
-            if subscription_id:
-                org.stripe_subscription_id = subscription_id
-            org.current_period_start = datetime.utcnow()
-            org.current_period_end = datetime.utcnow() + timedelta(days=30)
-            db.commit()
-            logger.info(f"[Stripe Webhook] Upgraded organization {org.id} to {org.subscription_tier}")
+                if org:
+                    org.subscription_tier = normalize_tier(tier)
+                    org.plan_tier = org.subscription_tier.lower()
+                    org.subscription_status = "ACTIVE"
+                    if customer_id:
+                        org.stripe_customer_id = customer_id
+                    if subscription_id:
+                        org.stripe_subscription_id = subscription_id
+                    now_utc = utc_now()
+                    org.current_period_start = now_utc
+                    org.current_period_end = now_utc + timedelta(days=30)
+                    db.commit()
+                    logger.info(f"[Stripe Webhook] Upgraded organization {org.id} to {org.subscription_tier}")
 
-    elif event_type in ("customer.subscription.deleted", "customer.subscription.paused"):
-        customer_id = data_object.get("customer")
-        if customer_id:
-            org = db.query(Organization).filter(Organization.stripe_customer_id == customer_id).first()
-            if org:
-                org.subscription_status = "CANCELED"
-                org.subscription_tier = "FREE"
-                org.plan_tier = "free"
-                db.commit()
-                logger.info(f"[Stripe Webhook] Downgraded organization {org.id} to FREE")
+            elif event_type in ("customer.subscription.deleted", "customer.subscription.paused"):
+                customer_id = data_object.get("customer")
+                if customer_id:
+                    org = db.query(Organization).filter(Organization.stripe_customer_id == customer_id).first()
+                    if org:
+                        org.subscription_status = "CANCELED"
+                        org.subscription_tier = "FREE"
+                        org.plan_tier = "free"
+                        db.commit()
+                        logger.info(f"[Stripe Webhook] Downgraded organization {org.id} to FREE")
+        except Exception as exc:
+            db.rollback()
+            logger.error(f"[Stripe Webhook Failed] Transaction rolled back: {exc}")
+            raise HTTPException(status_code=500, detail="Database transaction error processing Stripe webhook.")
+
+    await run_in_threadpool(_process_stripe_event)
 
     return {"status": "success", "event": event_type}
 
@@ -230,7 +250,7 @@ async def paymob_webhook(
 ):
     """
     Handles Paymob transaction callback webhooks, verifying HMAC security hashes
-    and updating organization subscription status in PostgreSQL.
+    and atomically updating organization subscription status.
     """
     payload_bytes = await request.body()
     try:
@@ -259,41 +279,47 @@ async def paymob_webhook(
 
     logger.info(f"[Paymob Webhook] Order {order_id} success={is_success}")
 
-    if is_success:
-        # Check merchant order data or extract tier info
-        merchant_order_id = ""
-        if isinstance(order_data, dict):
-            merchant_order_id = order_data.get("merchant_order_id", "")
+    def _process_paymob_event():
+        if is_success:
+            merchant_order_id = ""
+            if isinstance(order_data, dict):
+                merchant_order_id = order_data.get("merchant_order_id", "")
 
-        # Look up org or default
-        org = None
-        if merchant_order_id:
-            org = db.query(Organization).filter(Organization.id == merchant_order_id).first()
+            org = None
+            if merchant_order_id:
+                org = db.query(Organization).filter(Organization.id == merchant_order_id).first()
 
-        if not org:
-            org = db.query(Organization).first()
+            if not org:
+                org = db.query(Organization).first()
 
-        if org:
-            # Upgrade tier based on transaction amount or default to PRO
-            amount_cents = obj.get("amount_cents", 199900)
-            if amount_cents >= 699900:
-                tier = "ENTERPRISE"
-            elif amount_cents >= 199900:
-                tier = "PRO"
-            elif amount_cents >= 49900:
-                tier = "STARTER"
-            else:
-                tier = "PRO"
+            if org:
+                amount_cents = obj.get("amount_cents", 199900)
+                if amount_cents >= 699900:
+                    tier = "ENTERPRISE"
+                elif amount_cents >= 199900:
+                    tier = "PRO"
+                elif amount_cents >= 49900:
+                    tier = "STARTER"
+                else:
+                    tier = "PRO"
 
-            org.subscription_tier = tier
-            org.plan_tier = tier.lower()
-            org.subscription_status = "ACTIVE"
-            org.paymob_order_id = order_id
-            org.currency = "EGP"
-            org.current_period_start = datetime.utcnow()
-            org.current_period_end = datetime.utcnow() + timedelta(days=30)
-            db.commit()
-            logger.info(f"[Paymob Webhook] Upgraded org {org.id} to {tier} (Order: {order_id})")
+                try:
+                    org.subscription_tier = tier
+                    org.plan_tier = tier.lower()
+                    org.subscription_status = "ACTIVE"
+                    org.paymob_order_id = order_id
+                    org.currency = "EGP"
+                    now_utc = utc_now()
+                    org.current_period_start = now_utc
+                    org.current_period_end = now_utc + timedelta(days=30)
+                    db.commit()
+                    logger.info(f"[Paymob Webhook] Upgraded org {org.id} to {tier} (Order: {order_id})")
+                except Exception as exc:
+                    db.rollback()
+                    logger.error(f"[Paymob Webhook Failed] Transaction rolled back: {exc}")
+                    raise HTTPException(status_code=500, detail="Database error updating Paymob order.")
+
+    await run_in_threadpool(_process_paymob_event)
 
     return {
         "status": "received",
@@ -311,7 +337,7 @@ def simulate_upgrade(
 ):
     """
     Developer / QA convenience endpoint to simulate subscription tier changes in dev mode.
-    Forbidden in production environments.
+    Strictly forbidden in production environments.
     """
     if settings.ENVIRONMENT == "production":
         raise HTTPException(
@@ -324,14 +350,20 @@ def simulate_upgrade(
     if not target_org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
-    norm = normalize_tier(req.tier)
-    target_org.subscription_tier = norm
-    target_org.plan_tier = norm.lower()
-    target_org.subscription_status = "ACTIVE"
-    target_org.current_period_start = datetime.utcnow()
-    target_org.current_period_end = datetime.utcnow() + timedelta(days=30)
-    db.commit()
-    db.refresh(target_org)
+    try:
+        norm = normalize_tier(req.tier)
+        target_org.subscription_tier = norm
+        target_org.plan_tier = norm.lower()
+        target_org.subscription_status = "ACTIVE"
+        now_utc = utc_now()
+        target_org.current_period_start = now_utc
+        target_org.current_period_end = now_utc + timedelta(days=30)
+        db.commit()
+        db.refresh(target_org)
+    except Exception as exc:
+        db.rollback()
+        logger.error(f"[Simulate Upgrade Failed] Rolled back: {exc}")
+        raise HTTPException(status_code=500, detail="Database error during simulated upgrade.")
 
     return {
         "status": "success",

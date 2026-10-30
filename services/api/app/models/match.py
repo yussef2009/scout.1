@@ -1,7 +1,12 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, Float
+from sqlalchemy.orm import relationship
 from .database import Base
+
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 
 class MatchVideo(Base):
@@ -13,8 +18,12 @@ class MatchVideo(Base):
     storage_key = Column(String(500), nullable=True)
     duration_seconds = Column(Float, nullable=True, default=0.0)
     file_size_bytes = Column(Integer, nullable=True, default=0)
-    sport = Column(String(50), nullable=False, default="football")
-    status = Column(String(50), default="processed")  # uploaded, processing, processed, failed
-    org_id = Column(String(36), ForeignKey("organizations.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    sport = Column(String(50), nullable=False, default="football", index=True)
+    status = Column(String(50), default="processed", index=True)  # uploaded, processing, processed, failed
+    org_id = Column(String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now, index=True)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    # Relationships
+    organization = relationship("Organization", back_populates="match_videos")
+    scouting_reports = relationship("ScoutingReport", back_populates="match_video")

@@ -1,19 +1,20 @@
 from typing import List, Optional, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class SportPositionSchema(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     code: str
     label: str
     category: str
     primary_metrics: List[str] = Field(alias="primaryMetrics", default_factory=list)
     tactical_notes: str = Field(alias="tacticalNotes", default="")
 
-    class Config:
-        populate_by_name = True
-
 
 class SportConfigSchema(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     key: str
     name: str
     emoji: str
@@ -23,9 +24,6 @@ class SportConfigSchema(BaseModel):
     has_kinematics: bool = Field(alias="hasKinematics", default=False)
     position: str
     positions: List[SportPositionSchema]
-
-    class Config:
-        populate_by_name = True
 
 
 SPORT_DEFINITIONS: Dict[str, dict] = {

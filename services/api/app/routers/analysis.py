@@ -1,8 +1,10 @@
 import uuid
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Response, BackgroundTasks, status
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
-from ..models.database import get_db
+from ..models.database import get_db, SessionLocal
 from ..models.organization import Organization
 from ..models.report import ScoutingReport
 from ..models.player import Player
@@ -12,6 +14,8 @@ from ..services.usage_service import usage_service
 from ..dependencies.quota_guard import require_ai_analysis_quota
 from ..schemas.analysis import GenerateAnalysisRequest, GenerateAnalysisResponse
 from ..schemas.scouting import ScoutingReportSchema
+
+logger = logging.getLogger("scoutai.analysis")
 
 router = APIRouter(prefix="/api/v1/analysis", tags=["Analysis"])
 
@@ -23,7 +27,8 @@ async def generate_analysis(
     org: Organization = Depends(require_ai_analysis_quota),
 ):
     """
-    Orchestrates full tactical analysis using Gemini with Structured Outputs and saves report permanently to DB.
+    Orchestrates tactical analysis using Gemini Structured Outputs,
+    persisting reports inside an atomic database transaction with threadpool offloading.
     """
     player_ctx = req.playerContext.model_dump() if req.playerContext else None
     telemetry_dict = req.telemetry.model_dump() if req.telemetry else None
@@ -38,7 +43,7 @@ async def generate_analysis(
         language=req.language,
     )
 
-    # Generate shareable slug
+    # Generate unique shareable slug
     player_slug_part = "athlete"
     if req.playerContext and req.playerContext.label:
         player_slug_part = req.playerContext.label.replace("#", "").replace(" ", "-").lower()[:15]
@@ -48,59 +53,72 @@ async def generate_analysis(
     short_id = str(uuid.uuid4())[:8]
     shareable_slug = f"{player_slug_part}-{short_id}"
 
-    # Auto-link or create player record if requested
-    player_record = None
-    if req.selectedPlayerId or (req.playerContext and req.playerContext.label):
-        p_name = req.playerContext.label if req.playerContext else f"Player {req.selectedPlayerId}"
-        player_record = db.query(Player).filter(Player.slug == shareable_slug).first()
-        if not player_record:
-            player_record = Player(
-                slug=shareable_slug,
-                first_name=p_name,
-                last_name=f"({req.sport.capitalize()})",
-                primary_sport=req.sport,
-                primary_position=report_schema.position,
-                jersey_number=req.playerContext.jerseyNumber if req.playerContext else None,
-                team_color=req.playerContext.teamColorHex if req.playerContext else "#6366f1",
+    def _persist_transaction():
+        # Auto-link or create player record strictly linked to tenant organization
+        player_record = None
+        if req.selectedPlayerId or (req.playerContext and req.playerContext.label):
+            p_name = req.playerContext.label if req.playerContext else f"Player {req.selectedPlayerId}"
+            player_record = db.query(Player).filter(Player.slug == shareable_slug).first()
+            if not player_record:
+                player_record = Player(
+                    slug=shareable_slug,
+                    first_name=p_name,
+                    last_name=f"({req.sport.capitalize()})",
+                    primary_sport=req.sport,
+                    primary_position=report_schema.position,
+                    jersey_number=req.playerContext.jerseyNumber if req.playerContext else None,
+                    team_color=req.playerContext.teamColorHex if req.playerContext else "#6366f1",
+                    org_id=org.id,
+                )
+                db.add(player_record)
+                db.flush()
+
+        # Save scouting report with organization ownership
+        db_report = ScoutingReport(
+            slug=shareable_slug,
+            org_id=org.id,
+            player_id=player_record.id if player_record else None,
+            sport=req.sport,
+            position=report_schema.position,
+            position_code=report_schema.positionCode,
+            overall_score=report_schema.overallScore,
+            overall_grade=report_schema.overallGrade,
+            potential_rating=report_schema.potentialRating,
+            player_summary=report_schema.playerSummary,
+            one_liner=report_schema.oneLiner,
+            tags=report_schema.tags,
+            metrics=[m.model_dump() for m in report_schema.metrics],
+            radar_metrics=report_schema.radarMetrics or {},
+            position_profile=report_schema.positionProfile.model_dump(),
+            playing_time=report_schema.playingTime.model_dump() if report_schema.playingTime else {},
+            strengths=report_schema.strengths,
+            weaknesses=report_schema.weaknesses,
+            recommended_drills=[d.model_dump() for d in report_schema.recommendedDrills],
+            narrative=report_schema.narrative,
+            pro_comparisons=[p.model_dump() for p in report_schema.proComparisons],
+            kinematics=report_schema.kinematics.model_dump() if report_schema.kinematics else None,
+            telemetry=telemetry_dict,
+            language=req.language,
+            verified=True,
+        )
+
+        try:
+            db.add(db_report)
+            db.commit()
+            db.refresh(db_report)
+            usage_service.increment_usage(db, org.id, "ai_reports", amount=1)
+            return db_report
+        except Exception as e:
+            db.rollback()
+            logger.error(f"[Analysis Transaction Failed] Rolled back report creation: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database transaction error during report persistence.",
             )
-            db.add(player_record)
-            db.flush()
 
-    # Save scouting report in database
-    db_report = ScoutingReport(
-        slug=shareable_slug,
-        player_id=player_record.id if player_record else None,
-        sport=req.sport,
-        position=report_schema.position,
-        position_code=report_schema.positionCode,
-        overall_score=report_schema.overallScore,
-        overall_grade=report_schema.overallGrade,
-        potential_rating=report_schema.potentialRating,
-        player_summary=report_schema.playerSummary,
-        one_liner=report_schema.oneLiner,
-        tags=report_schema.tags,
-        metrics=[m.model_dump() for m in report_schema.metrics],
-        radar_metrics=report_schema.radarMetrics or {},
-        position_profile=report_schema.positionProfile.model_dump(),
-        playing_time=report_schema.playingTime.model_dump() if report_schema.playingTime else {},
-        strengths=report_schema.strengths,
-        weaknesses=report_schema.weaknesses,
-        recommended_drills=[d.model_dump() for d in report_schema.recommendedDrills],
-        narrative=report_schema.narrative,
-        pro_comparisons=[p.model_dump() for p in report_schema.proComparisons],
-        kinematics=report_schema.kinematics.model_dump() if report_schema.kinematics else None,
-        telemetry=telemetry_dict,
-        language=req.language,
-        verified=True,
-    )
-    db.add(db_report)
-    db.commit()
-    db.refresh(db_report)
+    # Offload blocking database writes to threadpool to avoid starving asyncio event loop
+    db_report = await run_in_threadpool(_persist_transaction)
 
-    # Increment monthly AI scouting reports usage meter
-    usage_service.increment_usage(db, org.id, "ai_reports", amount=1)
-
-    # Attach ID and slug to output schema
     report_dict = report_schema.model_dump()
     report_dict["id"] = db_report.id
     report_dict["slug"] = db_report.slug
@@ -120,6 +138,7 @@ async def generate_analysis(
 def get_report(slug_or_id: str, db: Session = Depends(get_db)):
     """
     Retrieves a persisted scouting report by unique slug or ID.
+    Shareable reports are queryable globally by their unguessable UUID-suffixed slug.
     """
     report = (
         db.query(ScoutingReport)
@@ -175,7 +194,7 @@ def export_report_pdf(slug_or_id: str, db: Session = Depends(get_db)):
     )
 
 
-# Asynchronous In-Memory Job Registry (Redis/DB backed in production)
+# Asynchronous Job Registry
 analysis_jobs_registry: Dict[str, Dict[str, Any]] = {}
 
 
@@ -183,7 +202,6 @@ async def _run_async_analysis_task(job_id: str, req_dict: dict, org_id: str):
     """
     Executes long-running multimodal analysis in background out-of-band from HTTP cycle.
     """
-    from ..models.database import SessionLocal
     db = SessionLocal()
     try:
         analysis_jobs_registry[job_id]["status"] = "processing"
@@ -224,12 +242,14 @@ async def _run_async_analysis_task(job_id: str, req_dict: dict, org_id: str):
                     primary_position=report_schema.position,
                     jersey_number=req.playerContext.jerseyNumber if req.playerContext else None,
                     team_color=req.playerContext.teamColorHex if req.playerContext else "#6366f1",
+                    org_id=org_id,
                 )
                 db.add(player_record)
                 db.flush()
 
         db_report = ScoutingReport(
             slug=shareable_slug,
+            org_id=org_id,
             player_id=player_record.id if player_record else None,
             sport=req.sport,
             position=report_schema.position,
@@ -254,12 +274,17 @@ async def _run_async_analysis_task(job_id: str, req_dict: dict, org_id: str):
             language=req.language,
             verified=True,
         )
-        db.add(db_report)
-        db.commit()
-        db.refresh(db_report)
 
-        if org:
-            usage_service.increment_usage(db, org.id, "ai_reports", amount=1)
+        try:
+            db.add(db_report)
+            db.commit()
+            db.refresh(db_report)
+
+            if org:
+                usage_service.increment_usage(db, org.id, "ai_reports", amount=1)
+        except Exception as db_exc:
+            db.rollback()
+            raise db_exc
 
         report_dict = report_schema.model_dump()
         report_dict["id"] = db_report.id
@@ -276,6 +301,7 @@ async def _run_async_analysis_task(job_id: str, req_dict: dict, org_id: str):
             "cached": False,
         }
     except Exception as exc:
+        logger.error(f"[Async Analysis Error] Job {job_id} failed: {exc}")
         analysis_jobs_registry[job_id]["status"] = "failed"
         analysis_jobs_registry[job_id]["error"] = str(exc)
     finally:
@@ -290,7 +316,7 @@ async def submit_analysis_job(
 ):
     """
     Submits a video analysis task to background execution, immediately returning 202 Accepted with a jobId.
-    Eliminates 30s-60s proxy timeouts on Vercel/Cloudflare.
+    Eliminates proxy timeouts on external cloud hosts.
     """
     job_id = str(uuid.uuid4())
     analysis_jobs_registry[job_id] = {

@@ -1,10 +1,14 @@
 import os
 import time
+import json
+import logging
 from typing import Dict, Any, List, Optional
 from .smart_sampler import smart_sampler
 from .detector import detector
 from .tracker import tracker
 from .homography import pitch_homography
+
+logger = logging.getLogger("scoutai.cv_worker")
 
 
 class CVPipeline:
@@ -87,7 +91,7 @@ cv_pipeline = CVPipeline()
 def run_worker_daemon():
     """
     Long-running daemon process that keeps the CV worker active,
-    processes queued video analysis tasks, and handles termination signals gracefully.
+    processes queued video analysis tasks from Redis, and handles termination signals gracefully.
     """
     import signal
     import sys
@@ -102,15 +106,54 @@ def run_worker_daemon():
     signal.signal(signal.SIGINT, _signal_handler)
     signal.signal(signal.SIGTERM, _signal_handler)
 
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    redis_client = None
+
+    try:
+        import redis
+        client = redis.from_url(redis_url, socket_timeout=3, socket_connect_timeout=3)
+        client.ping()
+        redis_client = client
+        print(f"[CVWorker] Connected to Redis queue at {redis_url}")
+    except Exception as exc:
+        print(f"[CVWorker Info] Redis not reachable ({exc}). Operating in standalone/polling mode.")
+
     print(f"[CVWorker] Hybrid Computer Vision Worker started (Mode: {os.getenv('CV_MODE', 'lightweight')})")
     print("[CVWorker] Ready and awaiting processing jobs from pipeline queue...")
 
     while running:
         try:
-            # Heartbeat & worker poll interval
-            time.sleep(2)
+            if redis_client:
+                # Block for 2 seconds waiting for queued CV jobs
+                job_raw = redis_client.brpop("scoutai:cv_jobs", timeout=2)
+                if job_raw:
+                    _, payload_str = job_raw
+                    try:
+                        job_data = json.loads(payload_str.decode("utf-8") if isinstance(payload_str, bytes) else payload_str)
+                        job_id = job_data.get("job_id", "unknown")
+                        video_path = job_data.get("video_path", "")
+                        sport = job_data.get("sport", "football")
+
+                        print(f"[CVWorker] Consuming job {job_id} for video: {video_path}")
+                        result = cv_pipeline.process_video(video_path=video_path, sport=sport)
+
+                        # Write back result with 24-hour expiration
+                        redis_client.setex(
+                            f"scoutai:cv_job_results:{job_id}",
+                            86400,
+                            json.dumps(result),
+                        )
+                        print(f"[CVWorker] Job {job_id} completed successfully.")
+                    except Exception as job_err:
+                        print(f"[CVWorker Error] Failed processing job: {job_err}")
+            else:
+                # Standby poll interval
+                time.sleep(2)
         except (KeyboardInterrupt, SystemExit):
             break
+        except Exception as loop_err:
+            print(f"[CVWorker Warning] Loop encounter: {loop_err}")
+            time.sleep(2)
 
     print("[CVWorker] Worker stopped gracefully.")
     sys.exit(0)
@@ -118,4 +161,3 @@ def run_worker_daemon():
 
 if __name__ == "__main__":
     run_worker_daemon()
-
