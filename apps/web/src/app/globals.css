@@ -189,3 +189,33 @@ body {
   align-items: center;
   justify-content: center;
 }
+
+/* =========================================================================
+   Nano Banana Flagship Design Tokens
+   ========================================================================= */
+.gold-glow {
+  box-shadow: 0 0 24px rgba(255, 225, 0, 0.22), 0 0 48px rgba(255, 225, 0, 0.08);
+}
+
+.banana-gradient {
+  background: linear-gradient(135deg, #FFE100 0%, #FFB800 100%);
+}
+
+.banana-gradient-text {
+  background: linear-gradient(135deg, #FFE100 0%, #FFB800 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.banana-glass {
+  background: rgba(13, 17, 23, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 225, 0, 0.22);
+}
+
+.banana-glass-active {
+  background: rgba(255, 225, 0, 0.12);
+  border-color: rgba(255, 225, 0, 0.65);
+  color: #FFE100;
+}

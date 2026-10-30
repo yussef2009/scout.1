@@ -21,6 +21,31 @@
 }
 
 /* ==========================================================================
+   NANO BANANA HIGH-PERFORMANCE DESIGN TOKENS
+   ========================================================================== */
+.gold-glow {
+  box-shadow: 0 0 35px -5px rgba(255, 225, 0, 0.22);
+}
+.banana-gradient {
+  background: linear-gradient(135deg, #FFE100 0%, #F59E0B 100%);
+}
+.banana-gradient-text {
+  background: linear-gradient(135deg, #FFE100 0%, #F59E0B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.banana-glass {
+  background: rgba(14, 18, 28, 0.88);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 225, 0, 0.2);
+}
+.banana-glass-active {
+  background: rgba(255, 225, 0, 0.14) !important;
+  border-color: #FFE100 !important;
+  color: #FFE100 !important;
+}
+
+/* ==========================================================================
    GLOBAL SCROLLBAR HIDING
    Completely hides scrollbars across all browsers while keeping smooth scroll
    ========================================================================== */
