@@ -456,19 +456,36 @@ Return strictly valid JSON adhering to the ScoutingReport schema."""
 
     def _build_detection_prompt(self, sport: dict, frame_count: int) -> str:
         sport_name = sport.get("name", "Football")
+        is_volleyball = "volleyball" in sport_name.lower()
+
+        sport_domain_guide = ""
+        if is_volleyball:
+            sport_domain_guide = """
+CRITICAL VOLLEYBALL ROSTER RULES (e.g. VNL / Professional):
+- A volleyball match has TWO opposing teams separated by the net: Team 1 (Near Court / Foreground) and Team 2 (Far Court / Across Net).
+- At all times during a rally, there are AT LEAST 12 ACTIVE ON-COURT ATHLETES (6 on Near Court + 6 on Far Court), PLUS LIBEROS:
+  * Near Court (Lower half): Outside Hitter (Zone 4), Middle Blocker (Zone 3), Opposite/Setter (Zone 2), Back Defenders (Zones 5, 6, 1), and Libero in contrasting kit.
+  * Far Court (Upper half): You MUST systematically scan all 6 players across the net despite distance perspective, plus Far Libero.
+  * Liberos wear contrasting kit colors (e.g. Yellow/White vs Blue/Red).
+- DO NOT STOP AFTER 5-6 PLAYERS. You must detect the full squad across both teams (expect 12 to 22 athletes across match rotations and substitutes).
+- Players on the same team share kit colors; distinguish them by jersey number and court position/zone.
+"""
+
         return f"""Analyze these {frame_count} keyframes from a {sport_name} match.
-Detect every distinct player. For each player identify:
+Detect EVERY distinct player across all teams, court zones, and rotations.
+{sport_domain_guide}
+For each player identify:
 - id: e.g. "P1", "P2"
-- label: e.g. "#10 Blue", "Red GK", "Libero"
+- label: e.g. "#10 Blue", "Red GK", "Libero Yellow", "#4 Red (Near Hitter)"
 - jerseyNumber: digits only if readable
 - team: team or kit identifier
 - teamColorHex: hex color of their jersey
-- position: estimated position label
-- roleCategory: broad role (Attacker, Defender, Midfielder, Goalkeeper, Specialist)
+- position: estimated position label (e.g. Outside Hitter, Middle Blocker, Setter, Libero, Opposite)
+- roleCategory: broad role (Attacker, Defender, Midfielder, Goalkeeper, Specialist, Setter, Libero)
 - confidence: integer 40-100
 - standoutTrait: one observable physical or technical trait
 - subStatus: "Starter" or "Substitute"
-Return strictly JSON with the key "players" containing the list of players."""
+Return strictly JSON with the key "players" containing the complete list of players."""
 
     def _generate_mock_report(
         self,

@@ -138,3 +138,48 @@ def test_detect_players_api_adaptive_lifecycle():
     assert "confidence" in player
     assert "subStatus" in player
 
+
+def test_volleyball_multi_player_clustering_preserves_squad():
+    """
+    [VOLLEYBALL CRITICAL] Verify that 12+ on-court players (6 near-court + 6 far-court + liberos)
+    are NOT collapsed into 5 or fewer entities during clustering, preserving distinct teammates.
+    """
+    # Create mock detections mimicking a VNL volleyball frame:
+    # 6 Near Court Team Blue (y ~ 0.6 to 0.85) at 6 distinct zones (x from 0.15 to 0.85)
+    # 6 Far Court Team Red (y ~ 0.15 to 0.40) at 6 distinct zones (x from 0.15 to 0.85)
+    # 1 Yellow Libero on Near Court
+    candidate_frames = []
+    h, w = 720, 1280
+    frame = np.full((h, w, 3), (40, 90, 180), dtype=np.uint8)  # volleyball court floor
+
+    # Generate 6 distinct Near-Court players wearing blue jerseys
+    for i, x_center in enumerate([0.18, 0.35, 0.50, 0.65, 0.80, 0.52]):
+        y_center = 0.65 if i < 3 else 0.82
+        x1, y1 = int((x_center - 0.03) * w), int((y_center - 0.08) * h)
+        x2, y2 = int((x_center + 0.03) * w), int((y_center + 0.08) * h)
+        frame[y1:y2, x1:x2] = (220, 50, 20)  # BGR blue
+
+    # Generate 6 distinct Far-Court players wearing red jerseys
+    for i, x_center in enumerate([0.20, 0.38, 0.52, 0.68, 0.82, 0.50]):
+        y_center = 0.22 if i < 3 else 0.35
+        x1, y1 = int((x_center - 0.02) * w), int((y_center - 0.05) * h)
+        x2, y2 = int((x_center + 0.02) * w), int((y_center + 0.05) * h)
+        frame[y1:y2, x1:x2] = (20, 20, 220)  # BGR red
+
+    # Add Near-Court Libero (Yellow)
+    frame[int(0.75*h):int(0.88*h), int(0.25*w):int(0.31*w)] = (30, 220, 240)  # BGR yellow
+
+    candidate_frames.append({
+        "frameIndex": 0,
+        "timestampSeconds": 5.0,
+        "epoch": "Early 1st Half",
+        "frame": frame,
+    })
+
+    # Run clustering
+    entities = player_clusterer.cluster_candidate_detections(candidate_frames, max_clusters=36)
+    
+    # Crucial assertion: clustering must retain multiple distinct candidates and not falsely collapse to <= 5
+    assert len(entities) >= 10, f"Expected at least 10 entities for full squad, got {len(entities)}"
+
+

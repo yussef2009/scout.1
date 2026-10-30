@@ -131,18 +131,21 @@ class PlayerDetector:
 
     def _detect_lightweight(self, frame: Any, width: int, height: int) -> List[Dict[str, Any]]:
         """
-        Lightweight CPU mode: Adaptive thresholding, edge filtering, and humanoid aspect ratio analysis.
-        Runs efficiently without GPU dependencies or neural network overhead.
+        Lightweight CPU mode: Multi-scale edge filtering, morphological closure, and humanoid aspect ratio analysis.
+        Runs efficiently without GPU dependencies or neural network overhead, capturing both near and far court players.
         """
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (7, 7), 0)
-        edges = cv2.Canny(blurred, 40, 130)
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        edges = cv2.Canny(blurred, 20, 70)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        dilated = cv2.dilate(edges, kernel, iterations=1)
 
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         detections = []
 
-        min_area = (width * height) * 0.001
-        max_area = (width * height) * 0.20
+        # Min area catches far-court players across the net (down to ~0.04% of frame area)
+        min_area = (width * height) * 0.0004
+        max_area = (width * height) * 0.22
 
         for cnt in contours:
             area = cv2.contourArea(cnt)
@@ -150,8 +153,8 @@ class PlayerDetector:
                 x, y, w, h = cv2.boundingRect(cnt)
                 aspect_ratio = float(h) / max(1, w)
 
-                # Upright human athlete aspect ratio (typically 1.4 to 4.5)
-                if 1.3 <= aspect_ratio <= 4.8:
+                # Upright human athlete aspect ratio (typically 1.2 to 4.8)
+                if 1.2 <= aspect_ratio <= 4.8:
                     x1, y1 = max(0, x), max(0, y)
                     x2, y2 = min(width, x + w), min(height, y + h)
                     crop = frame[y1:y2, x1:x2]
@@ -160,7 +163,7 @@ class PlayerDetector:
                     detections.append({
                         "classId": 0,
                         "label": "person",
-                        "confidence": 0.75,
+                        "confidence": 0.78,
                         "sharpness": sharpness,
                         "box": {
                             "x": round(float(x1) / width, 4),
@@ -171,9 +174,9 @@ class PlayerDetector:
                         "pixelBox": [x1, y1, x2, y2],
                     })
 
-        # Sort by sharpness * area and keep up to 26 candidate detections per frame
+        # Sort by sharpness * area and keep up to 36 candidate detections per frame
         detections.sort(key=lambda d: d["sharpness"] * (d["box"]["w"] * d["box"]["h"]), reverse=True)
-        return detections[:26]
+        return detections[:36]
 
 
 detector = PlayerDetector()

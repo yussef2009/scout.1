@@ -184,7 +184,14 @@ export async function extractVideoFrames(
     if (!context) throw new Error("The browser could not initialize video frame extraction.");
 
     const frames: VideoFrame[] = [];
-    const sampleCount = Math.max(3, Math.min(12, Math.round(frameCount)));
+    // Adaptive sampling: for full matches or longer clips (> 3 min), increase sample density to capture rotations & substitutions
+    let effectiveCount = frameCount;
+    if (video.duration > 600 && frameCount <= 8) {
+      effectiveCount = 16;
+    } else if (video.duration > 180 && frameCount <= 6) {
+      effectiveCount = 12;
+    }
+    const sampleCount = Math.max(3, Math.min(24, Math.round(effectiveCount)));
     for (let index = 0; index < sampleCount; index++) {
       const progress = 0.05 + (0.9 * index) / (sampleCount - 1);
       const timestamp = Math.max(0, Math.min(video.duration * progress, video.duration - 0.01));
@@ -522,6 +529,114 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+export function cropZoneFromBase64(
+  base64Data: string,
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
+): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth || img.width;
+        const h = img.naturalHeight || img.height;
+        const sx = Math.max(0, Math.floor(minX * w));
+        const sy = Math.max(0, Math.floor(minY * h));
+        const sw = Math.min(w - sx, Math.floor((maxX - minX) * w));
+        const sh = Math.min(h - sy, Math.floor((maxY - minY) * h));
+
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.min(1280, Math.max(320, sw));
+        canvas.height = Math.round(canvas.width * (sh / Math.max(1, sw)));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve("");
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+        const out = canvas.toDataURL("image/jpeg", 0.85);
+        resolve(out.replace(/^data:image\/[a-z]+;base64,/, ""));
+      } catch {
+        resolve("");
+      }
+    };
+    img.onerror = () => resolve("");
+    img.src = base64Data.startsWith("data:") ? base64Data : `data:image/jpeg;base64,${base64Data}`;
+  });
+}
+
+export function cropBboxFromBase64(
+  base64Data: string,
+  bbox: [number, number, number, number],
+): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const [ymin, xmin, ymax, xmax] = bbox;
+        const w = img.naturalWidth || img.width;
+        const h = img.naturalHeight || img.height;
+
+        const padX = Math.round((xmax - xmin) * 0.12);
+        const padY = Math.round((ymax - ymin) * 0.12);
+
+        const x1 = Math.max(0, Math.floor(((xmin - padX) / 1000) * w));
+        const y1 = Math.max(0, Math.floor(((ymin - padY) / 1000) * h));
+        const x2 = Math.min(w, Math.ceil(((xmax + padX) / 1000) * w));
+        const y2 = Math.min(h, Math.ceil(((ymax + padY) / 1000) * h));
+
+        const boxW = Math.max(10, x2 - x1);
+        const boxH = Math.max(15, y2 - y1);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = 160;
+        canvas.height = 200;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve("");
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, x1, y1, boxW, boxH, 0, 0, canvas.width, canvas.height);
+        const out = canvas.toDataURL("image/jpeg", 0.85);
+        resolve(out.replace(/^data:image\/[a-z]+;base64,/, ""));
+      } catch {
+        resolve("");
+      }
+    };
+    img.onerror = () => resolve("");
+    img.src = base64Data.startsWith("data:") ? base64Data : `data:image/jpeg;base64,${base64Data}`;
+  });
+}
+
+async function prepareVisionFrames(sport: string, frames: VideoFrame[]): Promise<VideoFrame[]> {
+  const isVolleyball = sport.toLowerCase().includes("volleyball");
+  if (!isVolleyball || frames.length === 0) return frames;
+
+  // For volleyball, create zoomed crops of the Far Court (across net) and Near Court (foreground)
+  // for up to 2 keyframes, so the vision model has 2x higher resolution to identify far-court players & numbers
+  const enhanced: VideoFrame[] = [...frames];
+  const sampleRef = frames.slice(0, Math.min(2, frames.length));
+  for (let i = 0; i < sampleRef.length; i++) {
+    const ref = sampleRef[i];
+    try {
+      const farCourt = await cropZoneFromBase64(ref.data, 0, 0.04, 1.0, 0.58);
+      if (farCourt) {
+        enhanced.push({ data: farCourt, timestamp: ref.timestamp });
+      }
+      const nearCourt = await cropZoneFromBase64(ref.data, 0, 0.38, 1.0, 0.98);
+      if (nearCourt) {
+        enhanced.push({ data: nearCourt, timestamp: ref.timestamp });
+      }
+    } catch {
+      // Fallback to original frames
+    }
+  }
+  return enhanced;
+}
+
 export async function detectVideoPlayers(
   apiKey: string,
   sport: string,
@@ -529,34 +644,74 @@ export async function detectVideoPlayers(
   preset: string,
   onModelChange?: ModelChangeCallback,
 ): Promise<DetectedPlayer[]> {
-  const prompt = `You are an elite sports video analyst with expert-level player recognition skills.
-Carefully examine these ${frames.length} sequential keyframes from a ${sport} video.
+  const isVolleyball = sport.toLowerCase().includes("volleyball");
+  const isSoccer = /soccer|football/i.test(sport);
+  const isBasketball = /basketball/i.test(sport);
 
-TASK: Identify EVERY distinct athlete visible across these frames with maximum accuracy.
+  const domainRules = isVolleyball
+    ? `
+CRITICAL VOLLEYBALL ROSTER RULES (e.g. VNL / Olympic / FIVB professional standard):
+1. MANDATORY ACTIVE ON-COURT ROSTER:
+   At all times during a rally, there are TWO TEAMS on opposite sides of the net with EXACTLY 6 PLAYERS ON EACH SIDE (MINIMUM 12 ACTIVE ON-COURT ATHLETES), PLUS LIBEROS:
+   - TEAM 1 (Near Court / Foreground, lower half of frame):
+     * Front row at net: Left Side Hitter / Outside (Zone 4), Middle Blocker (Zone 3), Opposite / Setter (Zone 2)
+     * Back row: Left Back (Zone 5), Middle Back (Zone 6), Right Back / Server (Zone 1)
+     * Libero: Wears a DISTINCT, CONTRASTING kit color (e.g. Bright Yellow when team is Dark Blue, or White when team is Red).
+   - TEAM 2 (Far Court / Across Net, upper half of frame):
+     * You MUST systematically scan and report all 6 players on the far side of the net despite distance perspective!
+     * Front row at net: Left Side Hitter, Middle Blocker, Right Side Hitter
+     * Back row: Left Back, Middle Back, Right Back
+     * Far Libero: Wears a contrasting jersey.
+   - SUBSTITUTES & ROTATIONS: Across sequential keyframes, teams rotate positions (Zones 1-6) and bench substitutes enter (serving specialists, setter/opposite double substitutions). Starters + substitutes typically total 14 to 22 athletes.
+   - CRITICAL REQUIREMENT: DO NOT STOP AFTER 5 OR 6 PLAYERS. A volleyball match has at least 12 players on court simultaneously. You MUST identify players on BOTH near and far courts.
 
-CONFIDENCE SCORING RUBRIC (be strict and honest):
-- 90-100: Clear face OR jersey number clearly readable + consistent across 3+ frames
-- 75-89: Clear body silhouette + kit color clearly identifiable + visible in 2+ frames
-- 60-74: Partial body visible, kit distinguishable, actions observable in 1-2 frames
-- 40-59: Limited visibility but kit or build features allow differentiation
-- BELOW 40: Omit these players — insufficient visual evidence
+2. ATHLETE DIFFERENTIATION:
+   - Teammates on the same side wear matching kit colors. Differentiate them by jersey number (if visible) and court position / zone.
+   - Give each athlete a specific label: e.g. "#12 Blue (Near Outside Hitter)", "#7 Blue (Near Setter)", "Blue (Near Middle Blocker)", "Red #8 (Far Hitter)", "Yellow Libero (Near Court)", "Red #11 (Far Blocker)".
+   - Two players standing at different positions or visible in the same frame are DIFFERENT ATHLETES. Never omit or merge them!
+`
+    : isSoccer
+    ? `
+CRITICAL SOCCER / FOOTBALL ROSTER RULES:
+- 11 vs 11 players on pitch (22 active outfielders + Goalkeepers in contrasting kits).
+- Identify outfielders by jersey number and pitch zone (wings, midfield, defense, forwards).
+`
+    : isBasketball
+    ? `
+CRITICAL BASKETBALL ROSTER RULES:
+- 5 vs 5 players on court (10 active players: PG, SG, SF, PF, C).
+`
+    : "";
+
+  const visionFrames = await prepareVisionFrames(sport, frames);
+
+  const prompt = `You are an elite sports video analyst and computer vision scout with expert-level player recognition skills.
+Carefully examine these ${visionFrames.length} keyframes (including tactical wide shots and zoomed court zone tiles) from a ${sport} match.
+
+TASK: Conduct an EXHAUSTIVE roster audit and identify EVERY distinct athlete visible across both teams and court halves.
+${domainRules}
+
+CONFIDENCE SCORING RUBRIC:
+- 85-100: Clear face OR jersey number readable + consistent across frames
+- 65-84: Clear body silhouette, position clearly identifiable on court
+- 40-64: Visible player in court zone (including far-court players across the net)
+- 30-39: Partial or distance visibility in court zone
+- BELOW 30: Only omit spectators, ball kids, or completely off-court background figures
 
 IDENTIFICATION RULES:
-1. Merge duplicate appearances of the same athlete across frames (same kit/number/build)
-2. Only report jersey numbers you can clearly read pixel-by-pixel — leave empty string if uncertain
-3. Describe the athlete's physical actions, body language, and court/field positioning as evidence
-4. Note the most distinctive observable athletic trait (explosive jumping, quick footwork, ball control, etc.)
-5. For team: describe the kit precisely (e.g. "blue #23 home jersey", "red away kit", "white training gear")
-6. "label" should be the most specific identifier: jersey number + team color if available, else descriptive phrase
-7. "bbox": [ymin, xmin, ymax, xmax] normalized bounding box coordinates on a 0-1000 scale around the athlete's body.
-8. "teamColorHex": dominant hex color of the athlete's jersey (e.g. "#fbbf24", "#22d3ee", "#ef4444").
+1. ONLY merge duplicate appearances of the SAME athlete (same jersey number AND same team).
+2. Teammates wearing identical jerseys at different court positions (e.g. Zone 4 Outside Hitter vs Zone 3 Middle Blocker) are DIFFERENT ATHLETES. Never merge them!
+3. Only report jersey numbers you can clearly read — leave empty string "" if uncertain.
+4. "label": Most specific identifier (e.g. "#12 Blue Near Hitter", "Blue Middle Blocker", "Red #8 Far Setter", "Yellow Libero Near Court").
+5. "bbox": [ymin, xmin, ymax, xmax] normalized bounding box coordinates on a 0-1000 scale around the athlete's body.
+6. "teamColorHex": dominant hex color of the athlete's jersey (e.g. "#fbbf24", "#22d3ee", "#ef4444").
 
 Return ONLY valid JSON matching this exact shape:
-{"players":[{"label":"#23 Blue","jerseyNumber":"23","position":"observed role","team":"blue home kit","teamColorHex":"#22d3ee","bbox":[200,150,700,450],"confidence":87,"description":"Detailed description of what is visible across frames","standoutTrait":"Most notable athletic quality observed"}]}
+{"players":[{"label":"#12 Blue (Near Hitter)","jerseyNumber":"12","position":"Outside Hitter","team":"Team Blue","teamColorHex":"#22d3ee","bbox":[350,180,680,320],"confidence":88,"description":"Front-row outside hitter on near court, dynamic spiking takeoff","standoutTrait":"Explosive vertical jump and powerful spike angle"}]}
 
-If NO athlete can be reliably identified with confidence >= 40, return: {"players":[]}`;
+If NO athlete can be reliably identified, return: {"players":[]}`;
 
-  const result = await requestGemini(apiKey, prompt, frames, preset, onModelChange);
+  const result = await requestGemini(apiKey, prompt, visionFrames, preset, onModelChange);
   const rawPlayers = (result as { players?: unknown })?.players;
   if (!Array.isArray(rawPlayers)) throw new Error("Gemini returned an invalid player list.");
   if (rawPlayers.some((player) => !isRecord(player))) {
@@ -568,10 +723,10 @@ If NO athlete can be reliably identified with confidence >= 40, return: {"player
       const rawBbox = Array.isArray(rec.bbox) && rec.bbox.length === 4
         ? (rec.bbox as unknown[]).map((n) => Math.max(0, Math.min(1000, Number(n) || 0)))
         : [
-            200 + (index % 3) * 160,
-            150 + index * 200,
-            680 + (index % 2) * 80,
-            380 + index * 200,
+            180 + (index % 4) * 140,
+            120 + ((index * 160) % 760),
+            460 + (index % 4) * 140,
+            240 + ((index * 160) % 760),
           ];
       return {
         id: `player-${index + 1}`,
@@ -586,17 +741,70 @@ If NO athlete can be reliably identified with confidence >= 40, return: {"player
         standoutTrait: asText(rec.standoutTrait),
       };
     })
-    .filter((player) => player.confidence >= 40); // Only include sufficiently confident detections
+    .filter((player) => player.confidence >= 28); // Retain far-court and background athletes without artificial pruning
+
+  // Robust multi-attribute deduplication: Never collapse different teammates into 1
+  const isDuplicate = (a: DetectedPlayer, b: DetectedPlayer): boolean => {
+    // If both have clear non-empty jersey numbers:
+    if (a.jerseyNumber && b.jerseyNumber) {
+      if (a.jerseyNumber !== b.jerseyNumber) return false;
+      if (a.team && b.team && a.team.toLowerCase().trim() === b.team.toLowerCase().trim()) return true;
+      if (a.teamColorHex && b.teamColorHex && a.teamColorHex.toLowerCase() === b.teamColorHex.toLowerCase()) return true;
+      return true;
+    }
+
+    // Spatial coordinates check
+    const [aYmin, aXmin, aYmax, aXmax] = a.bbox || [0, 0, 0, 0];
+    const [bYmin, bXmin, bYmax, bXmax] = b.bbox || [0, 0, 0, 0];
+    const aCenter = { x: (aXmin + aXmax) / 2, y: (aYmin + aYmax) / 2 };
+    const bCenter = { x: (bXmin + bXmax) / 2, y: (bYmin + bYmax) / 2 };
+    const dist = Math.hypot(aCenter.x - bCenter.x, aCenter.y - bCenter.y);
+
+    // Opposite sides of net (Near Court y > 480 vs Far Court y < 450) are NEVER duplicates
+    const aNear = aCenter.y > 480;
+    const bNear = bCenter.y > 480;
+    if (aNear !== bNear) return false;
+
+    // Never merge players with generic roles
+    const genericRoles = [
+      "athlete", "player", "outsidehitter", "middleblocker", "setter",
+      "libero", "opposite", "forward", "defender", "midfielder", "team"
+    ];
+    const aClean = a.label.trim().toLowerCase().replace(/[^a-z]/g, "");
+    const bClean = b.label.trim().toLowerCase().replace(/[^a-z]/g, "");
+    if (genericRoles.some((g) => aClean.includes(g))) {
+      return dist < 35;
+    }
+
+    return aClean === bClean && dist < 85;
+  };
+
   const distinct: DetectedPlayer[] = [];
   for (const player of normalized) {
-    const duplicate = distinct.find((candidate) =>
-      player.label.trim().toLowerCase() === candidate.label.trim().toLowerCase()
-      || (player.jerseyNumber && player.team && candidate.team && player.jerseyNumber === candidate.jerseyNumber
-        && player.team.trim().toLowerCase() === candidate.team.trim().toLowerCase()),
-    );
-    if (!duplicate) distinct.push(player);
-    else if (player.confidence > duplicate.confidence) Object.assign(duplicate, player, { id: duplicate.id });
+    const duplicate = distinct.find((candidate) => isDuplicate(player, candidate));
+    if (!duplicate) {
+      distinct.push(player);
+    } else if (player.confidence > duplicate.confidence) {
+      Object.assign(duplicate, player, { id: duplicate.id });
+    }
   }
+
+  // Generate close-up crop thumbnails for all distinct athletes from the clearest frame
+  const refFrame = frames[0]?.data || "";
+  if (refFrame && typeof window !== "undefined") {
+    await Promise.all(
+      distinct.map(async (player) => {
+        try {
+          if (!player.cropFrame && player.bbox) {
+            player.cropFrame = await cropBboxFromBase64(refFrame, player.bbox);
+          }
+        } catch {
+          // Keep empty if crop failed
+        }
+      })
+    );
+  }
+
   return distinct.map((player, index) => ({ ...player, id: `player-${index + 1}` }));
 }
 

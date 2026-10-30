@@ -3585,18 +3585,54 @@ function ProfileView({
                     </button>
                   </div>
                   {players.map((player) => (
-                    <label className="detected-player" key={player.id}>
+                    <label className="detected-player" key={player.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <input
                         type="checkbox"
                         checked={selectedPlayerIds.includes(player.id)}
                         disabled={busy}
                         onChange={() => togglePlayer(player.id)}
                       />
-                      <span>
-                        <strong>{player.label}</strong>
-                        <small>
-                          {player.position}
-                          {player.team ? ` · ${player.team}` : ""} ·{" "}
+                      {player.cropFrame ? (
+                        <img
+                          src={`data:image/jpeg;base64,${player.cropFrame}`}
+                          alt={player.label}
+                          className="roster-chip-crop-thumb"
+                          style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 8,
+                            objectFit: "cover",
+                            border: `2px solid ${player.teamColorHex || "var(--gold)"}`,
+                            flexShrink: 0,
+                          }}
+                        />
+                      ) : (
+                        <span
+                          className="player-number-pill"
+                          style={{
+                            backgroundColor: player.teamColorHex || "var(--panel-raised)",
+                            color: "#fff",
+                            minWidth: 36,
+                            height: 36,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: 8,
+                            fontWeight: 800,
+                            fontSize: 12,
+                            flexShrink: 0,
+                            border: "1px solid var(--line)",
+                          }}
+                        >
+                          {player.jerseyNumber ? `#${player.jerseyNumber}` : player.label.slice(0, 2).toUpperCase()}
+                        </span>
+                      )}
+                      <span style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <strong>{player.label}</strong>
+                          {player.jerseyNumber && (
+                            <span className="jersey-pill">#{player.jerseyNumber}</span>
+                          )}
                           <span
                             className={`confidence-badge ${
                               player.confidence >= 80
@@ -3608,6 +3644,10 @@ function ProfileView({
                           >
                             {player.confidence}% confidence
                           </span>
+                        </div>
+                        <small>
+                          {player.position}
+                          {player.team ? ` · ${player.team}` : ""}
                         </small>
                         <small>
                           {player.description || player.standoutTrait}
@@ -8250,23 +8290,23 @@ function SettingsView({
                   <strong>KEYFRAME SAMPLE COUNT</strong>
                   <span>
                     Controls the number of locally extracted frames sent for
-                    each scan.
+                    each scan (up to 24 frames for full matches).
                   </span>
                 </div>
                 <b>{frameCount} FRAMES</b>
                 <input
                   type="range"
-                  min="3"
-                  max="12"
-                  step="1"
+                  min="4"
+                  max="24"
+                  step="2"
                   value={frameCount}
                   onChange={(event) =>
                     setFrameCount(Number(event.target.value))
                   }
                 />
                 <small>
-                  <span>3 FRAMES</span>
-                  <span>12 FRAMES</span>
+                  <span>4 FRAMES (Quick)</span>
+                  <span>24 FRAMES (Full Match)</span>
                 </small>
               </div>
               <div className="privacy-note">
@@ -8584,7 +8624,7 @@ function App() {
       : "gemini-3.8-flash"
   })
   const [modelSaveError, setModelSaveError] = useState("")
-  const [frameCount, setFrameCount] = useState(6)
+  const [frameCount, setFrameCount] = useState(12)
   const [units, setUnits] = useState("Metric")
   const [accent, setAccent] = useState("Pure Gold")
   const [filterMetrics, setFilterMetrics] = useState(true)
@@ -8852,7 +8892,7 @@ function App() {
         setFrameCount(
           typeof preferences.frameCount === "number"
             ? preferences.frameCount
-            : 6,
+            : 12,
         )
         setFilterMetrics(
           typeof preferences.filterMetrics === "boolean"

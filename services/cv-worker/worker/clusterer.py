@@ -89,11 +89,13 @@ class PlayerClusterer:
     def cluster_candidate_detections(
         self,
         candidate_frames: List[Dict[str, Any]],
-        max_clusters: int = 32,
+        max_clusters: int = 36,
     ) -> List[Dict[str, Any]]:
         """
         Runs local player detection across candidate frames and clusters detections into distinct entities.
         Retains Top 2 sharpest thumbnails for each entity and flags Starter vs Substitute.
+        Guarantees that distinct teammates sharing kit colors and players across court zones (e.g. Volleyball 6v6)
+        are preserved without aggressive collapse.
         """
         if not HAS_CV2 or not candidate_frames:
             return self._generate_mock_clusters()
@@ -151,7 +153,10 @@ class PlayerClusterer:
             return self._generate_mock_clusters()
 
         # 2. Cluster detections into distinct player entities
-        # We group by Team Kit Hue, Field Proximity Corridor, and Temporal Continuity
+        # RULES FOR TEAM SPORTS (Volleyball, Football, Basketball):
+        # - Teammates share the SAME kit color. Never merge based on color alone.
+        # - Co-temporal exclusion: Detections from the SAME frame MUST belong to different players.
+        # - Spatial positioning: Players separated by distinct tactical court corridors/zones are distinct athletes.
         raw_clusters: List[List[Dict[str, Any]]] = []
 
         for det in all_detections:
@@ -159,16 +164,31 @@ class PlayerClusterer:
             best_sim_score = -1.0
 
             for c_idx, cluster in enumerate(raw_clusters):
+                # RULE 1: Co-temporal exclusion - A player cannot be in two places in the same frame
+                frame_indices = {d["frameIndex"] for d in cluster}
+                if det["frameIndex"] in frame_indices:
+                    continue
+
                 rep = cluster[0]
                 # Hue distance on circular 0-180 scale
                 hue_diff = min(abs(det["hsv"][0] - rep["hsv"][0]), 180 - abs(det["hsv"][0] - rep["hsv"][0]))
                 sat_diff = abs(det["hsv"][1] - rep["hsv"][1])
-                pos_dist = np.linalg.norm(det["pos"] - rep["pos"])
+                pos_dist = float(np.linalg.norm(det["pos"] - rep["pos"]))
 
-                # Kit color is primary match factor; spatial position is secondary
+                # In team sports, players with same kit color at different court positions are DIFFERENT teammates
+                # Near Court (y > 0.5) vs Far Court (y < 0.5) are opposing teams or distinct zones
+                diff_court_side = (det["pos"][1] > 0.5 and rep["pos"][1] < 0.45) or (det["pos"][1] < 0.45 and rep["pos"][1] > 0.5)
+                if diff_court_side:
+                    continue  # Across the net: cannot be the same player
+
                 if hue_diff < 22 and sat_diff < 80:
-                    sim = (1.0 - (hue_diff / 22.0)) * 0.65 + (1.0 - min(1.0, pos_dist)) * 0.35
-                    if sim > best_sim_score and sim > 0.50:
+                    # Same team kit! If they are spatially separated (> 0.22 normalized distance), they are different teammates!
+                    if pos_dist > 0.22:
+                        continue
+
+                    # Same kit + close spatial corridor across time
+                    sim = (1.0 - (hue_diff / 22.0)) * 0.35 + (1.0 - min(1.0, pos_dist)) * 0.65
+                    if sim > best_sim_score and sim > 0.60:
                         best_sim_score = sim
                         best_cluster_idx = c_idx
 
@@ -177,12 +197,12 @@ class PlayerClusterer:
             else:
                 raw_clusters.append([det])
 
-        # Filter out transient noise (clusters with only 1 detection and low sharpness)
-        valid_clusters = [c for c in raw_clusters if len(c) >= 2 or (len(c) == 1 and c[0]["sharpness"] >= 30.0)]
-        if not valid_clusters:
-            valid_clusters = raw_clusters[:max_clusters]
-        else:
-            valid_clusters = sorted(valid_clusters, key=lambda c: len(c), reverse=True)[:max_clusters]
+        # Retain all valid candidate clusters up to max_clusters (including single crisp detections)
+        valid_clusters = sorted(
+            raw_clusters,
+            key=lambda c: len(c) * 15.0 + max(d.get("sharpness", 0.0) for d in c),
+            reverse=True,
+        )[:max_clusters]
 
         # 3. For each cluster entity, retain Top 2 sharpest crop thumbnails and flag Starter vs Substitute
         player_entities: List[Dict[str, Any]] = []
