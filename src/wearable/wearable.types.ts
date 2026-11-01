@@ -1,5 +1,5 @@
 /**
- * SCOT Wearable — Type Definitions for ESP32 + MPU6050 IMU Integration
+ * SCOT Wearable — Type Definitions for ESP32 + MPU6500 / MPU6050 IMU Integration
  */
 
 export interface RawSensorReading {
@@ -26,6 +26,8 @@ export interface RawSensorReading {
   gyro_x?: number | string | null
   gyro_y?: number | string | null
   gyro_z?: number | string | null
+  sensor?: string
+  temp_c?: number | string | null
   timestamp_ms?: number
   units?: {
     accel?: string
@@ -56,14 +58,21 @@ export interface NormalizedSensorReading {
   accelUnit: string
   /** Gyroscope unit string, e.g. "rad/s" or "°/s" */
   gyroUnit: string
+  /** Detected hardware sensor model (e.g. "MPU6500", "MPU6050") */
+  sensorModel?: string
+  /** Sensor temperature in °C */
+  temperatureC?: number | null
 }
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error"
+
+export type TransportMode = "wifi" | "serial"
 
 export type MotionActivityLevel = "low" | "moderate" | "high" | "unknown"
 
 export interface WearableDeviceState {
   endpoint: string
+  transportMode: TransportMode
   status: ConnectionStatus
   lastReading: NormalizedSensorReading | null
   lastSuccessfulTime: number | null

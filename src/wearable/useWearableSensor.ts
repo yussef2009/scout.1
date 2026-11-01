@@ -5,6 +5,7 @@ import type {
   MotionActivityLevel,
   NormalizedSensorReading,
   RawSensorReading,
+  TransportMode,
 } from "./wearable.types"
 
 const DEFAULT_ENDPOINT = "http://192.168.4.1/data"
@@ -63,6 +64,8 @@ export function normalizeWearablePayload(
 
   const accelUnit = data.units?.accel || "m/s²"
   const gyroUnit = data.units?.gyro || "rad/s"
+  const sensorModel = data.sensor || (typeof data.sensor === "string" ? data.sensor : undefined)
+  const temperatureC = extractNum(data.temp_c)
 
   return {
     timestamp: now,
@@ -80,6 +83,8 @@ export function normalizeWearablePayload(
     },
     accelUnit,
     gyroUnit,
+    sensorModel,
+    temperatureC,
   }
 }
 
@@ -100,7 +105,7 @@ export function computeActivityLevel(
   const max = Math.max(...magnitudes)
   const spread = max - min
 
-  // Typical static IMU noise with earth gravity is < 0.6 m/s^2 spread
+  // Typical static IMU noise with earth gravity is < 0.8 m/s^2 spread
   if (spread < 0.8) {
     return "low"
   } else if (spread < 3.8) {
@@ -111,6 +116,7 @@ export function computeActivityLevel(
 }
 
 export function useWearableSensor() {
+  const [transportMode, setTransportMode] = useState<TransportMode>("wifi")
   const [endpoint, setEndpoint] = useState<string>(DEFAULT_ENDPOINT)
   const [status, setStatus] = useState<ConnectionStatus>("disconnected")
   const [lastReading, setLastReading] =
@@ -127,11 +133,21 @@ export function useWearableSensor() {
   )
   const [isSimulated, setIsSimulated] = useState<boolean>(false)
 
+  // WebSerial support detection
+  const isSerialSupported = useMemo(() => {
+    return typeof navigator !== "undefined" && "serial" in navigator
+  }, [])
+
   // Refs for tracking in-flight requests and timers
   const activeControllerRef = useRef<AbortController | null>(null)
   const pollingTimerRef = useRef<number | null>(null)
   const isRequestInFlight = useRef<boolean>(false)
   const simulationStepRef = useRef<number>(0)
+
+  // Serial connection refs
+  const serialPortRef = useRef<any>(null)
+  const serialReaderRef = useRef<any>(null)
+  const isSerialReadingRef = useRef<boolean>(false)
 
   // Clean up any in-flight requests and timers
   const stopPolling = useCallback(() => {
@@ -144,6 +160,23 @@ export function useWearableSensor() {
       activeControllerRef.current = null
     }
     isRequestInFlight.current = false
+  }, [])
+
+  // Stop serial reading and close port
+  const stopSerial = useCallback(async () => {
+    isSerialReadingRef.current = false
+    try {
+      if (serialReaderRef.current) {
+        await serialReaderRef.current.cancel().catch(() => {})
+        serialReaderRef.current = null
+      }
+      if (serialPortRef.current) {
+        await serialPortRef.current.close().catch(() => {})
+        serialPortRef.current = null
+      }
+    } catch {
+      // Ignore errors on close
+    }
   }, [])
 
   // Generate simulated mock reading for hardware-unavailable dev testing
@@ -183,29 +216,39 @@ export function useWearableSensor() {
       gyro: { x: gx, y: gy, z: gz },
       accelUnit: "m/s²",
       gyroUnit: "rad/s",
+      sensorModel: "SIMULATOR",
+      temperatureC: 25.5,
     }
   }, [])
 
-  // Execute a single poll
+  // Ingest reading helper
+  const ingestNormalizedReading = useCallback(
+    (normalized: NormalizedSensorReading) => {
+      setLastReading(normalized)
+      setLastSuccessfulTime(normalized.timestamp)
+      setTotalReadingsCount((c) => c + 1)
+      setStatus("connected")
+      setLastErrorMessage(null)
+
+      if (normalized.accel.magnitude !== null) {
+        const point: ChartDataPoint = {
+          timestamp: normalized.timestamp,
+          timeLabel: normalized.timeFormatted.split(".")[0],
+          magnitude: normalized.accel.magnitude,
+        }
+        setHistory((prev) => [...prev.slice(-(MAX_CHART_POINTS - 1)), point])
+      }
+    },
+    [],
+  )
+
+  // Execute a single HTTP poll
   const pollDevice = useCallback(async () => {
     if (isRequestInFlight.current) return
 
     if (isSimulated) {
       const simReading = generateSimulatedReading()
-      setLastReading(simReading)
-      setLastSuccessfulTime(simReading.timestamp)
-      setTotalReadingsCount((c) => c + 1)
-      setStatus("connected")
-      setLastErrorMessage(null)
-
-      if (simReading.accel.magnitude !== null) {
-        const point: ChartDataPoint = {
-          timestamp: simReading.timestamp,
-          timeLabel: simReading.timeFormatted.split(".")[0],
-          magnitude: simReading.accel.magnitude,
-        }
-        setHistory((prev) => [...prev.slice(-(MAX_CHART_POINTS - 1)), point])
-      }
+      ingestNormalizedReading(simReading)
       return
     }
 
@@ -237,33 +280,19 @@ export function useWearableSensor() {
 
       const json = await response.json()
       const normalized = normalizeWearablePayload(json)
-
-      setLastReading(normalized)
-      setLastSuccessfulTime(normalized.timestamp)
-      setTotalReadingsCount((c) => c + 1)
-      setStatus("connected")
-      setLastErrorMessage(null)
-
-      if (normalized.accel.magnitude !== null) {
-        const point: ChartDataPoint = {
-          timestamp: normalized.timestamp,
-          timeLabel: normalized.timeFormatted.split(".")[0],
-          magnitude: normalized.accel.magnitude,
-        }
-        setHistory((prev) => [...prev.slice(-(MAX_CHART_POINTS - 1)), point])
-      }
+      ingestNormalizedReading(normalized)
     } catch (err: unknown) {
       window.clearTimeout(timeoutId)
       let errorMsg = "Failed to communicate with sensor"
 
       if (err instanceof Error) {
         if (err.name === "AbortError") {
-          errorMsg = `Connection timed out after ${REQUEST_TIMEOUT_MS / 1000}s. Verify sensor is online.`
+          errorMsg = `Connection timed out after ${REQUEST_TIMEOUT_MS / 1000}s. Verify ESP32 is running.`
         } else if (
           err.message.includes("Failed to fetch") ||
           err.message.includes("NetworkError")
         ) {
-          errorMsg = `Cannot reach '${endpoint}'. Ensure laptop is connected to the ESP32 Wi-Fi ('SCOT-Sensor') and endpoint URL is correct.`
+          errorMsg = `Cannot reach '${endpoint}'. Ensure device Wi-Fi is connected to 'SCOT-Sensor' (or your router IP) and firmware is running.`
         } else {
           errorMsg = err.message
         }
@@ -276,48 +305,144 @@ export function useWearableSensor() {
       isRequestInFlight.current = false
       activeControllerRef.current = null
     }
-  }, [endpoint, isSimulated, generateSimulatedReading])
+  }, [endpoint, isSimulated, generateSimulatedReading, ingestNormalizedReading])
 
-  // Connect action
-  const connect = useCallback(() => {
+  // Connect via Web Serial (USB Cable)
+  const connectSerial = useCallback(async () => {
+    if (!isSerialSupported) {
+      setStatus("error")
+      setLastErrorMessage(
+        "Web Serial API is not supported in this browser. Please use Chrome, Edge, or Opera, or use Wi-Fi mode.",
+      )
+      return
+    }
+
     stopPolling()
+    await stopSerial()
+
     setStatus("connecting")
     setLastErrorMessage(null)
 
-    // Initial immediate poll
-    void pollDevice()
+    try {
+      const nav = navigator as any
+      const port = await nav.serial.requestPort()
+      await port.open({ baudRate: 115200 })
 
-    // Start repeating polling timer
-    pollingTimerRef.current = window.setInterval(() => {
-      void pollDevice()
-    }, pollingIntervalMs)
-  }, [stopPolling, pollDevice, pollingIntervalMs])
+      serialPortRef.current = port
+      isSerialReadingRef.current = true
+      setStatus("connected")
 
-  // Disconnect action
-  const disconnect = useCallback(() => {
-    stopPolling()
-    setStatus("disconnected")
-    setLastErrorMessage(null)
-  }, [stopPolling])
+      const textDecoder = new (window as any).TextDecoderStream()
+      port.readable.pipeTo(textDecoder.writable).catch(() => {})
+      const reader = textDecoder.readable.getReader()
+      serialReaderRef.current = reader
 
-  // Restart polling if interval or simulated mode changes while connected
-  useEffect(() => {
-    if (status === "connected" || status === "connecting") {
-      if (pollingTimerRef.current !== null) {
-        window.clearInterval(pollingTimerRef.current)
-        pollingTimerRef.current = window.setInterval(() => {
-          void pollDevice()
-        }, pollingIntervalMs)
+      let streamBuffer = ""
+
+      while (isSerialReadingRef.current) {
+        const { value, done } = await reader.read()
+        if (done) break
+        if (value) {
+          streamBuffer += value
+          const lines = streamBuffer.split("\n")
+          streamBuffer = lines.pop() ?? ""
+
+          for (const line of lines) {
+            const clean = line.trim()
+            if (!clean.startsWith("{") || !clean.endsWith("}")) continue
+            try {
+              const parsed = JSON.parse(clean)
+              const normalized = normalizeWearablePayload(parsed)
+              ingestNormalizedReading(normalized)
+            } catch {
+              // Ignore non-JSON diagnostic messages
+            }
+          }
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "NotFoundError") {
+        // User cancelled port selection dialog
+        setStatus("disconnected")
+        return
+      }
+      setStatus("error")
+      setLastErrorMessage(
+        err instanceof Error ? err.message : "Failed to open USB serial port",
+      )
+    } finally {
+      await stopSerial()
+      if (isSerialReadingRef.current) {
+        setStatus("disconnected")
       }
     }
-  }, [pollingIntervalMs, isSimulated, pollDevice, status])
+  }, [isSerialSupported, stopPolling, stopSerial, ingestNormalizedReading])
+
+  // Unified Connect Action
+  const connect = useCallback(() => {
+    if (isSimulated) {
+      stopPolling()
+      void stopSerial()
+      setStatus("connecting")
+      setLastErrorMessage(null)
+      void pollDevice()
+      pollingTimerRef.current = window.setInterval(() => {
+        void pollDevice()
+      }, pollingIntervalMs)
+      return
+    }
+
+    if (transportMode === "serial") {
+      void connectSerial()
+    } else {
+      stopPolling()
+      void stopSerial()
+      setStatus("connecting")
+      setLastErrorMessage(null)
+      void pollDevice()
+      pollingTimerRef.current = window.setInterval(() => {
+        void pollDevice()
+      }, pollingIntervalMs)
+    }
+  }, [
+    isSimulated,
+    transportMode,
+    connectSerial,
+    stopPolling,
+    stopSerial,
+    pollDevice,
+    pollingIntervalMs,
+  ])
+
+  // Unified Disconnect Action
+  const disconnect = useCallback(() => {
+    stopPolling()
+    void stopSerial()
+    setStatus("disconnected")
+    setLastErrorMessage(null)
+  }, [stopPolling, stopSerial])
+
+  // Restart Wi-Fi polling if interval or simulated mode changes while connected
+  useEffect(() => {
+    if (transportMode === "wifi" || isSimulated) {
+      if (status === "connected" || status === "connecting") {
+        if (pollingTimerRef.current !== null) {
+          window.clearInterval(pollingTimerRef.current)
+          pollingTimerRef.current = window.setInterval(() => {
+            void pollDevice()
+          }, pollingIntervalMs)
+        }
+      }
+    }
+  }, [pollingIntervalMs, isSimulated, pollDevice, status, transportMode])
 
   // Unmount cleanup
   useEffect(() => {
     return () => {
       stopPolling()
+      void stopSerial()
     }
-  }, [stopPolling])
+  }, [stopPolling, stopSerial])
 
   const activityLevel = useMemo(() => computeActivityLevel(history), [history])
 
@@ -328,6 +453,9 @@ export function useWearableSensor() {
   }, [])
 
   return {
+    transportMode,
+    setTransportMode,
+    isSerialSupported,
     endpoint,
     setEndpoint,
     status,

@@ -1,9 +1,13 @@
 import React, { useState } from "react"
-import type { ConnectionStatus } from "./wearable.types"
+import type { ConnectionStatus, TransportMode } from "./wearable.types"
 
 interface DeviceConnectionCardProps {
   endpoint: string
   onEndpointChange: (endpoint: string) => void
+  transportMode?: TransportMode
+  onTransportModeChange?: (mode: TransportMode) => void
+  isSerialSupported?: boolean
+  sensorModel?: string
   status: ConnectionStatus
   lastSuccessfulTime: number | null
   totalReadingsCount: number
@@ -21,6 +25,10 @@ interface DeviceConnectionCardProps {
 export function DeviceConnectionCard({
   endpoint,
   onEndpointChange,
+  transportMode = "wifi",
+  onTransportModeChange,
+  isSerialSupported = false,
+  sensorModel,
   status,
   lastSuccessfulTime,
   totalReadingsCount,
@@ -86,89 +94,190 @@ export function DeviceConnectionCard({
             <strong className="spec-val">SCOT Motion Sensor</strong>
           </div>
           <div className="spec-item">
-            <span className="spec-label">HARDWARE ARCHITECTURE</span>
-            <strong className="spec-val">ESP32 + MPU6050 (6-DOF IMU)</strong>
+            <span className="spec-label">HARDWARE SENSOR</span>
+            <strong className="spec-val">
+              {sensorModel ? `ESP32 + ${sensorModel}` : "ESP32 + MPU6500 / MPU6050"}
+            </strong>
           </div>
           <div className="spec-item">
-            <span className="spec-label">NETWORK TRANSPORT</span>
-            <strong className="spec-val">Local Wi-Fi / HTTP REST</strong>
+            <span className="spec-label">I2C BUS PINS</span>
+            <strong className="spec-val">SDA: GPIO 19 &middot; SCL: GPIO 18</strong>
           </div>
           <div className="spec-item">
-            <span className="spec-label">LAST READING RECEIVED</span>
-            <strong className="spec-val">{formattedLastTime}</strong>
+            <span className="spec-label">TRANSPORT MODE</span>
+            <strong className="spec-val">
+              {transportMode === "serial"
+                ? "Direct USB (Web Serial @ 115200)"
+                : "Wi-Fi HTTP REST (192.168.4.1)"}
+            </strong>
           </div>
         </div>
 
-        {/* Endpoint Input & Controls */}
-        <div className="endpoint-form-row">
-          <div className="endpoint-input-container">
-            <label className="endpoint-label">
-              <span>DEVICE ENDPOINT URL</span>
-              <div className="input-wrap">
-                <input
-                  type="url"
-                  value={urlDraft}
-                  onChange={(e) => validateAndApplyUrl(e.target.value)}
-                  placeholder="http://192.168.4.1/data"
-                  disabled={isConnecting || isConnected}
-                  aria-label="ESP32 Sensor Endpoint URL"
-                />
-              </div>
-            </label>
-            {urlError && (
-              <span className="endpoint-error-hint">{urlError}</span>
-            )}
+        {/* Transport Mode Switcher */}
+        {!isSimulated && onTransportModeChange && (
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              marginTop: "16px",
+              marginBottom: "12px",
+            }}
+          >
+            <button
+              type="button"
+              className={`text-button ${transportMode === "wifi" ? "active" : ""}`}
+              style={{
+                padding: "6px 14px",
+                borderRadius: "6px",
+                border: "1px solid",
+                borderColor: transportMode === "wifi" ? "var(--color-accent, #eab308)" : "#2d3748",
+                background: transportMode === "wifi" ? "rgba(234, 179, 8, 0.12)" : "transparent",
+                color: transportMode === "wifi" ? "#eab308" : "#94a3b8",
+                cursor: isConnected || isConnecting ? "not-allowed" : "pointer",
+                fontWeight: 600,
+                fontSize: "12px",
+              }}
+              disabled={isConnected || isConnecting}
+              onClick={() => onTransportModeChange("wifi")}
+            >
+              WI-FI ACCESS POINT / LAN
+            </button>
+            <button
+              type="button"
+              className={`text-button ${transportMode === "serial" ? "active" : ""}`}
+              style={{
+                padding: "6px 14px",
+                borderRadius: "6px",
+                border: "1px solid",
+                borderColor: transportMode === "serial" ? "var(--color-accent, #eab308)" : "#2d3748",
+                background: transportMode === "serial" ? "rgba(234, 179, 8, 0.12)" : "transparent",
+                color: transportMode === "serial" ? "#eab308" : "#94a3b8",
+                cursor: isConnected || isConnecting ? "not-allowed" : "pointer",
+                fontWeight: 600,
+                fontSize: "12px",
+              }}
+              disabled={isConnected || isConnecting}
+              onClick={() => onTransportModeChange("serial")}
+            >
+              DIRECT USB (WEB SERIAL)
+            </button>
           </div>
+        )}
 
-          <div className="polling-interval-container">
-            <label className="endpoint-label">
-              <span>POLL INTERVAL</span>
-              <div className="select-wrap">
-                <select
-                  value={pollingIntervalMs}
-                  onChange={(e) =>
-                    onPollingIntervalChange(Number(e.target.value))
-                  }
-                  disabled={isConnecting}
-                  aria-label="Sensor polling rate"
+        {/* Transport-Specific Controls */}
+        {transportMode === "wifi" ? (
+          <div className="endpoint-form-row">
+            <div className="endpoint-input-container">
+              <label className="endpoint-label">
+                <span>DEVICE ENDPOINT URL</span>
+                <div className="input-wrap">
+                  <input
+                    type="url"
+                    value={urlDraft}
+                    onChange={(e) => validateAndApplyUrl(e.target.value)}
+                    placeholder="http://192.168.4.1/data"
+                    disabled={isConnecting || isConnected}
+                    aria-label="ESP32 Sensor Endpoint URL"
+                  />
+                </div>
+              </label>
+              {urlError && (
+                <span className="endpoint-error-hint">{urlError}</span>
+              )}
+            </div>
+
+            <div className="polling-interval-container">
+              <label className="endpoint-label">
+                <span>POLL INTERVAL</span>
+                <div className="select-wrap">
+                  <select
+                    value={pollingIntervalMs}
+                    onChange={(e) =>
+                      onPollingIntervalChange(Number(e.target.value))
+                    }
+                    disabled={isConnecting}
+                    aria-label="Sensor polling rate"
+                  >
+                    <option value={200}>200 ms (5 Hz - Fast)</option>
+                    <option value={500}>500 ms (2 Hz - Default)</option>
+                    <option value={1000}>1000 ms (1 Hz - Standard)</option>
+                  </select>
+                </div>
+              </label>
+            </div>
+
+            <div className="endpoint-actions">
+              {!isConnected && !isConnecting ? (
+                <button
+                  type="button"
+                  className="primary-button connect-btn"
+                  onClick={onConnect}
+                  disabled={Boolean(urlError)}
                 >
-                  <option value={200}>200 ms (5 Hz - Fast)</option>
-                  <option value={500}>500 ms (2 Hz - Default)</option>
-                  <option value={1000}>1000 ms (1 Hz - Standard)</option>
-                </select>
-              </div>
-            </label>
+                  CONNECT DEVICE
+                </button>
+              ) : isConnecting ? (
+                <button
+                  type="button"
+                  className="primary-button connect-btn disabled"
+                  disabled
+                >
+                  <span className="btn-spinner" /> CONNECTING...
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="outline-button disconnect-btn"
+                  onClick={onDisconnect}
+                >
+                  DISCONNECT
+                </button>
+              )}
+            </div>
           </div>
+        ) : (
+          <div className="endpoint-form-row" style={{ alignItems: "center" }}>
+            <div style={{ flex: 1, paddingRight: "16px" }}>
+              <span className="endpoint-label" style={{ display: "block", marginBottom: "4px" }}>
+                <span>USB SERIAL LINK (115200 BAUD)</span>
+              </span>
+              <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8" }}>
+                {isSerialSupported
+                  ? "Plug your ESP32 into a USB port. Click below to select the COM port and stream real-time kinematics directly."
+                  : "Web Serial is not supported in this browser. Please use Google Chrome, Microsoft Edge, or switch to Wi-Fi mode."}
+              </p>
+            </div>
 
-          <div className="endpoint-actions">
-            {!isConnected && !isConnecting ? (
-              <button
-                type="button"
-                className="primary-button connect-btn"
-                onClick={onConnect}
-                disabled={Boolean(urlError)}
-              >
-                CONNECT DEVICE
-              </button>
-            ) : isConnecting ? (
-              <button
-                type="button"
-                className="primary-button connect-btn disabled"
-                disabled
-              >
-                <span className="btn-spinner" /> CONNECTING...
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="outline-button disconnect-btn"
-                onClick={onDisconnect}
-              >
-                DISCONNECT
-              </button>
-            )}
+            <div className="endpoint-actions">
+              {!isConnected && !isConnecting ? (
+                <button
+                  type="button"
+                  className="primary-button connect-btn"
+                  onClick={onConnect}
+                  disabled={!isSerialSupported}
+                >
+                  CONNECT USB PORT
+                </button>
+              ) : isConnecting ? (
+                <button
+                  type="button"
+                  className="primary-button connect-btn disabled"
+                  disabled
+                >
+                  <span className="btn-spinner" /> CONNECTING...
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="outline-button disconnect-btn"
+                  onClick={onDisconnect}
+                >
+                  DISCONNECT USB
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Error notification banner */}
         {hasError && lastErrorMessage && (
@@ -191,36 +300,25 @@ export function DeviceConnectionCard({
         {/* Network & CORS troubleshooting guide */}
         {showNetworkGuide && (
           <div className="network-guide-panel">
-            <span className="section-kicker">WI-FI & BROWSER CHECKS</span>
+            <span className="section-kicker">HARDWARE & WI-FI TROUBLESHOOTING</span>
             <ul>
               <li>
-                <strong>1. ESP32 Access Point:</strong> Verify your laptop Wi-Fi
-                is connected to the sensor network (e.g.,{" "}
-                <code>SCOT-Sensor</code>).
+                <strong>1. Sensor I2C Wiring:</strong> Make sure your MPU6500 or MPU6050 sensor is wired to:
+                <br />
+                <code>3V3 &rarr; VCC</code>, <code>GND &rarr; GND</code>, <code>GPIO 19 &rarr; SDA</code>, <code>GPIO 18 &rarr; SCL</code>.
               </li>
               <li>
-                <strong>2. Default Gateway:</strong> In SoftAP mode, the ESP32
-                defaults to IP <code>192.168.4.1</code>. Test in a new browser
-                tab:{" "}
+                <strong>2. USB Cable Option:</strong> The simplest option is switching to <strong>DIRECT USB (WEB SERIAL)</strong> mode above, which connects directly via Chrome/Edge without switching your Wi-Fi network.
+              </li>
+              <li>
+                <strong>3. Wi-Fi SoftAP:</strong> If using Wi-Fi, verify your computer Wi-Fi is connected to <code>SCOT-Sensor</code>, and test endpoint in your browser:{" "}
                 <a
                   href="http://192.168.4.1/data"
                   target="_blank"
                   rel="noreferrer"
                 >
                   http://192.168.4.1/data
-                </a>
-                .
-              </li>
-              <li>
-                <strong>3. CORS Headers:</strong> Ensure the ESP32 web server
-                includes header <code>Access-Control-Allow-Origin: *</code>. See
-                the provided firmware in <code>embedded/esp/espcode</code>.
-              </li>
-              <li>
-                <strong>4. Browser Mixed Content:</strong> If accessing SCOT
-                over HTTPS, modern browsers restrict unencrypted HTTP calls to
-                local subnets. Run SCOT locally with <code>npm run dev</code> on{" "}
-                <code>http://localhost:8443</code>.
+                </a>.
               </li>
             </ul>
           </div>

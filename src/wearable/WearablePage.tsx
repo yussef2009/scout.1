@@ -10,6 +10,9 @@ interface WearablePageProps {
 
 export function WearablePage({ theme = "Dark" }: WearablePageProps) {
   const {
+    transportMode,
+    setTransportMode,
+    isSerialSupported,
     endpoint,
     setEndpoint,
     status,
@@ -68,7 +71,7 @@ export function WearablePage({ theme = "Dark" }: WearablePageProps) {
       <section className="subpage-heading wearable-heading">
         <div className="heading-content">
           <p className="eyebrow">
-            <span /> HARDWARE SENSOR TELEMETRY · ESP32 + GY-521
+            <span /> HARDWARE SENSOR TELEMETRY · ESP32 + MPU6500 / MPU6050
           </p>
           <div className="title-row">
             <h1>
@@ -82,7 +85,9 @@ export function WearablePage({ theme = "Dark" }: WearablePageProps) {
                 {status === "connected"
                   ? isSimulated
                     ? "SIMULATOR ACTIVE"
-                    : "LIVE STREAMING"
+                    : transportMode === "serial"
+                      ? `USB STREAMING (${lastReading?.sensorModel || "MPU"})`
+                      : `LIVE WI-FI (${lastReading?.sensorModel || "MPU"})`
                   : status === "connecting"
                     ? "CONNECTING SENSOR"
                     : status === "error"
@@ -91,7 +96,6 @@ export function WearablePage({ theme = "Dark" }: WearablePageProps) {
               </span>
             </div>
           </div>
-
         </div>
       </section>
 
@@ -101,6 +105,10 @@ export function WearablePage({ theme = "Dark" }: WearablePageProps) {
         <DeviceConnectionCard
           endpoint={endpoint}
           onEndpointChange={setEndpoint}
+          transportMode={transportMode}
+          onTransportModeChange={setTransportMode}
+          isSerialSupported={isSerialSupported}
+          sensorModel={lastReading?.sensorModel}
           status={status}
           lastSuccessfulTime={lastSuccessfulTime}
           totalReadingsCount={totalReadingsCount}
@@ -140,7 +148,7 @@ export function WearablePage({ theme = "Dark" }: WearablePageProps) {
               </span>
               <p>
                 Calculated from short-window acceleration magnitude variance
-                (Δmagnitude). This is an experimental motion heuristic, not a
+                (&Delta;magnitude). This is an experimental motion heuristic, not a
                 validated medical diagnosis, injury predictor, or standalone
                 athlete ranking.
               </p>
@@ -189,7 +197,7 @@ export function WearablePage({ theme = "Dark" }: WearablePageProps) {
             unit={accelUnit}
             axis="MAG"
             featured={true}
-            deltaLabel="√(ax² + ay² + az²)"
+            deltaLabel="&radic;(ax&sup2; + ay&sup2; + az&sup2;)"
             statusColor="gold"
             subtext="Net instantaneous acceleration"
           />
@@ -253,7 +261,7 @@ export function WearablePage({ theme = "Dark" }: WearablePageProps) {
               <h2>DEVICE & SESSION HEALTH</h2>
             </div>
             <span className="updated">
-              <i /> POLLING EVERY {pollingIntervalMs} MS
+              <i /> {transportMode === "serial" ? "USB SERIAL 115200 BAUD" : `POLLING EVERY ${pollingIntervalMs} MS`}
             </span>
           </div>
 
@@ -271,12 +279,18 @@ export function WearablePage({ theme = "Dark" }: WearablePageProps) {
             </div>
 
             <div className="telemetry-info-box">
-              <span className="info-box-label">SAMPLING RATE CONFIG</span>
+              <span className="info-box-label">
+                {transportMode === "serial" ? "DATA TRANSPORT" : "SAMPLING RATE CONFIG"}
+              </span>
               <strong className="info-box-val">
-                {Math.round(1000 / pollingIntervalMs)} Hz
+                {transportMode === "serial"
+                  ? "Web Serial API"
+                  : `${Math.round(1000 / pollingIntervalMs)} Hz`}
               </strong>
               <small className="info-box-sub">
-                Interval: {pollingIntervalMs} ms per HTTP request
+                {transportMode === "serial"
+                  ? "Direct USB CDC communication"
+                  : `Interval: ${pollingIntervalMs} ms per HTTP request`}
               </small>
             </div>
 
@@ -289,25 +303,29 @@ export function WearablePage({ theme = "Dark" }: WearablePageProps) {
             </div>
 
             <div className="telemetry-info-box">
-              <span className="info-box-label">NETWORK ANOMALIES</span>
+              <span className="info-box-label">SENSOR TEMPERATURE</span>
               <strong
                 className="info-box-val"
-                style={{ color: errorCount > 0 ? "#ef4444" : "var(--green)" }}
+                style={{ color: "var(--color-accent, #eab308)" }}
               >
-                {errorCount} {errorCount === 1 ? "Error" : "Errors"}
+                {lastReading?.temperatureC != null
+                  ? `${lastReading.temperatureC.toFixed(1)} °C`
+                  : "-- °C"}
               </strong>
               <small className="info-box-sub">
-                {lastErrorMessage
-                  ? "Latest: " + lastErrorMessage.slice(0, 40) + "..."
-                  : "Zero transmission errors"}
+                Internal IMU thermal telemetry
               </small>
             </div>
 
             <div className="telemetry-info-box full-width">
-              <span className="info-box-label">ACTIVE SENSOR ENDPOINT</span>
-              <strong className="info-box-val mono-font">{endpoint}</strong>
+              <span className="info-box-label">ACTIVE SENSOR ENDPOINT / PORT</span>
+              <strong className="info-box-val mono-font">
+                {transportMode === "serial" ? "USB CDC Serial Port @ 115200 baud" : endpoint}
+              </strong>
               <small className="info-box-sub">
-                Direct client-to-microcontroller local connection
+                {lastReading?.sensorModel
+                  ? `Identified chip: ${lastReading.sensorModel} on SDA 19 / SCL 18`
+                  : "Direct client-to-microcontroller connection"}
               </small>
             </div>
           </div>
