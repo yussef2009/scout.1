@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 3
+names: ['ball', 'player', 'referee']
+
+roboflow:
+  workspace: qc
+  project: volleyball-hwxp2
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/qc/volleyball-hwxp2/dataset/2

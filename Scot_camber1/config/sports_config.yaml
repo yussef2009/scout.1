@@ -1,0 +1,126 @@
+# ==============================================================================
+# SCOT AI (Scout AI) - Multi-Sport Computer Vision Configuration
+# ==============================================================================
+
+version: "1.0.0"
+
+# ------------------------------------------------------------------------------
+# Global Inference & Tracking Defaults
+# ------------------------------------------------------------------------------
+global_settings:
+  device: "cuda:0"                 # Fallback to "cpu" if CUDA unavailable
+  confidence_threshold: 0.35
+  iou_threshold: 0.45
+  model_weights:
+    detection: "yolo11s.pt"
+    pose: "yolo11s-pose.pt"
+  bytetrack:
+    track_thresh: 0.45
+    track_buffer: 60
+    match_thresh: 0.8
+    frame_rate: 30
+
+# ------------------------------------------------------------------------------
+# Volleyball (FIVB Regulation Specs)
+# ------------------------------------------------------------------------------
+volleyball:
+  sport_id: "volleyball"
+  display_name: "Volleyball (Indoor FIVB)"
+  class_ids:
+    player: 0
+    ball: 1
+    referee: 2
+    net: 3
+    antenna: 4
+  action_classes:
+    - "Serve"
+    - "Spike"
+    - "Block"
+    - "Set"
+    - "Dig"
+    - "Idle"
+  court:
+    length_m: 18.0                 # Total court length (X-axis: 0.0 to 18.0m)
+    width_m: 9.0                   # Total court width (Y-axis: 0.0 to 9.0m)
+    half_length_m: 9.0             # Half court: 9m x 9m
+    net_position_x_m: 9.0          # Net is at center X = 9.0m
+    attack_line_distance_m: 3.0    # 3m from net on each side (X=6.0m and X=12.0m)
+    service_zone_depth_m: 3.0      # Behind baseline
+    net_height_men_m: 2.43
+    net_height_women_m: 2.24
+    zones:
+      # FIVB standard 6-Zone coordinates for Half A (0.0 to 9.0m)
+      # Zone 4: Front Left, Zone 3: Front Center, Zone 2: Front Right
+      # Zone 5: Back Left, Zone 6: Back Center, Zone 1: Back Right
+      court_a:
+        zone_4: { x_min: 6.0, x_max: 9.0, y_min: 0.0, y_max: 3.0, row: "front" }
+        zone_3: { x_min: 6.0, x_max: 9.0, y_min: 3.0, y_max: 6.0, row: "front" }
+        zone_2: { x_min: 6.0, x_max: 9.0, y_min: 6.0, y_max: 9.0, row: "front" }
+        zone_5: { x_min: 0.0, x_max: 6.0, y_min: 0.0, y_max: 3.0, row: "back" }
+        zone_6: { x_min: 0.0, x_max: 6.0, y_min: 3.0, y_max: 6.0, row: "back" }
+        zone_1: { x_min: 0.0, x_max: 6.0, y_min: 6.0, y_max: 9.0, row: "back" }
+      court_b:
+        zone_2: { x_min: 9.0, x_max: 12.0, y_min: 0.0, y_max: 3.0, row: "front" }
+        zone_3: { x_min: 9.0, x_max: 12.0, y_min: 3.0, y_max: 6.0, row: "front" }
+        zone_4: { x_min: 9.0, x_max: 12.0, y_min: 6.0, y_max: 9.0, row: "front" }
+        zone_1: { x_min: 12.0, x_max: 18.0, y_min: 0.0, y_max: 3.0, row: "back" }
+        zone_6: { x_min: 12.0, x_max: 18.0, y_min: 3.0, y_max: 6.0, row: "back" }
+        zone_5: { x_min: 12.0, x_max: 18.0, y_min: 6.0, y_max: 9.0, row: "back" }
+  kinematics:
+    spike_speed_threshold_kmh: 60.0 # Speeds above this considered spike/hard serve
+    min_jump_height_cm: 15.0       # Minimum delta Y to classify as jump
+    net_proximity_m: 1.5           # Distance from net to classify as block/front attack
+  default_homography_src:          # Default pixel corners for 1920x1080 broadcast view
+    - [340, 310]                   # Top-left corner (0, 0)
+    - [1580, 310]                  # Top-right corner (18, 0)
+    - [1860, 960]                  # Bottom-right corner (18, 9)
+    - [60, 960]                    # Bottom-left corner (0, 9)
+
+# ------------------------------------------------------------------------------
+# Football / Soccer (FIFA Regulation Specs)
+# ------------------------------------------------------------------------------
+football:
+  sport_id: "football"
+  display_name: "Football / Soccer (FIFA 105x68m)"
+  class_ids:
+    player: 0
+    ball: 1
+    goalkeeper: 2
+    referee: 3
+  court:
+    length_m: 105.0
+    width_m: 68.0
+    center_circle_radius_m: 9.15
+    penalty_box_length_m: 16.5
+    penalty_box_width_m: 40.32
+    goal_box_length_m: 5.5
+    goal_box_width_m: 18.32
+    penalty_spot_distance_m: 11.0
+  kinematics:
+    possession_distance_threshold_m: 1.8
+    sprint_speed_threshold_kmh: 24.0
+
+# ------------------------------------------------------------------------------
+# Basketball (FIBA Regulation Specs)
+# ------------------------------------------------------------------------------
+basketball:
+  sport_id: "basketball"
+  display_name: "Basketball (FIBA 28x15m)"
+  class_ids:
+    player: 0
+    ball: 1
+    referee: 2
+    rim: 3
+    backboard: 4
+  court:
+    length_m: 28.0
+    width_m: 15.0
+    three_point_radius_m: 6.75
+    paint_width_m: 4.9
+    paint_length_m: 5.8
+    free_throw_distance_m: 4.6
+    rim_height_m: 3.05
+  kinematics:
+    possession_distance_threshold_m: 1.2
+    sprint_speed_threshold_kmh: 18.0
+
