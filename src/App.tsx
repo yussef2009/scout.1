@@ -8373,7 +8373,15 @@ function App() {
     }
   }, [accountMenuOpen, notificationsOpen])
 
-  const [theme, setTheme] = useState("Dark")
+  const [theme, setTheme] = useState(() => {
+    try {
+      const saved = localStorage.getItem("scoutai_theme")
+      if (saved && ["Dark", "Light", "Midnight", "OLED", "Cyber"].includes(saved)) {
+        return saved
+      }
+    } catch {}
+    return "Dark"
+  })
   const [model, setModel] = useState(() => {
     const savedModel = localStorage.getItem("scoutai_primary_model")
     const isVisionModel = (id: string) =>
@@ -8955,6 +8963,9 @@ function App() {
       document.body.classList.add(themeClass)
     }
     document.documentElement.setAttribute("data-theme", theme.toLowerCase())
+    try {
+      localStorage.setItem("scoutai_theme", theme)
+    } catch {}
   }, [themeClass, theme])
 
   const pendingRegistrationsCount = useMemo(() => {

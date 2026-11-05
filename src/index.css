@@ -4232,7 +4232,7 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 6px 12px;
-  color: var(--gray);
+  color: #cbd5e1;
   font: 600 10.5px 'Space Grotesk', sans-serif;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -4434,7 +4434,7 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
   border: 1px solid var(--line);
   font: 700 9px/1 'Space Grotesk', sans-serif;
   letter-spacing: 0.12em;
-  color: var(--gray);
+  color: #e2e8f0;
   clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
 }
 
@@ -9364,61 +9364,92 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
   color: var(--gold-pale);
 }
 
-/* PRINT STYLES FOR PERFORMANCE REPORT */
+/* PRINT STYLES FOR PERFORMANCE REPORT (EXACT COLORS & HIGH-FIDELITY PDF) */
 @media print {
-  body {
-    background: #ffffff !important;
-    color: #111116 !important;
+  html, body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background: transparent !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 8mm 8mm 10mm;
+  }
+
   .print-hide,
   .topbar,
+  .desktop-nav,
+  .report-action-header,
   .mobile-bottom-nav,
   footer,
   .settings-nav,
-  .sport-strip {
+  .sport-strip,
+  .customize-pdf-modal,
+  .analysis-save-banner {
     display: none !important;
   }
+
   .performance-report-page {
     padding: 0 !important;
+    margin: 0 !important;
     max-width: 100% !important;
+    background: transparent !important;
   }
+
   .official-report-sheet {
-    background: #ffffff !important;
-    color: #111116 !important;
-    border: 1px solid #ddd !important;
     box-shadow: none !important;
-    padding: 24px !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 24px 28px !important;
+    border-radius: 8px !important;
   }
-  .sheet-top-header {
-    border-bottom-color: #111116 !important;
-  }
-  .sheet-lab-title strong,
-  .sheet-athlete-name,
-  .sheet-metric-val,
-  .spec-col strong,
-  .sheet-score-label strong {
-    color: #111116 !important;
-  }
+
+  /* Prevent awkward page break splits */
+  .sheet-top-header,
   .sheet-athlete-card,
   .sheet-specs-strip,
+  .sheet-metrics-grid,
   .sheet-metric-card,
+  .sheet-narrative-card,
+  .sheet-analysis-cols,
   .sheet-col-box,
-  .sheet-narrative-card {
-    background: #f8f8fa !important;
-    border-color: #ddd !important;
+  .sheet-footer,
+  .pitch-heatmap-container {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
-  .sheet-metric-bar {
-    background: #eee !important;
+
+  .official-report-sheet.sheet-theme-clean-white {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
   }
-  .sheet-metric-bar div {
-    background: #111116 !important;
+
+  .official-report-sheet.sheet-theme-nano-banana {
+    background: #08090C !important;
+    color: #f1f5f9 !important;
+    border: 1px solid rgba(255, 225, 0, 0.35) !important;
   }
-  .sheet-qr-visual {
-    border: 1px solid #111116 !important;
+
+  .official-report-sheet.sheet-theme-dark {
+    background: #0f0f13 !important;
+    color: #f1f5f9 !important;
+    border: 1px solid rgba(212, 175, 55, 0.35) !important;
   }
-  .sig-stroke {
-    color: #111116 !important;
-    border-bottom-color: #111116 !important;
+
+  .official-report-sheet.sheet-theme-navy {
+    background: #060b14 !important;
+    color: #f1f5f9 !important;
+    border: 1px solid rgba(56, 189, 248, 0.35) !important;
   }
 }
 
@@ -9895,24 +9926,35 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
 }
 
 /* Sheet custom themes */
+
+/* 1. Theme: Clean White Sheet (Executive Editorial & Print) */
 .official-report-sheet.sheet-theme-clean-white {
   background: #ffffff !important;
-  color: #111116 !important;
-  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06) !important;
 }
 
 .official-report-sheet.sheet-theme-clean-white .sheet-top-header {
-  border-bottom-color: #0f172a !important;
+  border-bottom: 2px solid #b45309 !important;
 }
 
-.official-report-sheet.sheet-theme-clean-white .sheet-lab-title strong,
-.official-report-sheet.sheet-theme-clean-white .sheet-athlete-name,
-.official-report-sheet.sheet-theme-clean-white .sheet-metric-val,
-.official-report-sheet.sheet-theme-clean-white .spec-col strong,
-.official-report-sheet.sheet-theme-clean-white .sheet-score-label strong,
-.official-report-sheet.sheet-theme-clean-white .sheet-narrative-card p,
-.official-report-sheet.sheet-theme-clean-white .sheet-col-box li {
+.official-report-sheet.sheet-theme-clean-white .sheet-lab-title strong {
   color: #0f172a !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-lab-title span {
+  color: #78350f !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .stamp-verified-label {
+  background: rgba(180, 83, 9, 0.08) !important;
+  border: 1px solid rgba(180, 83, 9, 0.35) !important;
+  color: #92400e !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .stamp-id {
+  color: #64748b !important;
 }
 
 .official-report-sheet.sheet-theme-clean-white .sheet-athlete-card,
@@ -9924,12 +9966,146 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
   border-color: #e2e8f0 !important;
 }
 
-.official-report-sheet.sheet-theme-navy {
-  background: #060b14 !important;
-  border-color: rgba(56, 189, 248, 0.3) !important;
+.official-report-sheet.sheet-theme-clean-white .sheet-athlete-name {
+  color: #0f172a !important;
+  background: none !important;
+  -webkit-text-fill-color: initial !important;
 }
 
-/* Nano Banana High-Contrast Flagship Theme */
+.official-report-sheet.sheet-theme-clean-white .sheet-avatar {
+  background: rgba(180, 83, 9, 0.08) !important;
+  border: 2px solid #b45309 !important;
+  color: #b45309 !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-kicker {
+  color: #b45309 !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-athlete-meta {
+  color: #64748b !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .score-ring {
+  background: conic-gradient(#b45309 var(--score), rgba(0, 0, 0, 0.08) 0) !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .score-ring::before {
+  background: #ffffff !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .score-ring span {
+  color: #0f172a !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .score-ring small {
+  color: #64748b !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-score-label span {
+  color: #64748b !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-score-label strong {
+  color: #b45309 !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-score-label small {
+  color: #0f172a !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .spec-col span {
+  color: #64748b !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .spec-col strong {
+  color: #0f172a !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-custom-scout-note {
+  background: #fefce8 !important;
+  border-color: #d97706 !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-custom-scout-kicker {
+  color: #b45309 !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-custom-scout-p {
+  color: #334155 !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-section-title {
+  color: #78350f !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-metric-kicker {
+  color: #64748b !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-metric-val {
+  color: #0f172a !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-metric-card.highlighted {
+  border-color: rgba(180, 83, 9, 0.4) !important;
+  background: #fffbeb !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-metric-card.highlighted .sheet-metric-val {
+  color: #b45309 !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-metric-benchmark {
+  color: #64748b !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-metric-bar {
+  background: #e2e8f0 !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-metric-bar div {
+  background: linear-gradient(90deg, #d97706 0%, #b45309 100%) !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-narrative-card p {
+  color: #334155 !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-col-box li {
+  color: #334155 !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-footer {
+  border-top-color: #e2e8f0 !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-qr-visual {
+  border: 1px solid #e2e8f0 !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-qr-visual i {
+  background: #0f172a !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-qr-text strong {
+  color: #0f172a !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sheet-qr-text span {
+  color: #b45309 !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sig-stroke {
+  color: #b45309 !important;
+  border-bottom-color: rgba(180, 83, 9, 0.4) !important;
+}
+
+.official-report-sheet.sheet-theme-clean-white .sig-line span {
+  color: #64748b !important;
+}
+
+/* 2. Theme: Nano Banana High-Contrast Flagship */
 .official-report-sheet.sheet-theme-nano-banana {
   background: #08090C !important;
   border: 1px solid rgba(255, 225, 0, 0.28) !important;
@@ -9955,8 +10131,8 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
 .official-report-sheet.sheet-theme-nano-banana .sheet-metric-card,
 .official-report-sheet.sheet-theme-nano-banana .sheet-col-box,
 .official-report-sheet.sheet-theme-nano-banana .sheet-narrative-card {
-  background: rgba(16, 20, 30, 0.82) !important;
-  border-color: rgba(255, 225, 0, 0.18) !important;
+  background: rgba(16, 20, 30, 0.88) !important;
+  border-color: rgba(255, 225, 0, 0.2) !important;
   backdrop-filter: blur(14px) !important;
 }
 
@@ -9967,9 +10143,16 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
 }
 
 .official-report-sheet.sheet-theme-nano-banana .sheet-athlete-name {
+  color: #FFE100 !important;
   background: linear-gradient(135deg, #FFE100 0%, #F59E0B 100%) !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-avatar {
+  background: rgba(255, 225, 0, 0.15) !important;
+  border: 2px solid #FFE100 !important;
+  color: #FFE100 !important;
 }
 
 .official-report-sheet.sheet-theme-nano-banana .stamp-verified-label {
@@ -9979,17 +10162,28 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
   box-shadow: 0 0 14px rgba(255, 225, 0, 0.25) !important;
 }
 
+.official-report-sheet.sheet-theme-nano-banana .stamp-id {
+  color: #FDE047 !important;
+}
+
 .official-report-sheet.sheet-theme-nano-banana .sheet-kicker {
   color: #FFE100 !important;
 }
 
-.official-report-sheet.sheet-theme-nano-banana .sheet-metric-val {
+.official-report-sheet.sheet-theme-nano-banana .score-ring {
+  background: conic-gradient(#FFE100 var(--score), rgba(255, 225, 0, 0.16) 0) !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .score-ring::before {
+  background: #08090C !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .score-ring span {
   color: #FFE100 !important;
 }
 
-.official-report-sheet.sheet-theme-nano-banana .sheet-metric-bar div {
-  background: linear-gradient(90deg, #FFE100 0%, #F59E0B 100%) !important;
-  box-shadow: 0 0 10px rgba(255, 225, 0, 0.4) !important;
+.official-report-sheet.sheet-theme-nano-banana .score-ring small {
+  color: #F59E0B !important;
 }
 
 .official-report-sheet.sheet-theme-nano-banana .sheet-score-label strong {
@@ -9998,6 +10192,203 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
 
 .official-report-sheet.sheet-theme-nano-banana .sheet-section-title {
   color: #FFE100 !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-metric-kicker {
+  color: #F59E0B !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-metric-val {
+  color: #FFE100 !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-metric-bar {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-metric-bar div {
+  background: linear-gradient(90deg, #FFE100 0%, #F59E0B 100%) !important;
+  box-shadow: 0 0 10px rgba(255, 225, 0, 0.4) !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-custom-scout-note {
+  background: rgba(255, 225, 0, 0.08) !important;
+  border-color: rgba(255, 225, 0, 0.4) !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-custom-scout-kicker {
+  color: #FFE100 !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sheet-custom-scout-p {
+  color: #e2e8f0 !important;
+}
+
+.official-report-sheet.sheet-theme-nano-banana .sig-stroke {
+  color: #FFE100 !important;
+  border-bottom-color: rgba(255, 225, 0, 0.4) !important;
+}
+
+/* 3. Theme: Dark Obsidian Gold */
+.official-report-sheet.sheet-theme-dark {
+  background: #0f0f13 !important;
+  border: 1px solid rgba(212, 175, 55, 0.3) !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8) !important;
+}
+
+.official-report-sheet.sheet-theme-dark .sheet-top-header {
+  border-bottom: 2px solid #d4af37 !important;
+}
+
+.official-report-sheet.sheet-theme-dark .sheet-lab-title strong {
+  color: #ffffff !important;
+}
+
+.official-report-sheet.sheet-theme-dark .sheet-lab-title span {
+  color: #d4af37 !important;
+}
+
+.official-report-sheet.sheet-theme-dark .sheet-athlete-card,
+.official-report-sheet.sheet-theme-dark .sheet-specs-strip,
+.official-report-sheet.sheet-theme-dark .sheet-metric-card,
+.official-report-sheet.sheet-theme-dark .sheet-col-box,
+.official-report-sheet.sheet-theme-dark .sheet-narrative-card {
+  background: #16171d !important;
+  border-color: rgba(255, 255, 255, 0.09) !important;
+}
+
+.official-report-sheet.sheet-theme-dark .sheet-athlete-name {
+  color: #ffffff !important;
+}
+
+.official-report-sheet.sheet-theme-dark .sheet-avatar {
+  background: rgba(212, 175, 55, 0.15) !important;
+  border: 2px solid #d4af37 !important;
+  color: #fcd34d !important;
+}
+
+.official-report-sheet.sheet-theme-dark .score-ring {
+  background: conic-gradient(#d4af37 var(--score), rgba(255, 255, 255, 0.1) 0) !important;
+}
+
+.official-report-sheet.sheet-theme-dark .score-ring::before {
+  background: #0f0f13 !important;
+}
+
+.official-report-sheet.sheet-theme-dark .score-ring span {
+  color: #ffffff !important;
+}
+
+.official-report-sheet.sheet-theme-dark .score-ring small {
+  color: #d4af37 !important;
+}
+
+.official-report-sheet.sheet-theme-dark .sheet-score-label strong {
+  color: #fcd34d !important;
+}
+
+.official-report-sheet.sheet-theme-dark .sheet-section-title {
+  color: #fcd34d !important;
+}
+
+.official-report-sheet.sheet-theme-dark .sheet-metric-val {
+  color: #ffffff !important;
+}
+
+.official-report-sheet.sheet-theme-dark .sheet-metric-card.highlighted .sheet-metric-val {
+  color: #fcd34d !important;
+}
+
+.official-report-sheet.sheet-theme-dark .sheet-metric-bar div {
+  background: linear-gradient(90deg, #d4af37 0%, #f59e0b 100%) !important;
+}
+
+.official-report-sheet.sheet-theme-dark .sig-stroke {
+  color: #fcd34d !important;
+  border-bottom-color: rgba(212, 175, 55, 0.4) !important;
+}
+
+/* 4. Theme: Federation Navy */
+.official-report-sheet.sheet-theme-navy {
+  background: #060b14 !important;
+  border: 1px solid rgba(56, 189, 248, 0.3) !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9) !important;
+}
+
+.official-report-sheet.sheet-theme-navy .sheet-top-header {
+  border-bottom: 2px solid #38bdf8 !important;
+}
+
+.official-report-sheet.sheet-theme-navy .sheet-lab-title strong {
+  color: #ffffff !important;
+}
+
+.official-report-sheet.sheet-theme-navy .sheet-lab-title span {
+  color: #7dd3fc !important;
+}
+
+.official-report-sheet.sheet-theme-navy .stamp-verified-label {
+  background: rgba(56, 189, 248, 0.15) !important;
+  border: 1px solid rgba(56, 189, 248, 0.4) !important;
+  color: #38bdf8 !important;
+}
+
+.official-report-sheet.sheet-theme-navy .sheet-athlete-card,
+.official-report-sheet.sheet-theme-navy .sheet-specs-strip,
+.official-report-sheet.sheet-theme-navy .sheet-metric-card,
+.official-report-sheet.sheet-theme-navy .sheet-col-box,
+.official-report-sheet.sheet-theme-navy .sheet-narrative-card {
+  background: #0b1322 !important;
+  border-color: rgba(56, 189, 248, 0.18) !important;
+}
+
+.official-report-sheet.sheet-theme-navy .sheet-athlete-name {
+  color: #ffffff !important;
+}
+
+.official-report-sheet.sheet-theme-navy .sheet-avatar {
+  background: rgba(56, 189, 248, 0.15) !important;
+  border: 2px solid #38bdf8 !important;
+  color: #38bdf8 !important;
+}
+
+.official-report-sheet.sheet-theme-navy .score-ring {
+  background: conic-gradient(#38bdf8 var(--score), rgba(56, 189, 248, 0.16) 0) !important;
+}
+
+.official-report-sheet.sheet-theme-navy .score-ring::before {
+  background: #060b14 !important;
+}
+
+.official-report-sheet.sheet-theme-navy .score-ring span {
+  color: #38bdf8 !important;
+}
+
+.official-report-sheet.sheet-theme-navy .score-ring small {
+  color: #94a3b8 !important;
+}
+
+.official-report-sheet.sheet-theme-navy .sheet-score-label strong {
+  color: #38bdf8 !important;
+}
+
+.official-report-sheet.sheet-theme-navy .sheet-section-title {
+  color: #38bdf8 !important;
+}
+
+.official-report-sheet.sheet-theme-navy .sheet-metric-val {
+  color: #38bdf8 !important;
+}
+
+.official-report-sheet.sheet-theme-navy .sheet-metric-bar div {
+  background: linear-gradient(90deg, #38bdf8 0%, #60a5fa 100%) !important;
+}
+
+.official-report-sheet.sheet-theme-navy .sig-stroke {
+  color: #38bdf8 !important;
+  border-bottom-color: rgba(56, 189, 248, 0.4) !important;
 }
 
 
@@ -13401,55 +13792,134 @@ html.theme-cyber, body.theme-cyber, main.theme-cyber {
   border-color: rgba(0, 0, 0, 0.12) !important;
 }
 
-/* Comprehensive Theme-Sync Explicit Overrides */
+/* ============================================================
+   COMPREHENSIVE THEME-SYNC & CONTRAST ENGINE (LIGHT, MIDNIGHT, OLED, CYBER, DARK)
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   1. LIGHT THEME (Daylight Arena - Executive High Contrast)
+   ------------------------------------------------------------ */
 .theme-light .header-status-badge,
 [data-theme="light"] .header-status-badge {
   background: #ffffff !important;
-  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  border: 1px solid rgba(0, 0, 0, 0.14) !important;
   color: #0f172a !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05) !important;
 }
 
 .theme-light .header-status-badge .status-badge-text,
-[data-theme="light"] .header-status-badge .status-badge-text {
+[data-theme="light"] .header-status-badge .status-badge-text,
+.theme-light .status-badge-text,
+[data-theme="light"] .status-badge-text {
   color: #0f172a !important;
+  font-weight: 700 !important;
 }
 
 .theme-light .header-status-badge .status-dot,
-[data-theme="light"] .header-status-badge .status-dot {
+[data-theme="light"] .header-status-badge .status-dot,
+.theme-light .status-dot,
+[data-theme="light"] .status-dot {
   background: #64748b !important;
+  box-shadow: none !important;
 }
 
 .theme-light .header-status-badge .status-dot.connected,
-[data-theme="light"] .header-status-badge .status-dot.connected {
+[data-theme="light"] .header-status-badge .status-dot.connected,
+.theme-light .status-dot.connected,
+[data-theme="light"] .status-dot.connected {
   background: #16a34a !important;
   box-shadow: 0 0 10px rgba(22, 163, 74, 0.5) !important;
 }
 
 .theme-light .header-status-badge .status-dot.connecting,
-[data-theme="light"] .header-status-badge .status-dot.connecting {
+[data-theme="light"] .header-status-badge .status-dot.connecting,
+.theme-light .status-dot.connecting,
+[data-theme="light"] .status-dot.connecting {
   background: #d97706 !important;
   box-shadow: 0 0 10px rgba(217, 119, 6, 0.5) !important;
 }
 
 .theme-light .header-status-badge .status-dot.error,
-[data-theme="light"] .header-status-badge .status-dot.error {
+[data-theme="light"] .header-status-badge .status-dot.error,
+.theme-light .status-dot.error,
+[data-theme="light"] .status-dot.error {
   background: #dc2626 !important;
   box-shadow: 0 0 10px rgba(220, 38, 38, 0.5) !important;
 }
 
+.theme-light .connection-status-pill,
+[data-theme="light"] .connection-status-pill {
+  background: #f1f5f9 !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  color: #0f172a !important;
+}
+
+.theme-light .status-indicator-text,
+[data-theme="light"] .status-indicator-text {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+.theme-light .status-indicator-dot,
+[data-theme="light"] .status-indicator-dot {
+  background: #64748b !important;
+}
+
+.theme-light .status-indicator-dot.connected,
+[data-theme="light"] .status-indicator-dot.connected {
+  background: #16a34a !important;
+  box-shadow: 0 0 8px rgba(22, 163, 74, 0.5) !important;
+}
+
+.theme-light .status-indicator-dot.connecting,
+[data-theme="light"] .status-indicator-dot.connecting {
+  background: #d97706 !important;
+  box-shadow: 0 0 8px rgba(217, 119, 6, 0.5) !important;
+}
+
+.theme-light .status-indicator-dot.error,
+[data-theme="light"] .status-indicator-dot.error {
+  background: #dc2626 !important;
+  box-shadow: 0 0 8px rgba(220, 38, 38, 0.5) !important;
+}
+
+/* Post Action Buttons in Light Mode */
 .theme-light .post-action-btn,
 [data-theme="light"] .post-action-btn {
   background: #f1f5f9 !important;
-  border: 1px solid rgba(0, 0, 0, 0.1) !important;
-  color: #475569 !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  color: #334155 !important;
+}
+
+.theme-light .post-action-btn span,
+.theme-light .post-action-btn small,
+[data-theme="light"] .post-action-btn span,
+[data-theme="light"] .post-action-btn small {
+  color: #334155 !important;
+}
+
+.theme-light .post-action-btn svg,
+[data-theme="light"] .post-action-btn svg {
+  stroke: #334155 !important;
 }
 
 .theme-light .post-action-btn:hover,
 [data-theme="light"] .post-action-btn:hover {
   background: #e2e8f0 !important;
-  border-color: rgba(180, 83, 9, 0.35) !important;
+  border-color: rgba(180, 83, 9, 0.4) !important;
   color: #0f172a !important;
+}
+
+.theme-light .post-action-btn:hover span,
+.theme-light .post-action-btn:hover small,
+[data-theme="light"] .post-action-btn:hover span,
+[data-theme="light"] .post-action-btn:hover small {
+  color: #0f172a !important;
+}
+
+.theme-light .post-action-btn:hover svg,
+[data-theme="light"] .post-action-btn:hover svg {
+  stroke: #0f172a !important;
 }
 
 .theme-light .post-action-btn.respects-btn.liked,
@@ -13459,8 +13929,17 @@ html.theme-cyber, body.theme-cyber, main.theme-cyber {
   color: #b45309 !important;
 }
 
+.theme-light .post-action-btn.respects-btn.liked span,
+.theme-light .post-action-btn.respects-btn.liked small,
+[data-theme="light"] .post-action-btn.respects-btn.liked span,
+[data-theme="light"] .post-action-btn.respects-btn.liked small {
+  color: #b45309 !important;
+  font-weight: 700 !important;
+}
+
 .theme-light .post-action-btn.respects-btn.liked svg,
 [data-theme="light"] .post-action-btn.respects-btn.liked svg {
+  stroke: #b45309 !important;
   fill: #b45309 !important;
 }
 
@@ -13471,12 +13950,36 @@ html.theme-cyber, body.theme-cyber, main.theme-cyber {
   color: #0f172a !important;
 }
 
+.theme-light .post-action-btn.comments-btn.active span,
+.theme-light .post-action-btn.comments-btn.active small,
+[data-theme="light"] .post-action-btn.comments-btn.active span,
+[data-theme="light"] .post-action-btn.comments-btn.active small {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+.theme-light .post-verified-stamp,
+[data-theme="light"] .post-verified-stamp {
+  color: #64748b !important;
+}
+
+.theme-light .post-verified-stamp svg,
+[data-theme="light"] .post-verified-stamp svg {
+  stroke: #16a34a !important;
+}
+
+/* Header Notification Bell in Light Mode */
 .theme-light .header-notification-btn,
 [data-theme="light"] .header-notification-btn {
   background: #ffffff !important;
   border: 1px solid rgba(0, 0, 0, 0.14) !important;
   color: #0f172a !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+}
+
+.theme-light .header-notification-btn svg,
+[data-theme="light"] .header-notification-btn svg {
+  stroke: #0f172a !important;
 }
 
 .theme-light .header-notification-btn:hover,
@@ -13487,6 +13990,13 @@ html.theme-cyber, body.theme-cyber, main.theme-cyber {
   border-color: #b45309 !important;
   color: #b45309 !important;
   box-shadow: 0 0 16px rgba(180, 83, 9, 0.2) !important;
+}
+
+.theme-light .header-notification-btn:hover svg,
+.theme-light .header-notification-btn.active svg,
+[data-theme="light"] .header-notification-btn:hover svg,
+[data-theme="light"] .header-notification-btn.active svg {
+  stroke: #b45309 !important;
 }
 
 .theme-light .notification-unread-pill,
@@ -13531,6 +14041,444 @@ html.theme-cyber, body.theme-cyber, main.theme-cyber {
 .theme-light .comment-composer input:focus,
 [data-theme="light"] .comment-composer input:focus {
   border-color: #b45309 !important;
+}
+
+/* ------------------------------------------------------------
+   2. MIDNIGHT THEME (Tactical Midnight Navy)
+   ------------------------------------------------------------ */
+.theme-midnight .header-status-badge,
+[data-theme="midnight"] .header-status-badge {
+  background: #0f1c33 !important;
+  border-color: rgba(56, 189, 248, 0.25) !important;
+  color: #e2e8f0 !important;
+}
+
+.theme-midnight .status-badge-text,
+[data-theme="midnight"] .status-badge-text {
+  color: #e2e8f0 !important;
+}
+
+.theme-midnight .header-status-badge .status-dot,
+[data-theme="midnight"] .header-status-badge .status-dot {
+  background: #64748b !important;
+}
+
+.theme-midnight .header-status-badge .status-dot.connected,
+[data-theme="midnight"] .header-status-badge .status-dot.connected {
+  background: #38bdf8 !important;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.6) !important;
+}
+
+.theme-midnight .header-status-badge .status-dot.connecting,
+[data-theme="midnight"] .header-status-badge .status-dot.connecting {
+  background: #fbbf24 !important;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.6) !important;
+}
+
+.theme-midnight .header-status-badge .status-dot.error,
+[data-theme="midnight"] .header-status-badge .status-dot.error {
+  background: #ef4444 !important;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.6) !important;
+}
+
+.theme-midnight .post-action-btn,
+[data-theme="midnight"] .post-action-btn {
+  background: #0f1c33 !important;
+  border-color: rgba(56, 189, 248, 0.2) !important;
+  color: #94a3b8 !important;
+}
+
+.theme-midnight .post-action-btn span,
+.theme-midnight .post-action-btn small,
+[data-theme="midnight"] .post-action-btn span,
+[data-theme="midnight"] .post-action-btn small {
+  color: #cbd5e1 !important;
+}
+
+.theme-midnight .post-action-btn svg,
+[data-theme="midnight"] .post-action-btn svg {
+  stroke: #94a3b8 !important;
+}
+
+.theme-midnight .post-action-btn:hover,
+[data-theme="midnight"] .post-action-btn:hover {
+  background: #152644 !important;
+  border-color: rgba(56, 189, 248, 0.45) !important;
+  color: #38bdf8 !important;
+}
+
+.theme-midnight .post-action-btn:hover span,
+.theme-midnight .post-action-btn:hover small,
+[data-theme="midnight"] .post-action-btn:hover span,
+[data-theme="midnight"] .post-action-btn:hover small {
+  color: #38bdf8 !important;
+}
+
+.theme-midnight .post-action-btn:hover svg,
+[data-theme="midnight"] .post-action-btn:hover svg {
+  stroke: #38bdf8 !important;
+}
+
+.theme-midnight .post-action-btn.respects-btn.liked,
+[data-theme="midnight"] .post-action-btn.respects-btn.liked {
+  background: rgba(56, 189, 248, 0.18) !important;
+  border-color: #38bdf8 !important;
+  color: #38bdf8 !important;
+}
+
+.theme-midnight .post-action-btn.respects-btn.liked span,
+.theme-midnight .post-action-btn.respects-btn.liked small,
+[data-theme="midnight"] .post-action-btn.respects-btn.liked span,
+[data-theme="midnight"] .post-action-btn.respects-btn.liked small {
+  color: #38bdf8 !important;
+}
+
+.theme-midnight .post-action-btn.respects-btn.liked svg,
+[data-theme="midnight"] .post-action-btn.respects-btn.liked svg {
+  stroke: #38bdf8 !important;
+  fill: #38bdf8 !important;
+}
+
+.theme-midnight .header-notification-btn,
+[data-theme="midnight"] .header-notification-btn {
+  background: #0b1322 !important;
+  border-color: rgba(56, 189, 248, 0.22) !important;
+  color: #ffffff !important;
+}
+
+.theme-midnight .header-notification-btn svg,
+[data-theme="midnight"] .header-notification-btn svg {
+  stroke: #ffffff !important;
+}
+
+.theme-midnight .header-notification-btn:hover,
+.theme-midnight .header-notification-btn.active,
+[data-theme="midnight"] .header-notification-btn:hover,
+[data-theme="midnight"] .header-notification-btn.active {
+  background: #0f1c33 !important;
+  border-color: #38bdf8 !important;
+  color: #38bdf8 !important;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.3) !important;
+}
+
+.theme-midnight .header-notification-btn:hover svg,
+.theme-midnight .header-notification-btn.active svg,
+[data-theme="midnight"] .header-notification-btn:hover svg,
+[data-theme="midnight"] .header-notification-btn.active svg {
+  stroke: #38bdf8 !important;
+}
+
+/* ------------------------------------------------------------
+   3. OLED THEME (Pure Pitch Black Monochrome)
+   ------------------------------------------------------------ */
+.theme-oled .header-status-badge,
+[data-theme="oled"] .header-status-badge {
+  background: #000000 !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
+}
+
+.theme-oled .status-badge-text,
+[data-theme="oled"] .status-badge-text {
+  color: #ffffff !important;
+}
+
+.theme-oled .header-status-badge .status-dot,
+[data-theme="oled"] .header-status-badge .status-dot {
+  background: #71717a !important;
+}
+
+.theme-oled .header-status-badge .status-dot.connected,
+[data-theme="oled"] .header-status-badge .status-dot.connected {
+  background: #22c55e !important;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.7) !important;
+}
+
+.theme-oled .header-status-badge .status-dot.connecting,
+[data-theme="oled"] .header-status-badge .status-dot.connecting {
+  background: #eab308 !important;
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.7) !important;
+}
+
+.theme-oled .header-status-badge .status-dot.error,
+[data-theme="oled"] .header-status-badge .status-dot.error {
+  background: #ef4444 !important;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.7) !important;
+}
+
+.theme-oled .post-action-btn,
+[data-theme="oled"] .post-action-btn {
+  background: #09090b !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #d4d4d8 !important;
+}
+
+.theme-oled .post-action-btn span,
+.theme-oled .post-action-btn small,
+[data-theme="oled"] .post-action-btn span,
+[data-theme="oled"] .post-action-btn small {
+  color: #ffffff !important;
+}
+
+.theme-oled .post-action-btn svg,
+[data-theme="oled"] .post-action-btn svg {
+  stroke: #ffffff !important;
+}
+
+.theme-oled .post-action-btn:hover,
+[data-theme="oled"] .post-action-btn:hover {
+  background: #18181b !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  color: #ffffff !important;
+}
+
+.theme-oled .post-action-btn.respects-btn.liked,
+[data-theme="oled"] .post-action-btn.respects-btn.liked {
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: #ffffff !important;
+  color: #ffffff !important;
+}
+
+.theme-oled .post-action-btn.respects-btn.liked svg,
+[data-theme="oled"] .post-action-btn.respects-btn.liked svg {
+  stroke: #ffffff !important;
+  fill: #ffffff !important;
+}
+
+.theme-oled .header-notification-btn,
+[data-theme="oled"] .header-notification-btn {
+  background: #09090b !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
+}
+
+.theme-oled .header-notification-btn svg,
+[data-theme="oled"] .header-notification-btn svg {
+  stroke: #ffffff !important;
+}
+
+.theme-oled .header-notification-btn:hover,
+.theme-oled .header-notification-btn.active,
+[data-theme="oled"] .header-notification-btn:hover,
+[data-theme="oled"] .header-notification-btn.active {
+  background: #18181b !important;
+  border-color: #ffffff !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.35) !important;
+}
+
+.theme-oled .header-notification-btn:hover svg,
+.theme-oled .header-notification-btn.active svg,
+[data-theme="oled"] .header-notification-btn:hover svg,
+[data-theme="oled"] .header-notification-btn.active svg {
+  stroke: #ffffff !important;
+}
+
+/* ------------------------------------------------------------
+   4. CYBER THEME (Matrix Tactical Emerald)
+   ------------------------------------------------------------ */
+.theme-cyber .header-status-badge,
+[data-theme="cyber"] .header-status-badge {
+  background: #0e1e16 !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+  color: #ecfdf5 !important;
+}
+
+.theme-cyber .status-badge-text,
+[data-theme="cyber"] .status-badge-text {
+  color: #ecfdf5 !important;
+}
+
+.theme-cyber .header-status-badge .status-dot,
+[data-theme="cyber"] .header-status-badge .status-dot {
+  background: #475569 !important;
+}
+
+.theme-cyber .header-status-badge .status-dot.connected,
+[data-theme="cyber"] .header-status-badge .status-dot.connected {
+  background: #10b981 !important;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.7) !important;
+}
+
+.theme-cyber .header-status-badge .status-dot.connecting,
+[data-theme="cyber"] .header-status-badge .status-dot.connecting {
+  background: #f59e0b !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.7) !important;
+}
+
+.theme-cyber .header-status-badge .status-dot.error,
+[data-theme="cyber"] .header-status-badge .status-dot.error {
+  background: #ef4444 !important;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.7) !important;
+}
+
+.theme-cyber .post-action-btn,
+[data-theme="cyber"] .post-action-btn {
+  background: #0a1710 !important;
+  border-color: rgba(16, 185, 129, 0.25) !important;
+  color: #6ee7b7 !important;
+}
+
+.theme-cyber .post-action-btn span,
+.theme-cyber .post-action-btn small,
+[data-theme="cyber"] .post-action-btn span,
+[data-theme="cyber"] .post-action-btn small {
+  color: #a7f3d0 !important;
+}
+
+.theme-cyber .post-action-btn svg,
+[data-theme="cyber"] .post-action-btn svg {
+  stroke: #6ee7b7 !important;
+}
+
+.theme-cyber .post-action-btn:hover,
+[data-theme="cyber"] .post-action-btn:hover {
+  background: #132a1f !important;
+  border-color: rgba(16, 185, 129, 0.5) !important;
+  color: #ffffff !important;
+}
+
+.theme-cyber .post-action-btn:hover span,
+.theme-cyber .post-action-btn:hover small,
+[data-theme="cyber"] .post-action-btn:hover span,
+[data-theme="cyber"] .post-action-btn:hover small {
+  color: #a7f3d0 !important;
+}
+
+.theme-cyber .post-action-btn:hover svg,
+[data-theme="cyber"] .post-action-btn:hover svg {
+  stroke: #a7f3d0 !important;
+}
+
+.theme-cyber .post-action-btn.respects-btn.liked,
+[data-theme="cyber"] .post-action-btn.respects-btn.liked {
+  background: rgba(16, 185, 129, 0.2) !important;
+  border-color: #10b981 !important;
+  color: #34d399 !important;
+}
+
+.theme-cyber .post-action-btn.respects-btn.liked span,
+.theme-cyber .post-action-btn.respects-btn.liked small,
+[data-theme="cyber"] .post-action-btn.respects-btn.liked span,
+[data-theme="cyber"] .post-action-btn.respects-btn.liked small {
+  color: #34d399 !important;
+}
+
+.theme-cyber .post-action-btn.respects-btn.liked svg,
+[data-theme="cyber"] .post-action-btn.respects-btn.liked svg {
+  stroke: #34d399 !important;
+  fill: #34d399 !important;
+}
+
+.theme-cyber .header-notification-btn,
+[data-theme="cyber"] .header-notification-btn {
+  background: #0e1e16 !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+  color: #ecfdf5 !important;
+}
+
+.theme-cyber .header-notification-btn svg,
+[data-theme="cyber"] .header-notification-btn svg {
+  stroke: #ecfdf5 !important;
+}
+
+.theme-cyber .header-notification-btn:hover,
+.theme-cyber .header-notification-btn.active,
+[data-theme="cyber"] .header-notification-btn:hover,
+[data-theme="cyber"] .header-notification-btn.active {
+  background: #132a1f !important;
+  border-color: #10b981 !important;
+  color: #10b981 !important;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.35) !important;
+}
+
+.theme-cyber .header-notification-btn:hover svg,
+.theme-cyber .header-notification-btn.active svg,
+[data-theme="cyber"] .header-notification-btn:hover svg,
+[data-theme="cyber"] .header-notification-btn.active svg {
+  stroke: #10b981 !important;
+}
+
+/* ------------------------------------------------------------
+   5. DARK THEME (Obsidian Gold Default)
+   ------------------------------------------------------------ */
+[data-theme="dark"] .header-status-badge {
+  background: rgba(18, 18, 22, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .status-badge-text {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .post-action-btn {
+  background: rgba(22, 24, 32, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .post-action-btn span,
+[data-theme="dark"] .post-action-btn small {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .post-action-btn svg {
+  stroke: #cbd5e1;
+}
+
+[data-theme="dark"] .post-action-btn:hover {
+  background: rgba(30, 32, 42, 0.95);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+[data-theme="dark"] .post-action-btn:hover span,
+[data-theme="dark"] .post-action-btn:hover small {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .post-action-btn:hover svg {
+  stroke: #ffffff;
+}
+
+[data-theme="dark"] .post-action-btn.respects-btn.liked {
+  background: rgba(212, 175, 55, 0.18);
+  border-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+[data-theme="dark"] .post-action-btn.respects-btn.liked span,
+[data-theme="dark"] .post-action-btn.respects-btn.liked small {
+  color: var(--gold-bright);
+}
+
+[data-theme="dark"] .post-action-btn.respects-btn.liked svg {
+  stroke: var(--gold-bright);
+  fill: var(--gold-bright);
+}
+
+[data-theme="dark"] .header-notification-btn {
+  background: rgba(18, 18, 22, 0.85);
+  border: 1px solid var(--line);
+  color: #ffffff;
+}
+
+[data-theme="dark"] .header-notification-btn svg {
+  stroke: #ffffff;
+}
+
+[data-theme="dark"] .header-notification-btn:hover,
+[data-theme="dark"] .header-notification-btn.active {
+  background: rgba(26, 26, 32, 0.95);
+  border-color: var(--gold-bright);
+  color: var(--gold-bright);
+  box-shadow: 0 0 16px rgba(212, 175, 55, 0.3);
+}
+
+[data-theme="dark"] .header-notification-btn:hover svg,
+[data-theme="dark"] .header-notification-btn.active svg {
+  stroke: var(--gold-bright);
 }
 
 /* ============================================================

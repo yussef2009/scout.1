@@ -387,6 +387,7 @@ export function PerformanceReportPage({
         {/* Custom Recruiter Note if specified */}
         {customScoutNote && (
           <div
+            className="sheet-custom-scout-note"
             style={{
               padding: "16px 20px",
               borderRadius: 8,
@@ -396,6 +397,7 @@ export function PerformanceReportPage({
             }}
           >
             <span
+              className="sheet-custom-scout-kicker"
               style={{
                 fontSize: 10,
                 color: "var(--gold-bright)",
@@ -408,6 +410,7 @@ export function PerformanceReportPage({
               CERTIFIED SCOUT & RECRUITING EVALUATION NOTE
             </span>
             <p
+              className="sheet-custom-scout-p"
               style={{
                 margin: 0,
                 fontSize: 13,

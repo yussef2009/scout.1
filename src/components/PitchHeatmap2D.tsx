@@ -34,8 +34,24 @@ export const PitchHeatmap2D: React.FC<PitchHeatmap2DProps> = ({
   const isBasketball = !isSoccer && !isTennis && !isVolleyball && !isTrack && !isBoxing && !isSwimming && !isBaseball && !isCycling && !isGymnastics
 
   const isNanoBanana = theme === "nano-banana"
-  const goldColor = isNanoBanana ? "#FFE100" : "var(--gold-bright, #fbbf24)"
-  const goldGlow = isNanoBanana ? "rgba(255, 225, 0, 0.25)" : "rgba(251, 191, 36, 0.2)"
+  const isCleanWhite = theme === "clean-white"
+  const isNavy = theme === "navy"
+  const isDark = theme === "dark"
+
+  const goldColor = isNanoBanana
+    ? "#FFE100"
+    : isCleanWhite
+      ? "#B45309"
+      : isNavy
+        ? "#38BDF8"
+        : "var(--gold-bright, #fbbf24)"
+  const goldGlow = isNanoBanana
+    ? "rgba(255, 225, 0, 0.25)"
+    : isCleanWhite
+      ? "rgba(180, 83, 9, 0.15)"
+      : isNavy
+        ? "rgba(56, 189, 248, 0.25)"
+        : "rgba(251, 191, 36, 0.2)"
 
   // Dynamic zone metrics & titles tailored per sport
   let zone1Label = "ATTACKING THIRD"
@@ -224,14 +240,33 @@ export const PitchHeatmap2D: React.FC<PitchHeatmap2DProps> = ({
 
   return (
     <div
+      className={`pitch-heatmap-container pitch-theme-${theme}`}
       style={{
-        background: isNanoBanana ? "rgba(14, 18, 28, 0.85)" : "rgba(255, 255, 255, 0.04)",
-        border: `1px solid ${isNanoBanana ? "rgba(255, 225, 0, 0.22)" : "rgba(255, 255, 255, 0.1)"}`,
+        background: isNanoBanana
+          ? "rgba(14, 18, 28, 0.85)"
+          : isCleanWhite
+            ? "#f8fafc"
+            : isNavy
+              ? "rgba(11, 19, 34, 0.9)"
+              : "rgba(255, 255, 255, 0.04)",
+        border: `1px solid ${
+          isNanoBanana
+            ? "rgba(255, 225, 0, 0.22)"
+            : isCleanWhite
+              ? "#e2e8f0"
+              : isNavy
+                ? "rgba(56, 189, 248, 0.25)"
+                : "rgba(255, 255, 255, 0.1)"
+        }`,
         borderRadius: "20px",
         padding: "24px",
         marginTop: "24px",
         backdropFilter: "blur(14px)",
-        boxShadow: isNanoBanana ? `0 0 35px -5px ${goldGlow}` : "none",
+        boxShadow: isNanoBanana
+          ? `0 0 35px -5px ${goldGlow}`
+          : isCleanWhite
+            ? "0 4px 20px rgba(0,0,0,0.03)"
+            : "none",
       }}
     >
       <div
@@ -260,13 +295,27 @@ export const PitchHeatmap2D: React.FC<PitchHeatmap2DProps> = ({
             style={{
               fontSize: "18px",
               fontWeight: 800,
-              color: "#ffffff",
+              color: isCleanWhite
+                ? "#0f172a"
+                : isNanoBanana
+                  ? "#FFE100"
+                  : "#ffffff",
               margin: "4px 0 2px",
             }}
           >
             {courtTitle}
           </h3>
-          <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.65)", margin: 0 }}>
+          <p
+            style={{
+              fontSize: "13px",
+              color: isCleanWhite
+                ? "#64748b"
+                : isNanoBanana
+                  ? "#F59E0B"
+                  : "rgba(255,255,255,0.65)",
+              margin: 0,
+            }}
+          >
             {courtSubtitle}
           </p>
         </div>
@@ -541,105 +590,255 @@ export const PitchHeatmap2D: React.FC<PitchHeatmap2DProps> = ({
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
           <div
             style={{
-              background: isNanoBanana ? "rgba(16, 20, 30, 0.85)" : "rgba(255, 255, 255, 0.03)",
-              border: `1px solid ${isNanoBanana ? "rgba(255, 225, 0, 0.16)" : "rgba(255, 255, 255, 0.08)"}`,
+              background: isNanoBanana
+                ? "rgba(16, 20, 30, 0.85)"
+                : isCleanWhite
+                  ? "#ffffff"
+                  : isNavy
+                    ? "rgba(6, 11, 20, 0.85)"
+                    : "rgba(255, 255, 255, 0.03)",
+              border: `1px solid ${
+                isNanoBanana
+                  ? "rgba(255, 225, 0, 0.16)"
+                  : isCleanWhite
+                    ? "#e2e8f0"
+                    : isNavy
+                      ? "rgba(56, 189, 248, 0.2)"
+                      : "rgba(255, 255, 255, 0.08)"
+              }`,
               borderRadius: "12px",
               padding: "16px",
             }}
           >
-            <span style={{ fontSize: "11px", color: isNanoBanana ? "#FFE100" : "rgba(255,255,255,0.6)", fontWeight: 700, fontFamily: "monospace" }}>
+            <span
+              style={{
+                fontSize: "11px",
+                color: isNanoBanana
+                  ? "#FFE100"
+                  : isCleanWhite
+                    ? "#64748b"
+                    : isNavy
+                      ? "#38bdf8"
+                      : "rgba(255,255,255,0.6)",
+                fontWeight: 700,
+                fontFamily: "monospace",
+              }}
+            >
               {zone1Label}
             </span>
             <div
               style={{
                 fontSize: "24px",
                 fontWeight: 900,
-                color: isNanoBanana ? "#ffffff" : "#10b981",
+                color: isNanoBanana
+                  ? "#ffffff"
+                  : isCleanWhite
+                    ? "#059669"
+                    : "#10b981",
                 marginTop: "4px",
               }}
             >
               {zone1Val}
             </div>
-            <small style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>
+            <small
+              style={{
+                fontSize: "11px",
+                color: isCleanWhite
+                  ? "#64748b"
+                  : "rgba(255,255,255,0.5)",
+              }}
+            >
               {zone1Desc}
             </small>
           </div>
 
           <div
             style={{
-              background: isNanoBanana ? "rgba(16, 20, 30, 0.85)" : "rgba(255, 255, 255, 0.03)",
-              border: `1px solid ${isNanoBanana ? "rgba(255, 225, 0, 0.16)" : "rgba(255, 255, 255, 0.08)"}`,
+              background: isNanoBanana
+                ? "rgba(16, 20, 30, 0.85)"
+                : isCleanWhite
+                  ? "#ffffff"
+                  : isNavy
+                    ? "rgba(6, 11, 20, 0.85)"
+                    : "rgba(255, 255, 255, 0.03)",
+              border: `1px solid ${
+                isNanoBanana
+                  ? "rgba(255, 225, 0, 0.16)"
+                  : isCleanWhite
+                    ? "#e2e8f0"
+                    : isNavy
+                      ? "rgba(56, 189, 248, 0.2)"
+                      : "rgba(255, 255, 255, 0.08)"
+              }`,
               borderRadius: "12px",
               padding: "16px",
             }}
           >
-            <span style={{ fontSize: "11px", color: isNanoBanana ? "#FFE100" : "rgba(255,255,255,0.6)", fontWeight: 700, fontFamily: "monospace" }}>
+            <span
+              style={{
+                fontSize: "11px",
+                color: isNanoBanana
+                  ? "#FFE100"
+                  : isCleanWhite
+                    ? "#64748b"
+                    : isNavy
+                      ? "#38bdf8"
+                      : "rgba(255,255,255,0.6)",
+                fontWeight: 700,
+                fontFamily: "monospace",
+              }}
+            >
               {zone2Label}
             </span>
             <div
               style={{
                 fontSize: "24px",
                 fontWeight: 900,
-                color: isNanoBanana ? "#ffffff" : "#22d3ee",
+                color: isNanoBanana
+                  ? "#ffffff"
+                  : isCleanWhite
+                    ? "#0284c7"
+                    : "#22d3ee",
                 marginTop: "4px",
               }}
             >
               {zone2Val}
             </div>
-            <small style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>
+            <small
+              style={{
+                fontSize: "11px",
+                color: isCleanWhite
+                  ? "#64748b"
+                  : "rgba(255,255,255,0.5)",
+              }}
+            >
               {zone2Desc}
             </small>
           </div>
 
           <div
             style={{
-              background: isNanoBanana ? "rgba(16, 20, 30, 0.85)" : "rgba(255, 255, 255, 0.03)",
-              border: `1px solid ${isNanoBanana ? "rgba(255, 225, 0, 0.16)" : "rgba(255, 255, 255, 0.08)"}`,
+              background: isNanoBanana
+                ? "rgba(16, 20, 30, 0.85)"
+                : isCleanWhite
+                  ? "#ffffff"
+                  : isNavy
+                    ? "rgba(6, 11, 20, 0.85)"
+                    : "rgba(255, 255, 255, 0.03)",
+              border: `1px solid ${
+                isNanoBanana
+                  ? "rgba(255, 225, 0, 0.16)"
+                  : isCleanWhite
+                    ? "#e2e8f0"
+                    : isNavy
+                      ? "rgba(56, 189, 248, 0.2)"
+                      : "rgba(255, 255, 255, 0.08)"
+              }`,
               borderRadius: "12px",
               padding: "16px",
             }}
           >
-            <span style={{ fontSize: "11px", color: isNanoBanana ? "#FFE100" : "rgba(255,255,255,0.6)", fontWeight: 700, fontFamily: "monospace" }}>
+            <span
+              style={{
+                fontSize: "11px",
+                color: isNanoBanana
+                  ? "#FFE100"
+                  : isCleanWhite
+                    ? "#64748b"
+                    : isNavy
+                      ? "#38bdf8"
+                      : "rgba(255,255,255,0.6)",
+                fontWeight: 700,
+                fontFamily: "monospace",
+              }}
+            >
               {zone3Label}
             </span>
             <div
               style={{
                 fontSize: "24px",
                 fontWeight: 900,
-                color: isNanoBanana ? "#ffffff" : "#818cf8",
+                color: isNanoBanana
+                  ? "#ffffff"
+                  : isCleanWhite
+                    ? "#6366f1"
+                    : "#818cf8",
                 marginTop: "4px",
               }}
             >
               {zone3Val}
             </div>
-            <small style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>
+            <small
+              style={{
+                fontSize: "11px",
+                color: isCleanWhite
+                  ? "#64748b"
+                  : "rgba(255,255,255,0.5)",
+              }}
+            >
               {zone3Desc}
             </small>
           </div>
 
           <div
             style={{
-              background: isNanoBanana ? "rgba(16, 20, 30, 0.85)" : "rgba(255, 255, 255, 0.03)",
-              border: `1px solid ${isNanoBanana ? "rgba(255, 225, 0, 0.35)" : "rgba(251, 191, 36, 0.25)"}`,
+              background: isNanoBanana
+                ? "rgba(16, 20, 30, 0.85)"
+                : isCleanWhite
+                  ? "#ffffff"
+                  : isNavy
+                    ? "rgba(6, 11, 20, 0.85)"
+                    : "rgba(255, 255, 255, 0.03)",
+              border: `1px solid ${
+                isNanoBanana
+                  ? "rgba(255, 225, 0, 0.35)"
+                  : isCleanWhite
+                    ? "rgba(180, 83, 9, 0.3)"
+                    : isNavy
+                      ? "rgba(56, 189, 248, 0.3)"
+                      : "rgba(251, 191, 36, 0.25)"
+              }`,
               borderRadius: "12px",
               padding: "16px",
             }}
           >
-            <span style={{ fontSize: "11px", color: "#FFE100", fontWeight: 700, fontFamily: "monospace" }}>
+            <span
+              style={{
+                fontSize: "11px",
+                color: isNanoBanana
+                  ? "#FFE100"
+                  : isCleanWhite
+                    ? "#b45309"
+                    : isNavy
+                      ? "#38bdf8"
+                      : "#FFE100",
+                fontWeight: 700,
+                fontFamily: "monospace",
+              }}
+            >
               {zone4Label}
             </span>
             <div
               style={{
                 fontSize: "16px",
                 fontWeight: 800,
-                color: "#ffffff",
+                color: isCleanWhite
+                  ? "#0f172a"
+                  : "#ffffff",
                 marginTop: "6px",
                 lineHeight: "1.3",
               }}
             >
               {zone4Val}
             </div>
-            <small style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>
+            <small
+              style={{
+                fontSize: "11px",
+                color: isCleanWhite
+                  ? "#64748b"
+                  : "rgba(255,255,255,0.5)",
+              }}
+            >
               {zone4Desc}
             </small>
           </div>

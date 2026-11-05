@@ -1,0 +1,6 @@
+WiFi
+adafruit/Adafruit MPU6050 @ ^2.2.4
+adafruit/Adafruit Unified Sensor @ ^1.1.9
+WebServer
+bblanchon/ArduinoJson @ ^6.21.3
+Wire
