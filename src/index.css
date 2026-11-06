@@ -14506,3 +14506,1200 @@ html[dir="rtl"] .mobile-tab-link-icon {
   margin-left: 10px;
   margin-right: 0;
 }
+
+
+/* ============================================================
+   INTERACTIVE TUTORIAL & ONBOARDING SYSTEM (CRYSTAL CLEAR UI)
+   ============================================================ */
+
+/* --- First-time Onboarding Choice Modal --- */
+.onboarding-choice-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3, 6, 12, 0.82);
+  backdrop-filter: blur(10px);
+  padding: 16px;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.onboarding-choice-dialog {
+  max-width: 860px;
+  width: 100%;
+  background: #0b0f19;
+  border: 1.5px solid rgba(212, 175, 55, 0.45);
+  border-radius: 20px;
+  padding: 36px 34px 28px;
+  box-shadow: 0 25px 85px rgba(0, 0, 0, 0.9), 0 0 50px rgba(212, 175, 55, 0.15);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  animation: modalScaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.onboarding-welcome-header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.onboarding-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  font: 800 10px/1 'Inter', sans-serif;
+  letter-spacing: 0.1em;
+  color: var(--gold-bright, #ffd700);
+}
+
+.onboarding-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.6; }
+}
+
+.onboarding-main-title {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: clamp(22px, 3.5vw, 32px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.onboarding-main-title em {
+  font-style: normal;
+  background: linear-gradient(135deg, #ffd700, #d4af37);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.onboarding-subtitle {
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 620px;
+  margin: 0;
+}
+
+.onboarding-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 22px;
+  margin: 32px 0 24px;
+}
+
+.onboarding-action-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: left;
+  border-radius: 16px;
+  padding: 24px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.featured-tutorial-card {
+  background: linear-gradient(160deg, rgba(212, 175, 55, 0.14) 0%, rgba(15, 20, 32, 0.96) 100%);
+  border: 1.5px solid rgba(212, 175, 55, 0.55);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.featured-tutorial-card:hover {
+  border-color: #ffd700;
+  transform: translateY(-3px);
+  box-shadow: 0 20px 50px rgba(212, 175, 55, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.discover-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+}
+
+.discover-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-3px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+.action-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.action-card-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.tutorial-icon {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.25), rgba(255, 215, 0, 0.1));
+  border: 1px solid rgba(212, 175, 55, 0.45);
+}
+
+.discover-icon {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.recommended-chip {
+  font: 800 9px/1 'Inter', sans-serif;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #ffd700;
+  color: #0b0f19;
+}
+
+.solo-chip {
+  font: 800 9px/1 'Inter', sans-serif;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+}
+
+.action-card-body {
+  flex: 1;
+}
+
+.action-card-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.action-card-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.action-card-perks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: #34d399;
+  font-weight: 600;
+}
+
+.action-card-footer {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.action-cta-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 700 11px/1 'Inter', sans-serif;
+  letter-spacing: 0.06em;
+  color: #ffd700;
+  transition: gap 0.2s;
+}
+
+.featured-tutorial-card:hover .action-cta-label {
+  gap: 12px;
+}
+
+.secondary-cta {
+  color: #cbd5e1;
+}
+
+.onboarding-choice-footnote {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* --- Interactive Tutorial Tour (CRYSTAL CLEAR / NO BLUR) --- */
+.tutorial-tour-portal {
+  position: relative;
+  z-index: 1300;
+  pointer-events: none; /* Allows click-through and scrolling on the live page */
+}
+
+/* 
+   THE INTERFACE IS NEVER BLURRED!
+   Zero backdrop-filter blur, 100% transparent overlay.
+*/
+.tutorial-tour-scrim.clear-scrim {
+  position: fixed;
+  inset: 0;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  pointer-events: none;
+  z-index: 1301;
+}
+
+/* Target Element High-Contrast Spotlight Box */
+.tutorial-spotlight-box.clear-view-spotlight {
+  position: fixed;
+  z-index: 1305;
+  border-radius: 12px;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 0 2.5px #ffd700, 0 0 30px rgba(255, 215, 0, 0.5), inset 0 0 15px rgba(255, 215, 0, 0.12);
+}
+
+.spotlight-pulse-border {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 12px;
+  animation: spotlightPulse 2s infinite ease-in-out;
+}
+
+@keyframes spotlightPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+
+/* High-tech corner brackets */
+.spotlight-corner {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: #ffd700;
+  border-style: solid;
+}
+
+.spotlight-corner.top-left {
+  top: -3px;
+  left: -3px;
+  border-width: 3px 0 0 3px;
+}
+
+.spotlight-corner.top-right {
+  top: -3px;
+  right: -3px;
+  border-width: 3px 3px 0 0;
+}
+
+.spotlight-corner.bottom-left {
+  bottom: -3px;
+  left: -3px;
+  border-width: 0 0 3px 3px;
+}
+
+.spotlight-corner.bottom-right {
+  bottom: -3px;
+  right: -3px;
+  border-width: 0 3px 3px 0;
+}
+
+.spotlight-target-tag {
+  position: absolute;
+  top: -28px;
+  left: 0;
+  background: #ffd700;
+  color: #0b0f19;
+  font: 800 9.5px/1 'Inter', sans-serif;
+  letter-spacing: 0.08em;
+  padding: 5px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+}
+
+/* Floating Detailed Tutorial Card */
+.tutorial-floating-card {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1315;
+  width: min(480px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 48px));
+  background: #0d121f;
+  border: 1.5px solid rgba(212, 175, 55, 0.45);
+  border-radius: 20px;
+  padding: 22px 24px 20px;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.9), 0 0 40px rgba(212, 175, 55, 0.16);
+  animation: cardSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  pointer-events: auto; /* Active controls on the card itself */
+}
+
+.tutorial-floating-card.minimized {
+  width: 320px;
+  padding: 14px 18px;
+  gap: 8px;
+}
+
+@keyframes cardSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tutorial-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tutorial-header-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tutorial-step-eyebrow {
+  font: 800 9px/1 'Inter', sans-serif;
+  letter-spacing: 0.1em;
+  color: #ffd700;
+}
+
+.tutorial-role-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 700 9.5px/1 'Inter', sans-serif;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.tutorial-role-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffd700;
+  box-shadow: 0 0 8px #ffd700;
+}
+
+.step-counter-tag {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #cbd5e1;
+  font-size: 8.5px;
+  font-weight: 800;
+}
+
+.tutorial-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tutorial-icon-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #94a3b8;
+  font-size: 13px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.15s;
+}
+
+.tutorial-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.tutorial-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.tutorial-progress-track {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.tutorial-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #d4af37, #ffd700);
+  transition: width 0.3s ease-out;
+}
+
+.tutorial-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tutorial-icon-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tutorial-step-emoji {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.tutorial-step-title {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 16.5px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.tutorial-step-desc {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #cbd5e1;
+  margin: 0;
+}
+
+/* Detailed Highlights Checklist */
+.tutorial-highlights-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.highlights-header {
+  font: 800 9.5px/1 'Inter', sans-serif;
+  letter-spacing: 0.08em;
+  color: #ffd700;
+}
+
+.highlights-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.highlight-item {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+
+.highlight-label {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.highlight-detail {
+  color: #94a3b8;
+}
+
+/* Actionable How-to-use guide */
+.tutorial-how-to-use-box {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.how-to-label {
+  display: block;
+  font: 800 9.5px/1 'Inter', sans-serif;
+  letter-spacing: 0.08em;
+  color: #34d399;
+  margin-bottom: 4px;
+}
+
+.how-to-text {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #f1f5f9;
+  margin: 0;
+}
+
+/* Pro Coach / Scout Tip */
+.tutorial-step-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.tip-icon {
+  font-size: 16px;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+.tip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tip-body strong {
+  font: 800 9px/1 'Inter', sans-serif;
+  letter-spacing: 0.08em;
+  color: #ffd700;
+}
+
+.tip-text {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #f1f5f9;
+  margin: 0;
+}
+
+/* Step dots */
+.tutorial-step-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.step-dot.active {
+  background: #ffd700;
+  transform: scale(1.35);
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+}
+
+.step-dot.completed {
+  background: rgba(212, 175, 55, 0.6);
+}
+
+.tutorial-role-switcher-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.role-switcher-label {
+  font: 700 8.5px/1 'Inter', sans-serif;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.role-buttons-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.role-switch-btn {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  font: 700 9.5px/1 'Inter', sans-serif;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.role-switch-btn:hover {
+  border-color: rgba(212, 175, 55, 0.4);
+  color: #ffffff;
+}
+
+.role-switch-btn.active {
+  background: rgba(212, 175, 55, 0.18);
+  border-color: #ffd700;
+  color: #ffd700;
+}
+
+.tutorial-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.tutorial-btn {
+  font: 700 10.5px/1 'Inter', sans-serif;
+  letter-spacing: 0.06em;
+  padding: 9px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.18s;
+  border: 0;
+}
+
+.tutorial-btn-ghost {
+  background: transparent;
+  color: #94a3b8;
+}
+
+.tutorial-btn-ghost:hover {
+  color: #ffffff;
+}
+
+.tutorial-nav-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tutorial-btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+}
+
+.tutorial-btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.tutorial-btn-secondary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.tutorial-btn-primary {
+  background: linear-gradient(135deg, #ffd700, #d4af37);
+  color: #0b0f19;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.35);
+}
+
+.tutorial-btn-primary:hover {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+
+/* --- Settings Integration Styles --- */
+.settings-tutorial-quick-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  background: linear-gradient(145deg, rgba(212, 175, 55, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin: 18px 0;
+}
+
+.settings-tutorial-quick-banner .banner-text strong {
+  display: block;
+  font-size: 13px;
+  color: #ffffff;
+  margin: 4px 0 2px;
+}
+
+.settings-tutorial-quick-banner .banner-text p {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.launch-tutorial-btn {
+  white-space: nowrap;
+}
+
+.tutorial-settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tutorial-role-selection-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.selection-label {
+  font: 700 10px/1 'Inter', sans-serif;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+}
+
+.tutorial-role-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.tutorial-role-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.tutorial-role-tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(212, 175, 55, 0.3);
+}
+
+.tutorial-role-tab.selected {
+  background: rgba(212, 175, 55, 0.12);
+  border-color: #ffd700;
+}
+
+.tab-role-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.current-account-tag {
+  font: 800 8px/1 'Inter', sans-serif;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #ffd700;
+  color: #0b0f19;
+}
+
+.tutorial-preview-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.preview-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 700 9.5px/1 'Inter', sans-serif;
+  letter-spacing: 0.08em;
+  color: #ffd700;
+  margin-bottom: 6px;
+}
+
+.preview-header h3 {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 18px;
+  color: #ffffff;
+  margin: 0 0 4px;
+}
+
+.preview-header p {
+  color: #94a3b8;
+  font-size: 13px;
+  margin: 0;
+}
+
+.preview-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-step-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.step-num {
+  font: 800 12px/1 'Space Grotesk', sans-serif;
+  color: #ffd700;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(212, 175, 55, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.step-details {
+  flex: 1;
+}
+
+.step-details strong {
+  display: block;
+  font-size: 12.5px;
+  color: #ffffff;
+  margin-bottom: 2px;
+}
+
+.step-details p {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.step-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.tutorial-notice-message {
+  font-size: 12px;
+  color: #10b981;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* ============================================================
+   HIGH-CONTRAST THEME ADAPTATIONS (CRYSTAL CLEAR)
+   ============================================================ */
+
+/* LIGHT MODE */
+.theme-light .onboarding-choice-dialog,
+[data-theme="light"] .onboarding-choice-dialog {
+  background: #ffffff;
+  border-color: rgba(212, 175, 55, 0.55);
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.18), 0 0 50px rgba(212, 175, 55, 0.15);
+}
+
+.theme-light .onboarding-main-title,
+[data-theme="light"] .onboarding-main-title {
+  color: #0f172a;
+}
+
+.theme-light .onboarding-subtitle,
+[data-theme="light"] .onboarding-subtitle {
+  color: #475569;
+}
+
+.theme-light .featured-tutorial-card,
+[data-theme="light"] .featured-tutorial-card {
+  background: linear-gradient(160deg, rgba(212, 175, 55, 0.15) 0%, #ffffff 100%);
+  border-color: rgba(212, 175, 55, 0.6);
+}
+
+.theme-light .featured-tutorial-card:hover,
+[data-theme="light"] .featured-tutorial-card:hover {
+  border-color: #b78912;
+  box-shadow: 0 18px 45px rgba(212, 175, 55, 0.25);
+}
+
+.theme-light .discover-card,
+[data-theme="light"] .discover-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.theme-light .action-card-title,
+[data-theme="light"] .action-card-title {
+  color: #0f172a;
+}
+
+.theme-light .action-card-desc,
+[data-theme="light"] .action-card-desc {
+  color: #475569;
+}
+
+.theme-light .action-card-footer,
+[data-theme="light"] .action-card-footer {
+  border-top-color: #e2e8f0;
+}
+
+.theme-light .action-cta-label,
+[data-theme="light"] .action-cta-label {
+  color: #b78912;
+}
+
+.theme-light .secondary-cta,
+[data-theme="light"] .secondary-cta {
+  color: #475569;
+}
+
+.theme-light .onboarding-choice-footnote,
+[data-theme="light"] .onboarding-choice-footnote {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.theme-light .tutorial-floating-card,
+[data-theme="light"] .tutorial-floating-card {
+  background: #ffffff;
+  border-color: rgba(212, 175, 55, 0.6);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18), 0 0 35px rgba(212, 175, 55, 0.15);
+}
+
+.theme-light .tutorial-step-title,
+[data-theme="light"] .tutorial-step-title {
+  color: #0f172a;
+}
+
+.theme-light .tutorial-step-desc,
+[data-theme="light"] .tutorial-step-desc {
+  color: #334155;
+}
+
+.theme-light .tutorial-highlights-box,
+[data-theme="light"] .tutorial-highlights-box {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.theme-light .highlights-header,
+[data-theme="light"] .highlights-header {
+  color: #b78912;
+}
+
+.theme-light .highlight-label,
+[data-theme="light"] .highlight-label {
+  color: #0f172a;
+}
+
+.theme-light .highlight-detail,
+[data-theme="light"] .highlight-detail {
+  color: #475569;
+}
+
+.theme-light .tutorial-how-to-use-box,
+[data-theme="light"] .tutorial-how-to-use-box {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.theme-light .how-to-label,
+[data-theme="light"] .how-to-label {
+  color: #15803d;
+}
+
+.theme-light .how-to-text,
+[data-theme="light"] .how-to-text {
+  color: #166534;
+}
+
+.theme-light .tutorial-step-tip,
+[data-theme="light"] .tutorial-step-tip {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.theme-light .tip-body strong,
+[data-theme="light"] .tip-body strong {
+  color: #92400e;
+}
+
+.theme-light .tip-text,
+[data-theme="light"] .tip-text {
+  color: #78350f;
+}
+
+.theme-light .step-dot,
+[data-theme="light"] .step-dot {
+  background: #cbd5e1;
+}
+
+.theme-light .step-dot.active,
+[data-theme="light"] .step-dot.active {
+  background: #b78912;
+}
+
+.theme-light .role-switch-btn,
+[data-theme="light"] .role-switch-btn {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.theme-light .role-switch-btn.active,
+[data-theme="light"] .role-switch-btn.active {
+  background: #fef3c7;
+  border-color: #b78912;
+  color: #92400e;
+}
+
+.theme-light .tutorial-btn-ghost,
+[data-theme="light"] .tutorial-btn-ghost {
+  color: #64748b;
+}
+
+.theme-light .tutorial-btn-secondary,
+[data-theme="light"] .tutorial-btn-secondary {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.theme-light .settings-tutorial-quick-banner,
+[data-theme="light"] .settings-tutorial-quick-banner {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.theme-light .settings-tutorial-quick-banner .banner-text strong,
+[data-theme="light"] .settings-tutorial-quick-banner .banner-text strong {
+  color: #0f172a;
+}
+
+.theme-light .tutorial-role-tab,
+[data-theme="light"] .tutorial-role-tab {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+.theme-light .tab-role-name,
+[data-theme="light"] .tab-role-name {
+  color: #0f172a;
+}
+
+.theme-light .tutorial-preview-card,
+[data-theme="light"] .tutorial-preview-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+.theme-light .preview-header h3,
+[data-theme="light"] .preview-header h3 {
+  color: #0f172a;
+}
+
+.theme-light .preview-step-item,
+[data-theme="light"] .preview-step-item {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.theme-light .step-details strong,
+[data-theme="light"] .step-details strong {
+  color: #0f172a;
+}
+
+/* OLED / PURE BLACK MODE */
+[data-theme="oled"] .onboarding-choice-dialog,
+[data-theme="oled"] .tutorial-floating-card {
+  background: #000000;
+  border-color: #ffd700;
+}
+
+[data-theme="oled"] .featured-tutorial-card {
+  background: #000000;
+  border-color: #ffd700;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .onboarding-choice-dialog {
+    padding: 24px 18px 20px;
+  }
+  .tutorial-floating-card {
+    bottom: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    padding: 16px;
+  }
+  .settings-tutorial-quick-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -33,6 +33,12 @@ import {
 import { PerformanceReportPage } from "./reports/PerformanceReportPage"
 import { NanoBananaAnalysisView } from "./components/NanoBananaAnalysisView"
 import { ScoutVaultModal, type SavedScoutReport } from "./components/ScoutVaultModal"
+import {
+  OnboardingChoiceModal,
+  InteractiveTutorialTour,
+  type TutorialRole,
+  TUTORIAL_DATA,
+} from "./components/InteractiveTutorial"
 import AdminPortalPage from "./admin/AdminPortalPage"
 import PlansPage from "./plans/PlansPage"
 import {
@@ -6859,6 +6865,8 @@ function SettingsView({
   onSaveAllSettings,
   authenticated = false,
   onOpenAuth,
+  onStartTutorial,
+  onResetOnboardingChoice,
 }: {
   theme: string
   setTheme: (theme: string) => void
@@ -6894,8 +6902,16 @@ function SettingsView({
   onSaveAllSettings?: () => Promise<void> | void
   authenticated?: boolean
   onOpenAuth?: () => void
+  onStartTutorial?: (role: TutorialRole) => void
+  onResetOnboardingChoice?: () => void
 }) {
   const [section, setSection] = useState("Account & Security")
+  const [selectedTutorialRole, setSelectedTutorialRole] = useState<TutorialRole>(() => {
+    if (role.toLowerCase().includes("club")) return "Club"
+    if (role.toLowerCase().includes("scout")) return "Scout"
+    return "Player"
+  })
+  const [resetPromptNotice, setResetPromptNotice] = useState("")
   const [twoFactor, setTwoFactor] = useState(true)
   const [nameDraft, setNameDraft] = useState(name)
   const [accountSaved, setAccountSaved] = useState(false)
@@ -7042,13 +7058,14 @@ function SettingsView({
             "Regional Preferences",
             "Sport & Dashboard",
             "AI Vision Engine",
+            "Interactive Tutorial",
           ].map((item) => (
             <button
               key={item}
               className={section === item ? "active" : ""}
               onClick={() => setSection(item)}
             >
-              {item}
+              {item === "Interactive Tutorial" ? "🎓 Interactive Tutorial" : item}
             </button>
           ))}
           <span>LOCAL WORKSPACE</span>
@@ -7138,6 +7155,32 @@ function SettingsView({
                   <i />
                 </button>
               </div>
+
+              <div className="settings-tutorial-quick-banner">
+                <div className="banner-text">
+                  <span className="section-kicker">ONBOARDING & PRODUCT TOUR</span>
+                  <strong>NEED A QUICK WALKTHROUGH OF YOUR {role.toUpperCase()} TOOLS?</strong>
+                  <p>
+                    Launch the guided product tour tailored to your account type ({role}). Master smart metrics, AI video analysis, and scouting telemetry.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="primary-button launch-tutorial-btn"
+                  onClick={() =>
+                    onStartTutorial?.(
+                      role.toLowerCase().includes("club")
+                        ? "Club"
+                        : role.toLowerCase().includes("scout")
+                          ? "Scout"
+                          : "Player",
+                    )
+                  }
+                >
+                  START {role.toUpperCase()} TUTORIAL 🚀
+                </button>
+              </div>
+
               <button
                 className="primary-button save-settings"
                 disabled={savingGlobal}
@@ -8097,6 +8140,103 @@ function SettingsView({
             </section>
           )}
 
+          {section === "Interactive Tutorial" && (
+            <section className="settings-card tutorial-settings-card">
+              <div className="panel-title">
+                <div>
+                  <span className="section-kicker">GUIDED LEARNING</span>
+                  <h2>INTERACTIVE PRODUCT TOURS</h2>
+                </div>
+                <span className="verified-stamp">
+                  <Icon name="bolt" size={13} /> {selectedTutorialRole.toUpperCase()} EDITION
+                </span>
+              </div>
+              <p className="setting-description">
+                Experience Scot AI through interactive step-by-step product walkthroughs. Each tutorial is customized with role-specific telemetry, workflows, and best practices.
+              </p>
+
+              {/* Role Selection Tabs */}
+              <div className="tutorial-role-selection-box">
+                <span className="selection-label">SELECT TUTORIAL EXPERIENCE:</span>
+                <div className="tutorial-role-tabs">
+                  {(["Player", "Club", "Scout"] as TutorialRole[]).map((r) => {
+                    const isCurrent = role.toLowerCase().includes(r.toLowerCase())
+                    const isSelected = selectedTutorialRole === r
+                    return (
+                      <button
+                        key={r}
+                        type="button"
+                        className={`tutorial-role-tab ${isSelected ? "selected" : ""}`}
+                        onClick={() => setSelectedTutorialRole(r)}
+                      >
+                        <span className="tab-role-name">
+                          {r === "Player" ? "⚡ Player / Athlete" : r === "Club" ? "🛡️ Club / Academy" : "🔭 Scout / Agent"}
+                        </span>
+                        {isCurrent && <span className="current-account-tag">YOUR ACCOUNT</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Tutorial Preview Banner */}
+              <div className="tutorial-preview-card">
+                <div className="preview-header">
+                  <div className="preview-badge">
+                    <span>{TUTORIAL_DATA[selectedTutorialRole].steps.length} INTERACTIVE STEPS</span>
+                    <span>·</span>
+                    <span>EST. 2 MINUTES</span>
+                  </div>
+                  <h3>{TUTORIAL_DATA[selectedTutorialRole].title}</h3>
+                  <p>{TUTORIAL_DATA[selectedTutorialRole].subtitle}</p>
+                </div>
+
+                <div className="preview-steps-list">
+                  {TUTORIAL_DATA[selectedTutorialRole].steps.map((st, idx) => (
+                    <div key={st.id} className="preview-step-item">
+                      <span className="step-num">{idx + 1}</span>
+                      <div className="step-details">
+                        <strong>{st.title}</strong>
+                        <p>{st.description.slice(0, 90)}...</p>
+                      </div>
+                      <span className="step-icon">{st.icon}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="preview-actions">
+                  <button
+                    type="button"
+                    className="primary-button start-tutorial-hero-btn"
+                    onClick={() => onStartTutorial?.(selectedTutorialRole)}
+                  >
+                    START {selectedTutorialRole.toUpperCase()} TUTORIAL 🚀
+                  </button>
+
+                  <button
+                    type="button"
+                    className="outline-button reset-prompt-btn"
+                    onClick={() => {
+                      if (onResetOnboardingChoice) {
+                        onResetOnboardingChoice()
+                        setResetPromptNotice("Onboarding prompt reset! You will see the welcome choice dialog upon next sign-in.")
+                        setTimeout(() => setResetPromptNotice(""), 4000)
+                      }
+                    }}
+                  >
+                    RESET WELCOME PROMPT 🔄
+                  </button>
+                </div>
+
+                {resetPromptNotice && (
+                  <p className="tutorial-notice-message">
+                    ✓ {resetPromptNotice}
+                  </p>
+                )}
+              </div>
+            </section>
+          )}
+
           {globalSaveError && (
             <p className="analysis-error" role="alert">
               {globalSaveError}
@@ -8235,6 +8375,85 @@ function App() {
     document.documentElement.dir = lang === "ar" ? "rtl" : "ltr"
     document.documentElement.lang = lang
   }, [lang])
+
+  // Interactive Onboarding & Tutorial System State
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false)
+  const [activeTutorial, setActiveTutorial] = useState<{
+    role: TutorialRole
+    stepIndex: number
+  } | null>(null)
+
+  const handleStartTutorial = (targetRole: TutorialRole) => {
+    try {
+      localStorage.setItem("scot_onboarding_choice", "tutorial")
+    } catch {}
+    setShowOnboardingModal(false)
+    setRole(targetRole)
+    setActiveTutorial({ role: targetRole, stepIndex: 0 })
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  const handleDiscoverAlone = () => {
+    try {
+      localStorage.setItem("scot_onboarding_choice", "discovered")
+    } catch {}
+    setShowOnboardingModal(false)
+  }
+
+  const handleResetOnboardingChoice = () => {
+    try {
+      localStorage.removeItem("scot_onboarding_choice")
+    } catch {}
+  }
+
+  const handleTutorialNext = () => {
+    if (!activeTutorial) return
+    const total = TUTORIAL_DATA[activeTutorial.role].steps.length
+    if (activeTutorial.stepIndex < total - 1) {
+      setActiveTutorial({
+        ...activeTutorial,
+        stepIndex: activeTutorial.stepIndex + 1,
+      })
+    } else {
+      handleTutorialFinish()
+    }
+  }
+
+  const handleTutorialPrev = () => {
+    if (!activeTutorial || activeTutorial.stepIndex <= 0) return
+    setActiveTutorial({
+      ...activeTutorial,
+      stepIndex: activeTutorial.stepIndex - 1,
+    })
+  }
+
+  const handleTutorialSkip = () => {
+    setActiveTutorial(null)
+  }
+
+  const handleTutorialFinish = () => {
+    if (activeTutorial) {
+      try {
+        localStorage.setItem(`scot_tutorial_completed_${activeTutorial.role}`, "true")
+      } catch {}
+    }
+    setActiveTutorial(null)
+  }
+
+  const handleTutorialSelectStep = (idx: number) => {
+    if (!activeTutorial) return
+    setActiveTutorial({ ...activeTutorial, stepIndex: idx })
+  }
+
+  const handleTutorialChangeRole = (newRole: TutorialRole) => {
+    setRole(newRole)
+    setActiveTutorial({ role: newRole, stepIndex: 0 })
+  }
+
+  const handleTutorialNavigateView = (targetView: string) => {
+    setView(targetView)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
 
   const [activeAdmin, setActiveAdmin] = useState<AdminAccount | null>(() => getActiveAdminSession())
   const isAdminLoggedIn = Boolean(activeAdmin)
@@ -8873,6 +9092,12 @@ function App() {
   const completeAuth = (mode: AuthMode) => {
     setAuthOpen(false)
     setView(mode === "Register" ? "Profile" : "Dashboard")
+    try {
+      const choice = localStorage.getItem("scot_onboarding_choice")
+      if (!choice) {
+        setShowOnboardingModal(true)
+      }
+    } catch {}
   }
 
   const handleSignOut = async () => {
@@ -10131,6 +10356,8 @@ function App() {
             setScope(enabled ? "Town / City Level" : "Country / National Level")
           }
           onSaveAllSettings={handleSaveAllSettings}
+          onStartTutorial={handleStartTutorial}
+          onResetOnboardingChoice={handleResetOnboardingChoice}
         />
       )}
 
@@ -10226,6 +10453,31 @@ function App() {
             setSearchOpen(false)
             setViewingProfile(p)
           }}
+        />
+      )}
+
+      {/* First-time Onboarding Choice Modal */}
+      <OnboardingChoiceModal
+        isOpen={showOnboardingModal}
+        userName={userName}
+        role={role}
+        onStartTutorial={handleStartTutorial}
+        onDiscoverAlone={handleDiscoverAlone}
+      />
+
+      {/* Floating Interactive Tutorial Tour */}
+      {activeTutorial && (
+        <InteractiveTutorialTour
+          isOpen={Boolean(activeTutorial)}
+          role={activeTutorial.role}
+          stepIndex={activeTutorial.stepIndex}
+          onNext={handleTutorialNext}
+          onPrev={handleTutorialPrev}
+          onSkip={handleTutorialSkip}
+          onFinish={handleTutorialFinish}
+          onSelectStep={handleTutorialSelectStep}
+          onChangeRole={handleTutorialChangeRole}
+          onNavigateView={handleTutorialNavigateView}
         />
       )}
       {activeMessageReply && (
