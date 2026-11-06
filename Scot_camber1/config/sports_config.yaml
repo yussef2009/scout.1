@@ -39,6 +39,25 @@ volleyball:
     - "Set"
     - "Dig"
     - "Idle"
+  roboflow_action_model:
+    model_id: "yussef-essam/volleyball-actions-bg8ht-jctrk-2-yolo26x-t1"
+    classes:
+      0: "a_surve"
+      1: "attacker"
+      2: "b_surve"
+      3: "block"
+      4: "blocker"
+      5: "blocking"
+      6: "defense"
+      7: "digging"
+      8: "over"
+      9: "passing"
+      10: "serving"
+      11: "setting"
+      12: "spike"
+      13: "spiking"
+    role_classes: ["attacker", "blocker"]
+    action_classes: ["a_surve", "b_surve", "serving", "spike", "spiking", "block", "blocking", "setting", "digging", "passing", "defense", "over"]
   court:
     length_m: 18.0                 # Total court length (X-axis: 0.0 to 18.0m)
     width_m: 9.0                   # Total court width (Y-axis: 0.0 to 9.0m)

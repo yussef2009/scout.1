@@ -36,9 +36,12 @@ def download_volleyball_dataset(
     output_dir: str = "./dataset/volleyball_yolov11",
     model_format: str = "yolov11",
     use_fallback: bool = False,
+    workspace: Optional[str] = None,
+    project: Optional[str] = None,
+    version: Optional[int] = None,
 ) -> Path:
     """
-    Downloads volleyball dataset using Roboflow SDK with automatic fallback.
+    Downloads volleyball dataset using Roboflow SDK with automatic fallback or custom project.
     """
     resolved_key = (
         api_key
@@ -66,7 +69,9 @@ def download_volleyball_dataset(
 
     # Dataset candidate selection
     targets = []
-    if use_fallback:
+    if workspace and project:
+        targets.append((workspace, project, version or 1))
+    elif use_fallback:
         targets.append((FALLBACK_DATASET_WORKSPACE, FALLBACK_DATASET_PROJECT, FALLBACK_DATASET_VERSION))
         targets.append((PRIMARY_DATASET_WORKSPACE, PRIMARY_DATASET_PROJECT, PRIMARY_DATASET_VERSION))
     else:
@@ -125,6 +130,9 @@ def parse_args():
     parser.add_argument("--output_dir", "--output-dir", "-o", type=str, default="./dataset/volleyball_yolov11", help="Target directory")
     parser.add_argument("--format", "-f", type=str, default="yolov11", help="Export format (yolov11 / yolov8)")
     parser.add_argument("--use_fallback", "--use-fallback", action="store_true", help="Directly download lightweight fallback dataset")
+    parser.add_argument("--workspace", "-w", type=str, default=None, help="Custom Roboflow workspace slug")
+    parser.add_argument("--project", "-p", type=str, default=None, help="Custom Roboflow project slug")
+    parser.add_argument("--version", "-v", type=int, default=None, help="Custom dataset version number")
     return parser.parse_args()
 
 
@@ -135,5 +143,8 @@ if __name__ == "__main__":
         output_dir=args.output_dir,
         model_format=args.format,
         use_fallback=args.use_fallback,
+        workspace=args.workspace,
+        project=args.project,
+        version=args.version,
     )
 

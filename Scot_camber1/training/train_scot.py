@@ -50,12 +50,14 @@ def train_model(
     freeze: int = 10,
     cos_lr: bool = True,
     mosaic: float = 1.0,
+    lr0: float = None,
+    resume: bool = False,
     project: str = "./runs/scot_train",
     name: str = None,
     device: str = None,
 ) -> Dict[str, Any]:
     """
-    Executes fine-tuning of YOLOv11 detection or pose estimation model.
+    Executes fine-tuning or resumed training of YOLO detection or pose estimation model.
     """
     selected_device = device or check_hardware()
 
@@ -71,7 +73,7 @@ def train_model(
         run_name = name or f"scot_custom_{task}"
 
     logger.info("=" * 70)
-    logger.info("SCOT AI YOLOV11 TRAINING SESSION")
+    logger.info("SCOT AI YOLOV11 / CUSTOM TRAINING SESSION")
     logger.info(f"Task Mode           : {task.upper()}")
     logger.info(f"Initial Weights     : {weights}")
     logger.info(f"Dataset Config      : {data_yaml}")
@@ -81,20 +83,22 @@ def train_model(
     logger.info(f"Backbone Freeze     : First {freeze} layers")
     logger.info(f"Cosine LR Scheduler : {cos_lr}")
     logger.info(f"Mosaic Augmentation : {mosaic} (crucial for small fast balls)")
+    logger.info(f"Strict Resume Mode  : {resume}")
+    if lr0:
+        logger.info(f"Initial LR (lr0)    : {lr0}")
     logger.info(f"Device Target       : {selected_device}")
     logger.info("=" * 70)
 
-    # Initialize Ultralytics YOLOv11 model
+    # Initialize Ultralytics YOLO model
     model = YOLO(weights)
 
-    # Launch model training
-    train_results = model.train(
+    train_kwargs = dict(
         data=data_yaml,
         epochs=epochs,
         patience=patience,
         batch=batch,
         imgsz=imgsz,
-        freeze=freeze,
+        freeze=freeze if not resume else None,
         cos_lr=cos_lr,
         mosaic=mosaic,
         device=selected_device,
@@ -107,6 +111,13 @@ def train_model(
         exist_ok=True,
         verbose=True,
     )
+    if lr0 is not None:
+        train_kwargs["lr0"] = lr0
+    if resume:
+        train_kwargs["resume"] = True
+
+    # Launch model training
+    train_results = model.train(**train_kwargs)
 
     best_checkpoint_path = Path(project) / run_name / "weights" / "best.pt"
     logger.info(f"Training completed. Best model checkpoint saved to: {best_checkpoint_path}")
@@ -179,6 +190,8 @@ def parse_args():
     parser.add_argument("--project", type=str, default="./runs/scot_train", help="Destination project directory")
     parser.add_argument("--name", "-n", type=str, default=None, help="Sub-run directory name")
     parser.add_argument("--device", type=str, default=None, help="CUDA device index e.g. 0 or cpu")
+    parser.add_argument("--lr0", type=float, default=None, help="Initial learning rate for fine-tuning")
+    parser.add_argument("--resume", action="store_true", help="Resume training from checkpoint")
     return parser.parse_args()
 
 
@@ -195,6 +208,8 @@ if __name__ == "__main__":
         freeze=args.freeze,
         cos_lr=not args.no_cos_lr,
         mosaic=args.mosaic,
+        lr0=args.lr0,
+        resume=args.resume,
         project=args.project,
         name=args.name,
         device=args.device,
