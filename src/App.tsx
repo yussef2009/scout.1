@@ -41,6 +41,22 @@ import {
 } from "./components/InteractiveTutorial"
 import AdminPortalPage from "./admin/AdminPortalPage"
 import PlansPage from "./plans/PlansPage"
+import SearchExpand from "./components/SearchExpand"
+import Search3DPopover from "./components/Search3DPopover"
+import ExploreStreamTabs, {
+  type StreamTab,
+  type ExploreStreamTabsProps,
+} from "./components/ExploreStreamTabs"
+import ReelCard9x16, {
+  type ReelCard9x16Props,
+} from "./components/ReelCard9x16"
+import NewsBulletinCard, {
+  type NewsBulletinCardProps,
+  calculateGrade,
+} from "./components/NewsBulletinCard"
+import SocialPostCard, {
+  type SocialPostCardProps,
+} from "./components/SocialPostCard"
 import {
   type AdminAccount,
   ADMIN_ACCOUNTS,
@@ -249,6 +265,19 @@ export const sports = [
   "Cycling",
   "Baseball",
 ]
+
+export const SPORT_ICONS: Record<string, string> = {
+  Soccer: "⚽",
+  Basketball: "🏀",
+  Tennis: "🎾",
+  Boxing: "🥊",
+  Swimming: "🏊",
+  "Track & Field": "🏃",
+  Volleyball: "🏐",
+  Gymnastics: "🤸",
+  Cycling: "🚴",
+  Baseball: "⚾",
+}
 
 export const sportMetrics: Record<string, {
   label: string
@@ -5872,13 +5901,15 @@ function SearchModal({
   onClose,
   profiles,
   onSelectProfile,
+  initialTerm = "",
 }: {
   isOpen: boolean
   onClose: () => void
   profiles: DirectoryProfile[]
   onSelectProfile: (profile: DirectoryProfile) => void
+  initialTerm?: string
 }) {
-  const [searchTerm, setSearchTerm] = useState("")
+  const [searchTerm, setSearchTerm] = useState(initialTerm)
   const [roleFilter, setRoleFilter] =
     useState<"All" | "Player" | "Club" | "Scout">("All")
   const [sportFilter, setSportFilter] = useState("All")
@@ -6019,6 +6050,19 @@ export type PostComment = {
   timestamp: string
 }
 
+export {
+  ExploreStreamTabs,
+  type StreamTab,
+  type ExploreStreamTabsProps,
+  ReelCard9x16,
+  type ReelCard9x16Props,
+  NewsBulletinCard,
+  type NewsBulletinCardProps,
+  SocialPostCard,
+  type SocialPostCardProps,
+  calculateGrade,
+}
+
 export type FeedPost = {
   id: string
   authorName: string
@@ -6034,6 +6078,17 @@ export type FeedPost = {
   comments?: PostComment[]
   metrics?: { label: string; value: string }[]
   isVerified?: boolean
+  postType?: "dispatch" | "reel" | "news"
+  streamType?: "dispatch" | "reel" | "news"
+  rating?: number
+  ratingGrade?: string
+  newsCategory?: string
+  newsHeadline?: string
+  videoUrl?: string
+  isFollowing?: boolean
+  isAudioMuted?: boolean
+  isMuted?: boolean
+  sharesCount?: number
 }
 
 const INITIAL_POSTS: FeedPost[] = [
@@ -6052,6 +6107,12 @@ const INITIAL_POSTS: FeedPost[] = [
     likes: 42,
     commentsCount: 2,
     isVerified: true,
+    postType: "news",
+    streamType: "news",
+    newsCategory: "Scouting Bulletin",
+    newsHeadline: "U-18 Cairo Youth Cup Squad Assessment",
+    rating: 97,
+    ratingGrade: "A+",
     metrics: [
       { label: "SQUAD RATING", value: "97/100" },
       { label: "COUNTER-PRESS", value: "3.2s" },
@@ -6088,9 +6149,17 @@ const INITIAL_POSTS: FeedPost[] = [
       "Vertical takeoff workout today in Alexandria. Hit 78.4 cm with 0.83 sec hang time. Verified directly with Scot AI Vision Engine keyframe analysis!",
     mediaUrl:
       "https://images.unsplash.com/photo-1762025884013-8a42741468e2?auto=format&fit=crop&w=800&q=80",
+    videoUrl:
+      "https://images.unsplash.com/photo-1762025884013-8a42741468e2?auto=format&fit=crop&w=800&q=80",
     likes: 67,
     commentsCount: 1,
     isVerified: true,
+    postType: "reel",
+    streamType: "reel",
+    rating: 94,
+    ratingGrade: "A",
+    isFollowing: false,
+    isAudioMuted: true,
     metrics: [
       { label: "VERTICAL ELEVATION", value: "78.4 CM" },
       { label: "HANG TIME", value: "0.83 SEC" },
@@ -6120,6 +6189,12 @@ const INITIAL_POSTS: FeedPost[] = [
     likes: 31,
     commentsCount: 0,
     isVerified: true,
+    postType: "news",
+    streamType: "news",
+    newsCategory: "Scouting Bulletin",
+    newsHeadline: "EMEA & MENA High-Pace Winger Evaluation",
+    rating: 92,
+    ratingGrade: "A-",
     metrics: [
       { label: "SCOUT STATUS", value: "LICENSED" },
       { label: "COVERAGE", value: "EMEA / MENA" },
@@ -6139,6 +6214,12 @@ const INITIAL_POSTS: FeedPost[] = [
     likes: 89,
     commentsCount: 1,
     isVerified: true,
+    postType: "news",
+    streamType: "news",
+    newsCategory: "Combine Report",
+    newsHeadline: "Youth Biomechanical Audit in Madrid",
+    rating: 98,
+    ratingGrade: "A+",
     metrics: [
       { label: "MOVEMENT SYMMETRY", value: "98.2%" },
       { label: "ACCELERATION", value: "4.12 M/S²" },
@@ -6164,9 +6245,19 @@ const INITIAL_POSTS: FeedPost[] = [
     timestamp: "8h ago",
     content:
       "Catch-and-shoot mechanics breakdown from morning drills. Release angle dialed in at 48° with zero wasted motion.",
+    mediaUrl:
+      "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=800&q=80",
+    videoUrl:
+      "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=800&q=80",
     likes: 29,
     commentsCount: 0,
     isVerified: true,
+    postType: "reel",
+    streamType: "reel",
+    rating: 90,
+    ratingGrade: "A-",
+    isFollowing: false,
+    isAudioMuted: true,
     metrics: [
       { label: "RELEASE ANGLE", value: "48.2°" },
       { label: "RELEASE TIME", value: "0.38S" },
@@ -6204,26 +6295,97 @@ const QUICK_METRICS_LIST = [
   { label: "RELEASE ANGLE", value: "48.2°" },
 ]
 
+const SPOTLIGHT_ATHLETES = [
+  {
+    name: "Elena Rostova",
+    sport: "Volleyball",
+    role: "Opposite Hitter",
+    rating: 96,
+    breakthrough: "3.12m Spike Reach · 104 km/h Velocity",
+    location: "Milan, Italy",
+    image: "https://images.unsplash.com/photo-1547347298-4074fc3086f0?auto=format&fit=crop&w=400&q=80",
+    badge: "FIVB TOP PROSPECT",
+  },
+  {
+    name: "Omar Khalil",
+    sport: "Basketball",
+    role: "Shooting Guard",
+    rating: 94,
+    breakthrough: "48.2° Release Angle · 88cm Leap",
+    location: "Alexandria, Egypt",
+    image: "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=400&q=80",
+    badge: "NBA ACADEMY EVAL",
+  },
+  {
+    name: "Tariq Mansour",
+    sport: "Soccer",
+    role: "Winger",
+    rating: 91,
+    breakthrough: "34.8 km/h Sprint · 3.84 m/s² Accel",
+    location: "Cairo, Egypt",
+    image: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=400&q=80",
+    badge: "SPEED ACCELERATOR",
+  },
+  {
+    name: "Maya Lin",
+    sport: "Combat Sports",
+    role: "Featherweight",
+    rating: 93,
+    breakthrough: "118ms Strike Reaction · 98% Balance",
+    location: "Tokyo, Japan",
+    image: "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=400&q=80",
+    badge: "NEUROMUSCULAR ELITE",
+  },
+]
+
 function FeedView({
   sport,
   onSelectProfile,
   currentUserName,
   currentUserRole,
   followingList,
+  onToggleFollow,
 }: {
   sport: string
   onSelectProfile: (profile: DirectoryProfile) => void
   currentUserName: string
   currentUserRole: string
   followingList: string[]
+  onToggleFollow?: (authorName: string) => void
 }) {
+  const [streamFilter, setStreamFilter] = useState<StreamTab>("all")
   const [filter, setFilter] =
-    useState<"all" | "following" | "clubs" | "scouts" | "sport">("all")
+    useState<"all" | "following" | "clubs" | "scouts" | "players" | "sport">("all")
+  const [selectedSportFilter, setSelectedSportFilter] = useState<string>("all")
+  const [sortBy, setSortBy] = useState<"latest" | "respected" | "footage">("latest")
   const [searchQuery, setSearchQuery] = useState("")
   const [posts, setPosts] = useState<FeedPost[]>(() => {
     try {
       const stored = localStorage.getItem("scot_feed_posts")
-      return stored ? JSON.parse(stored) as FeedPost[] : INITIAL_POSTS
+      if (stored) {
+        const parsed = JSON.parse(stored) as FeedPost[]
+        return parsed.map((p) => {
+          if (!p.postType && !p.streamType) {
+            const initialMatch = INITIAL_POSTS.find((ip) => ip.id === p.id)
+            if (initialMatch) {
+              return {
+                ...p,
+                postType: initialMatch.postType,
+                streamType: initialMatch.streamType,
+                rating: p.rating ?? initialMatch.rating,
+                ratingGrade: p.ratingGrade ?? initialMatch.ratingGrade,
+                newsCategory: p.newsCategory ?? initialMatch.newsCategory,
+                newsHeadline: p.newsHeadline ?? initialMatch.newsHeadline,
+                videoUrl: p.videoUrl ?? initialMatch.videoUrl,
+                isFollowing: p.isFollowing ?? initialMatch.isFollowing,
+                isAudioMuted: p.isAudioMuted ?? initialMatch.isAudioMuted,
+              }
+            }
+          }
+          return p
+        })
+      }
+      return INITIAL_POSTS
     } catch {
       return INITIAL_POSTS
     }
@@ -6238,8 +6400,26 @@ function FeedView({
   const [expandedComments, setExpandedComments] =
     useState<Record<string, boolean>>({})
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({})
+  const [savedPostIds, setSavedPostIds] = useState<Record<string, boolean>>({})
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showComposer, setShowComposer] = useState(false)
+  const [composerStreamType, setComposerStreamType] = useState<
+    "dispatch" | "reel" | "news"
+  >("dispatch")
+  const [newRating, setNewRating] = useState<number>(95)
+  const [newNewsHeadline, setNewNewsHeadline] = useState("")
+  const [newNewsCategory, setNewNewsCategory] = useState("Scouting Bulletin")
+  const [newReelDuration, setNewReelDuration] = useState("30s")
+
+  const streamCounts = {
+    all: posts.length,
+    reels: posts.filter(
+      (p) => p.postType === "reel" || p.streamType === "reel",
+    ).length,
+    news: posts.filter(
+      (p) => p.postType === "news" || p.streamType === "news",
+    ).length,
+  }
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -6264,6 +6444,14 @@ function FeedView({
   const handleCreatePost = () => {
     if (!newContent.trim()) return
     const mediaUrl = SAMPLE_MEDIA_OPTIONS[selectedMediaIndex]?.url || undefined
+    const computedGrade = calculateGrade(newRating)
+    const effectiveType: "dispatch" | "reel" | "news" =
+      composerStreamType === "news"
+        ? "news"
+        : composerStreamType === "reel" || mediaUrl
+          ? "reel"
+          : "dispatch"
+
     const post: FeedPost = {
       id: `post-${Date.now()}`,
       authorName: currentUserName || "Verified Athlete",
@@ -6278,17 +6466,36 @@ function FeedView({
       sport: newSport,
       timestamp: "Just now",
       content: newContent.trim(),
-      mediaUrl,
+      mediaUrl:
+        effectiveType === "reel" && !mediaUrl
+          ? "https://images.unsplash.com/photo-1762025884013-8a42741468e2?auto=format&fit=crop&w=800&q=80"
+          : mediaUrl,
+      videoUrl:
+        effectiveType === "reel"
+          ? mediaUrl ||
+            "https://images.unsplash.com/photo-1762025884013-8a42741468e2?auto=format&fit=crop&w=800&q=80"
+          : undefined,
       likes: 0,
       commentsCount: 0,
       comments: [],
       metrics: selectedMetrics.length > 0 ? selectedMetrics : undefined,
       isVerified: true,
+      postType: effectiveType,
+      streamType: effectiveType,
+      rating: newRating,
+      ratingGrade: computedGrade,
+      newsHeadline:
+        effectiveType === "news"
+          ? newNewsHeadline.trim() || "Scouting Intelligence Bulletin"
+          : undefined,
+      newsCategory: effectiveType === "news" ? newNewsCategory : undefined,
     }
     savePosts([post, ...posts])
     setNewContent("")
+    setNewNewsHeadline("")
     setSelectedMetrics([])
     setSelectedMediaIndex(0)
+    setComposerStreamType("dispatch")
     setShowComposer(false)
     showToast("Performance intel published to SCOT network!")
   }
@@ -6305,6 +6512,14 @@ function FeedView({
         }
       }),
     )
+  }
+
+  const toggleBookmark = (id: string) => {
+    setSavedPostIds((prev) => {
+      const isSaved = !prev[id]
+      showToast(isSaved ? "Intel saved to Scout Vault!" : "Removed from saved intel.")
+      return { ...prev, [id]: isSaved }
+    })
   }
 
   const handleAddComment = (postId: string) => {
@@ -6333,27 +6548,48 @@ function FeedView({
     showToast("Comment recorded on telemetry log.")
   }
 
-  const filteredPosts = posts.filter((p) => {
-    if (filter === "following" && !followingList.includes(p.authorName))
-      return false
-    if (filter === "clubs" && p.authorRole !== "Club") return false
-    if (filter === "scouts" && p.authorRole !== "Scout") return false
-    if (filter === "sport" && p.sport !== sport) return false
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      const matchText = (p.content || "").toLowerCase().includes(q)
-      const matchAuthor = (p.authorName || "").toLowerCase().includes(q)
-      const matchSport = (p.sport || "").toLowerCase().includes(q)
-      const matchMetrics = (p.metrics || []).some(
-        (m) =>
-          m.label.toLowerCase().includes(q) ||
-          m.value.toLowerCase().includes(q),
-      )
-      if (!matchText && !matchAuthor && !matchSport && !matchMetrics)
+  const filteredPosts = posts
+    .filter((p) => {
+      // Milestone 1: Feed Filter Tabs (All / Reels / News)
+      if (streamFilter === "reels") {
+        const isReel = p.postType === "reel" || p.streamType === "reel"
+        if (!isReel) return false
+      } else if (streamFilter === "news") {
+        const isNews = p.postType === "news" || p.streamType === "news"
+        if (!isNews) return false
+      }
+
+      if (selectedSportFilter !== "all" && p.sport.toLowerCase() !== selectedSportFilter.toLowerCase()) {
         return false
-    }
-    return true
-  })
+      }
+      if (filter === "following" && !followingList.includes(p.authorName))
+        return false
+      if (filter === "clubs" && p.authorRole !== "Club") return false
+      if (filter === "scouts" && p.authorRole !== "Scout") return false
+      if (filter === "players" && p.authorRole !== "Player") return false
+      if (filter === "sport" && p.sport !== sport) return false
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase()
+        const matchText = (p.content || "").toLowerCase().includes(q)
+        const matchAuthor = (p.authorName || "").toLowerCase().includes(q)
+        const matchSport = (p.sport || "").toLowerCase().includes(q)
+        const matchHeadline = (p.newsHeadline || "").toLowerCase().includes(q)
+        const matchCategory = (p.newsCategory || "").toLowerCase().includes(q)
+        const matchMetrics = (p.metrics || []).some(
+          (m) =>
+            m.label.toLowerCase().includes(q) ||
+            m.value.toLowerCase().includes(q),
+        )
+        if (!matchText && !matchAuthor && !matchSport && !matchMetrics && !matchHeadline && !matchCategory)
+          return false
+      }
+      return true
+    })
+    .sort((a, b) => {
+      if (sortBy === "respected") return (b.likes || 0) - (a.likes || 0)
+      if (sortBy === "footage") return (b.mediaUrl ? 1 : 0) - (a.mediaUrl ? 1 : 0)
+      return 0 // "latest" retains natural stream order
+    })
 
   return (
     <div className="feed-shell">
@@ -6368,13 +6604,56 @@ function FeedView({
       {/* Explore Header Hero */}
       <section className="explore-header-card">
         <div className="explore-header-meta">
-          <span className="section-kicker">
-            ATHLETIC COMMUNITY & TALENT INTEL
-          </span>
-          <h2>EXPLORE SCOT NETWORK</h2>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+            <span
+              style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                backgroundColor: "#10b981",
+                boxShadow: "0 0 10px #10b981",
+                display: "inline-block",
+              }}
+            />
+            <span className="section-kicker" style={{ margin: 0 }}>
+              LIVE TALENT RADAR · 60 FPS COMPUTER VISION
+            </span>
+          </div>
+          <h2>EXPLORE ATHLETIC INTEL & SCOUT NETWORK</h2>
+          <p className="explore-tagline">
+            Real-time kinematics, verified athlete keyframes, and talent discovery across international scouting networks.
+          </p>
 
+          {/* Quick Sport Filters Bar inside Hero */}
+          <div className="explore-hero-sport-pills" role="toolbar" aria-label="Sport category quick filters">
+            <button
+              type="button"
+              className={`sport-hero-pill ${selectedSportFilter === "all" ? "active" : ""}`}
+              onClick={() => setSelectedSportFilter("all")}
+            >
+              <span>ALL SPORTS</span>
+            </button>
+            {sports.map((s) => (
+              <button
+                type="button"
+                key={s}
+                className={`sport-hero-pill ${selectedSportFilter === s ? "active" : ""}`}
+                onClick={() => setSelectedSportFilter(selectedSportFilter === s ? "all" : s)}
+              >
+                <span>{s.toUpperCase()}</span>
+              </button>
+            ))}
+          </div>
         </div>
+
         <div className="explore-stats-row">
+          <div className="explore-stat-badge">
+            <span>INDEXED RECRUITS</span>
+            <strong>12.8K+</strong>
+            <small>
+              <i /> VERIFIED PROFILES
+            </small>
+          </div>
           <div className="explore-stat-badge">
             <span>NETWORK SCOUTS</span>
             <strong>1,420+</strong>
@@ -6385,18 +6664,83 @@ function FeedView({
           <div className="explore-stat-badge">
             <span>COMPUTER VISION</span>
             <strong>60 FPS</strong>
-            <small>AI KEYFRAMES</small>
+            <small>YOLOv11 KINEMATICS</small>
           </div>
           <div className="explore-stat-badge">
-            <span>INDEXED RECRUITS</span>
-            <strong>12.8K</strong>
-            <small>VERIFIED PLAYERS</small>
+            <span>DATA INTEGRITY</span>
+            <strong>99.2%</strong>
+            <small>FIVB & COMBINE STANDARDS</small>
           </div>
+        </div>
+      </section>
+
+      {/* Featured Scouting Spotlight Carousel */}
+      <section className="explore-spotlights-section" aria-label="Weekly Talent Spotlights">
+        <div className="explore-spotlights-header">
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <Icon name="trend" size={13} />
+            <span>SCOUT RADAR · TOP RECRUITS OF THE WEEK</span>
+          </div>
+          <small style={{ fontSize: "10px", color: "var(--muted)" }}>Click athlete to inspect dossier</small>
+        </div>
+
+        <div className="explore-spotlights-container">
+          {SPOTLIGHT_ATHLETES.map((athlete) => (
+            <div
+              key={athlete.name}
+              className="explore-spotlight-card"
+              onClick={() => {
+                const match = directoryProfiles.find((d) => d.name === athlete.name)
+                if (match) {
+                  onSelectProfile(match)
+                }
+              }}
+              title={`View ${athlete.name}'s talent dossier`}
+            >
+              <span className="explore-spotlight-rating">{athlete.rating}/100</span>
+              <div className="explore-spotlight-top">
+                <img
+                  src={athlete.image}
+                  alt={athlete.name}
+                  className="explore-spotlight-img"
+                  onError={(e) => {
+                    e.currentTarget.src =
+                      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&h=160&q=80"
+                  }}
+                />
+                <div className="explore-spotlight-info">
+                  <strong>{athlete.name}</strong>
+                  <small>{athlete.sport} · {athlete.role}</small>
+                </div>
+              </div>
+
+              <div className="explore-spotlight-breakthrough">
+                <div style={{ fontSize: "9px", color: "#f59e0b", fontWeight: 700, marginBottom: "2px" }}>
+                  {athlete.badge}
+                </div>
+                {athlete.breakthrough}
+              </div>
+
+              <div className="explore-spotlight-footer">
+                <span>{athlete.location}</span>
+                <span className="explore-spotlight-btn">
+                  DOSSIER <Icon name="arrow" size={11} />
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
       {/* Search & Navigation Bar */}
       <div className="feed-controls-bar">
+        {/* Milestone 1: Feed Filter Tabs */}
+        <ExploreStreamTabs
+          activeTab={streamFilter}
+          onSelectTab={setStreamFilter}
+          counts={streamCounts}
+        />
+
         <div className="feed-search-wrap">
           <Icon name="search" size={14} />
           <input
@@ -6418,16 +6762,29 @@ function FeedView({
         </div>
 
         <div className="feed-filters-nav" role="tablist">
-          {/* Dispatch composer toggle (+) under search bar with the other tabs */}
+          {/* Dispatch composer toggle: ONLY '+' sign without text */}
           <button
             type="button"
             className={`feed-filter-btn feed-new-dispatch-btn ${showComposer ? "active" : ""}`}
             onClick={() => setShowComposer(!showComposer)}
-            title={showComposer ? "Hide dispatch composer" : "Log new telemetry dispatch (+)"}
+            title={showComposer ? "Close dispatch composer" : "Add new post (+)"}
+            aria-label={showComposer ? "Close dispatch composer" : "Add new post (+)"}
             aria-expanded={showComposer}
+            style={{
+              width: "36px",
+              height: "36px",
+              minWidth: "36px",
+              padding: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "20px",
+              fontWeight: 700,
+              lineHeight: 1,
+              borderRadius: "8px",
+            }}
           >
-            <span className="dispatch-toggle-icon">{showComposer ? "✕" : "+"}</span>
-            <span>{showComposer ? "CLOSE DISPATCH" : "NEW DISPATCH"}</span>
+            <span>{showComposer ? "✕" : "+"}</span>
           </button>
 
           {[
@@ -6437,8 +6794,9 @@ function FeedView({
               label: "FOLLOWING",
               count: followingList.length,
             },
+            { key: "players", label: "VERIFIED ATHLETES" },
             { key: "clubs", label: "CLUBS & ACADEMIES" },
-            { key: "scouts", label: "SCOUTS" },
+            { key: "scouts", label: "PRO SCOUTS" },
             { key: "sport", label: `${sport.toUpperCase()} ONLY` },
           ].map(({ key, label, count }) => (
             <button
@@ -6473,6 +6831,131 @@ function FeedView({
               </span>
             </div>
             <span className="composer-badge">AI BIOMECHANICS LOG</span>
+          </div>
+
+          {/* Stream Type Selector Tabs */}
+          <div className="composer-stream-type-tabs flex items-center gap-1.5 p-1 bg-black/40 rounded-lg border border-amber-500/20 mb-3">
+            <button
+              type="button"
+              className={`stream-type-btn flex-1 py-1.5 px-2 rounded text-[11px] font-mono font-bold tracking-wider transition-all ${
+                composerStreamType === "dispatch"
+                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+              onClick={() => setComposerStreamType("dispatch")}
+            >
+              DISPATCH
+            </button>
+            <button
+              type="button"
+              className={`stream-type-btn flex-1 py-1.5 px-2 rounded text-[11px] font-mono font-bold tracking-wider transition-all ${
+                composerStreamType === "reel"
+                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+              onClick={() => {
+                setComposerStreamType("reel")
+                if (selectedMediaIndex === 0) setSelectedMediaIndex(1)
+              }}
+            >
+              REEL (9:16 HIGHLIGHT)
+            </button>
+            <button
+              type="button"
+              className={`stream-type-btn flex-1 py-1.5 px-2 rounded text-[11px] font-mono font-bold tracking-wider transition-all ${
+                composerStreamType === "news"
+                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+              onClick={() => setComposerStreamType("news")}
+            >
+              NEWS BULLETIN
+            </button>
+          </div>
+
+          {/* News Bulletin Specific Fields */}
+          {composerStreamType === "news" && (
+            <div className="composer-news-fields flex flex-col gap-2 mb-3 p-2.5 rounded bg-black/40 border border-amber-500/20">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-mono text-neutral-400">
+                  BULLETIN HEADLINE:
+                </span>
+                <input
+                  type="text"
+                  placeholder="e.g. U-18 Cairo Youth Cup Squad Assessment"
+                  value={newNewsHeadline}
+                  onChange={(e) => setNewNewsHeadline(e.target.value)}
+                  className="composer-headline-input bg-black/60 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-400"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-mono text-neutral-400">
+                  INTELLIGENCE CATEGORY:
+                </span>
+                <select
+                  value={newNewsCategory}
+                  onChange={(e) => setNewNewsCategory(e.target.value)}
+                  className="composer-category-select bg-black/60 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                >
+                  <option value="Scouting Bulletin">Scouting Bulletin</option>
+                  <option value="Combine Report">Combine Report</option>
+                  <option value="Tactical Analysis">Tactical Analysis</option>
+                  <option value="Talent Announcement">
+                    Talent Announcement
+                  </option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Reel Specific Fields */}
+          {composerStreamType === "reel" && (
+            <div className="composer-reel-fields flex items-center justify-between mb-3 p-2.5 rounded bg-black/40 border border-amber-500/20 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-neutral-400">
+                  DURATION:
+                </span>
+                <select
+                  value={newReelDuration}
+                  onChange={(e) => setNewReelDuration(e.target.value)}
+                  className="composer-duration-select bg-black/60 border border-white/10 rounded px-2 py-1 text-xs text-white"
+                >
+                  <option value="15s">15 Seconds</option>
+                  <option value="30s">30 Seconds</option>
+                  <option value="45s">45 Seconds</option>
+                  <option value="60s">60 Seconds</option>
+                </select>
+              </div>
+              <span className="text-[10px] font-mono text-amber-300">
+                9:16 VERTICAL HUD ENABLED (YOLOv11 VISION)
+              </span>
+            </div>
+          )}
+
+          {/* Rating Score Slider with Live Dynamic Grade Display */}
+          <div className="composer-rating-group p-2.5 rounded bg-black/40 border border-amber-500/20 mb-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-mono text-neutral-400">
+                SCOT AI RATING SCORE:
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="composer-rating-val text-xs font-mono font-bold text-amber-300">
+                  {newRating}/100
+                </span>
+                <span className="composer-grade-stamp text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-500/40">
+                  GRADE {calculateGrade(newRating)}
+                </span>
+              </div>
+            </div>
+            <input
+              type="range"
+              min={50}
+              max={100}
+              value={newRating}
+              onChange={(e) => setNewRating(Number(e.target.value))}
+              className="w-full accent-amber-400 cursor-pointer"
+              aria-label="Scot AI Rating"
+            />
           </div>
 
           <textarea
@@ -6559,269 +7042,191 @@ function FeedView({
           <strong>NO INTEL LOGS FOUND</strong>
           <p>
             No posts match your selected filter or keyword. Try switching
-            categories or publish your first performance dispatch.
+            categories, resetting filters, or publish your first performance dispatch.
           </p>
           <button
             type="button"
             className="outline-button"
             onClick={() => {
+              setStreamFilter("all")
               setFilter("all")
+              setSelectedSportFilter("all")
               setSearchQuery("")
             }}
           >
-            RESET FILTERS
+            RESET ALL FILTERS
           </button>
         </div>
       ) : (
         <div className="posts-stack">
           {filteredPosts.map((post) => {
             const isCommentsOpen = !!expandedComments[post.id]
+            const isSaved = !!savedPostIds[post.id]
             const commentsList = post.comments || []
-            return (
-              <article key={post.id} className="post-card">
-                {/* Post Header */}
-                <div className="post-header">
-                  <div
-                    className={`post-avatar-wrap role-${post.authorRole.toLowerCase()}`}
-                  >
-                    <img
-                      src={post.authorImage}
-                      alt={post.authorName}
-                      onError={(e) => {
-                        e.currentTarget.src =
-                          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&h=160&q=80"
-                      }}
-                      onClick={() => {
-                        const match = directoryProfiles.find(
-                          (d) => d.name === post.authorName,
-                        )
-                        if (match) onSelectProfile(match)
-                      }}
-                    />
-                  </div>
+            const isReel = post.postType === "reel" || post.streamType === "reel"
 
-                  <div className="post-header-info">
-                    <div className="post-author-row">
-                      <strong
-                        onClick={() => {
-                          const match = directoryProfiles.find(
-                            (d) => d.name === post.authorName,
-                          )
-                          if (match) onSelectProfile(match)
-                        }}
-                      >
-                        {post.authorName}
-                      </strong>
-                      {post.isVerified && (
-                        <span
-                          className="verified-shield-icon"
-                          title="SCOT Verified Athletic Identity"
-                        >
-                          <Icon name="shield" size={12} />
-                        </span>
-                      )}
-                      <span
-                        className={`post-role-badge badge-${post.authorRole.toLowerCase()}`}
-                      >
-                        {post.authorRole.toUpperCase()}
-                      </span>
-                    </div>
-
-                    <div className="post-meta-sub">
-                      <span className="sport-indicator-chip">{post.sport}</span>
-                      <span className="meta-separator">·</span>
-                      <span className="post-time">{post.timestamp}</span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="outline-button post-view-btn"
-                    onClick={() => {
-                      const match = directoryProfiles.find(
-                        (d) => d.name === post.authorName,
-                      )
-                      if (match) onSelectProfile(match)
-                    }}
-                  >
-                    VIEW PROFILE
-                  </button>
-                </div>
-
-                {/* Telemetry Metric Badges */}
-                {post.metrics && post.metrics.length > 0 && (
-                  <div className="post-telemetry-strip">
-                    {post.metrics.map((m, i) => (
-                      <div key={i} className="post-metric-pill">
-                        <Icon name="bolt" size={10} />
-                        <span>{m.label}:</span>
-                        <strong>{m.value}</strong>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Content */}
-                <p className="post-content">{post.content}</p>
-
-                {/* Media with HUD Overlay */}
-                {post.mediaUrl && (
-                  <div className="post-media-hud-container">
-                    <img
-                      src={post.mediaUrl}
-                      alt="Match footage"
-                      className="post-media-preview"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none"
-                      }}
-                    />
-                    <div className="hud-badge top-left">
-                      <i className="hud-pulse-dot" />
-                      <span>60 FPS · AI VISION TRACKING</span>
-                    </div>
-                    <div className="hud-badge top-right">
-                      <Icon name="shield" size={11} />
-                      <span>BIOMECHANICS VERIFIED</span>
-                    </div>
-                    <div className="hud-scanlines-overlay" />
-                  </div>
-                )}
-
-                {/* Post Footer Actions */}
-                <div className="post-footer-actions">
-                  <button
-                    type="button"
-                    className={`post-action-btn respects-btn ${
-                      post.isLiked ? "liked" : ""
-                    }`}
-                    onClick={() => toggleLike(post.id)}
-                    title="Give respects / kudos"
-                  >
-                    <Icon name="bolt" size={14} />
-                    <span>{post.likes}</span>
-                    <small>{post.isLiked ? "RESPECTED" : "RESPECTS"}</small>
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`post-action-btn comments-btn ${
-                      isCommentsOpen ? "active" : ""
-                    }`}
-                    onClick={() =>
-                      setExpandedComments({
-                        ...expandedComments,
-                        [post.id]: !isCommentsOpen,
-                      })
+            if (isReel) {
+              const postIsFollowing =
+                post.isFollowing ?? followingList.includes(post.authorName)
+              return (
+                <ReelCard9x16
+                  key={post.id}
+                  post={post}
+                  isFollowing={postIsFollowing}
+                  onToggleFollow={(authorName) => {
+                    if (onToggleFollow) {
+                      onToggleFollow(authorName)
                     }
-                    title="View and post comments"
-                  >
-                    <span>{post.commentsCount || 0}</span>
-                    <small>COMMENTS</small>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="post-action-btn share-btn"
-                    onClick={() => {
-                      try {
-                        navigator.clipboard.writeText(window.location.href)
-                        showToast("Post link copied to clipboard!")
-                      } catch {
-                        showToast("Intel link indexed.")
+                    const nextFollowing = !postIsFollowing
+                    savePosts(
+                      posts.map((p) =>
+                        p.authorName === authorName
+                          ? { ...p, isFollowing: nextFollowing }
+                          : p,
+                      ),
+                    )
+                    showToast(
+                      nextFollowing
+                        ? `Now following ${authorName}`
+                        : `Unfollowed ${authorName}`,
+                    )
+                  }}
+                  onToggleLike={(postId) => toggleLike(postId)}
+                  onToggleComments={(postId) =>
+                    setExpandedComments((prev) => ({
+                      ...prev,
+                      [postId]: !prev[postId],
+                    }))
+                  }
+                  onShare={(p) => {
+                    try {
+                      const res = navigator.clipboard.writeText(
+                        `${window.location.origin}/reel/${p.id}`,
+                      )
+                      if (res && typeof res.catch === "function") {
+                        res
+                          .then(() =>
+                            showToast("Reel link copied to clipboard!"),
+                          )
+                          .catch(() => showToast("Intel link indexed."))
+                      } else {
+                        showToast("Reel link copied to clipboard!")
                       }
-                    }}
-                    title="Share post"
-                  >
-                    <Icon name="trend" size={12} />
-                    <small>SHARE INTEL</small>
-                  </button>
+                    } catch {
+                      showToast("Intel link indexed.")
+                    }
+                  }}
+                  onSelectProfile={(target) => {
+                    const authorName =
+                      typeof target === "string" ? target : post.authorName
+                    const match = directoryProfiles.find(
+                      (d) => d.name === authorName,
+                    )
+                    if (match) onSelectProfile(match)
+                  }}
+                  isCommentsOpen={isCommentsOpen}
+                  comments={commentsList}
+                  commentDraft={commentDrafts[post.id] || ""}
+                  onCommentDraftChange={(val) =>
+                    setCommentDrafts((prev) => ({ ...prev, [post.id]: val }))
+                  }
+                  onAddComment={(postId) => handleAddComment(postId)}
+                  currentUserName={currentUserName}
+                  currentUserRole={currentUserRole}
+                  onSaveToVault={(postId) => toggleBookmark(postId)}
+                  isSaved={isSaved}
+                />
+              )
+            }
 
-                  <span className="post-verified-stamp">
-                    <Icon name="shield" size={11} />
-                    <span>VERIFIED RECORD</span>
-                  </span>
-                </div>
+            const isNews =
+              post.postType === "news" ||
+              post.streamType === "news" ||
+              !!post.newsCategory ||
+              !!post.newsHeadline
 
-                {/* Expandable Comments Drawer */}
-                {isCommentsOpen && (
-                  <div className="post-comments-drawer">
-                    <div className="comments-header">
-                      <span>
-                        COMMENTS LOG & SCOUT NOTES ({commentsList.length})
-                      </span>
-                    </div>
+            if (isNews) {
+              return (
+                <NewsBulletinCard
+                  key={post.id}
+                  post={post}
+                  onToggleLike={(postId) => toggleLike(postId)}
+                  onToggleComments={(postId) =>
+                    setExpandedComments((prev) => ({
+                      ...prev,
+                      [postId]: !prev[postId],
+                    }))
+                  }
+                  onShare={() => {
+                    try {
+                      navigator.clipboard.writeText(window.location.href)
+                      showToast("Post link copied to clipboard!")
+                    } catch {
+                      showToast("Intel link indexed.")
+                    }
+                  }}
+                  onSaveToVault={(postId) => toggleBookmark(postId)}
+                  onSelectProfile={(target) => {
+                    const authorName =
+                      typeof target === "string" ? target : post.authorName
+                    const match = directoryProfiles.find(
+                      (d) => d.name === authorName,
+                    )
+                    if (match) onSelectProfile(match)
+                  }}
+                  isCommentsOpen={isCommentsOpen}
+                  comments={commentsList}
+                  commentDraft={commentDrafts[post.id] || ""}
+                  onCommentDraftChange={(val) =>
+                    setCommentDrafts((prev) => ({ ...prev, [post.id]: val }))
+                  }
+                  onAddComment={(postId) => handleAddComment(postId)}
+                  currentUserName={currentUserName}
+                  currentUserRole={currentUserRole}
+                  isSaved={isSaved}
+                />
+              )
+            }
 
-                    {commentsList.length > 0 ? (
-                      <div className="comments-list">
-                        {commentsList.map((comm) => (
-                          <div key={comm.id} className="comment-item">
-                            <div className="comment-avatar">
-                              <span>
-                                {(comm.authorName || "User")
-                                  .slice(0, 2)
-                                  .toUpperCase()}
-                              </span>
-                            </div>
-                            <div className="comment-content-box">
-                              <div className="comment-author-bar">
-                                <strong>{comm.authorName}</strong>
-                                <span
-                                  className={`comment-role-pill role-${(comm.authorRole || "Player").toLowerCase()}`}
-                                >
-                                  {comm.authorRole}
-                                </span>
-                                <small>{comm.timestamp}</small>
-                              </div>
-                              <p className="comment-text">{comm.content}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="comments-empty">
-                        <span>
-                          No comments recorded yet. Be the first scout or
-                          athlete to contribute!
-                        </span>
-                      </div>
-                    )}
-
-                    {/* New Comment Input */}
-                    <div className="comment-composer">
-                      <input
-                        type="text"
-                        placeholder={`Add scout note as ${currentUserName || "Observer"}...`}
-                        value={commentDrafts[post.id] || ""}
-                        onChange={(e) =>
-                          setCommentDrafts({
-                            ...commentDrafts,
-                            [post.id]: e.target.value,
-                          })
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault()
-                            handleAddComment(post.id)
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="primary-button"
-                        style={{
-                          minHeight: 32,
-                          padding: "0 12px",
-                          fontSize: 9,
-                        }}
-                        disabled={!commentDrafts[post.id]?.trim()}
-                        onClick={() => handleAddComment(post.id)}
-                      >
-                        POST NOTE
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </article>
+            return (
+              <SocialPostCard
+                key={post.id}
+                post={post}
+                onToggleLike={(postId) => toggleLike(postId)}
+                onToggleComments={(postId) =>
+                  setExpandedComments((prev) => ({
+                    ...prev,
+                    [postId]: !prev[postId],
+                  }))
+                }
+                onShare={() => {
+                  try {
+                    navigator.clipboard.writeText(window.location.href)
+                    showToast("Post link copied to clipboard!")
+                  } catch {
+                    showToast("Intel link indexed.")
+                  }
+                }}
+                onSaveToVault={(postId) => toggleBookmark(postId)}
+                onSelectProfile={(target) => {
+                  const authorName =
+                    typeof target === "string" ? target : post.authorName
+                  const match = directoryProfiles.find(
+                    (d) => d.name === authorName,
+                  )
+                  if (match) onSelectProfile(match)
+                }}
+                isCommentsOpen={isCommentsOpen}
+                comments={commentsList}
+                commentDraft={commentDrafts[post.id] || ""}
+                onCommentDraftChange={(val) =>
+                  setCommentDrafts((prev) => ({ ...prev, [post.id]: val }))
+                }
+                onAddComment={(postId) => handleAddComment(postId)}
+                currentUserName={currentUserName}
+                currentUserRole={currentUserRole}
+                isSaved={isSaved}
+              />
             )
           })}
         </div>
@@ -8336,6 +8741,7 @@ const genericMetrics = [
 function App() {
   const [sport, setSport] = useState("Basketball")
   const [showSportsMenu, setShowSportsMenu] = useState(false)
+  const [hoveredSport, setHoveredSport] = useState<string | null>(null)
   const [scope, setScope] = useState("Town / City Level")
   const [region, setRegion] = useState("All regions")
   const [query, setQuery] = useState("")
@@ -8350,6 +8756,7 @@ function App() {
   const [authError, setAuthError] = useState("")
   const [apiKey, setApiKey] = useState("")
   const [view, setView] = useState("Dashboard")
+  const [pointedBottomTab, setPointedBottomTab] = useState<string | null>(null)
   const [lang, setLang] = useState<"en" | "ar">(() => {
     return (localStorage.getItem("scot_app_lang") as "en" | "ar") || "en"
   })
@@ -8466,6 +8873,7 @@ function App() {
   }, [view, isAdminLoggedIn])
 
   const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement>(null)
 
@@ -8776,7 +9184,7 @@ function App() {
           frameCount,
           filterMetrics,
           localLeaderboardFirst,
-          gemini_api_key: apiKey ? apiKey : null,
+          has_gemini_api_key: Boolean(apiKey),
         },
         updated_at: new Date().toISOString(),
       })
@@ -8894,15 +9302,16 @@ function App() {
           leaderboardFirst ? "Town / City Level" : "Country / National Level",
         )
 
-        // Load account-specific API key for this authenticated user only
+        // Load account-specific API key for this authenticated user from secure client storage
         const accountApiKey =
-          typeof preferences.gemini_api_key === "string" &&
-          preferences.gemini_api_key.trim()
-            ? preferences.gemini_api_key.trim()
-            : (localStorage.getItem(`scoutai_gemini_key_${user.id}`)?.trim() ?? "")
+          (sessionStorage.getItem(`scoutai_gemini_key_${user.id}`) ||
+            localStorage.getItem(`scoutai_gemini_key_${user.id}`) ||
+            (typeof preferences.gemini_api_key === "string" ? preferences.gemini_api_key : "")
+          ).trim()
         setApiKey(accountApiKey)
         if (accountApiKey) {
           try {
+            sessionStorage.setItem(`scoutai_gemini_key_${user.id}`, accountApiKey)
             localStorage.setItem(`scoutai_gemini_key_${user.id}`, accountApiKey)
           } catch {}
         }
@@ -9269,32 +9678,73 @@ function App() {
         </nav>
 
         <div className="header-actions">
-          <button
-            type="button"
-            className="outline-button desktop-only"
-            style={{ minHeight: 34, padding: "0 12px", gap: 6, fontSize: 9 }}
-            onClick={() => setSearchOpen(true)}
-            title={lang === "ar" ? "بحث الأندية واللاعبين" : "Search clubs and players"}
-          >
-            <Icon name="search" size={13} /> {lang === "ar" ? "بحث" : "SEARCH"}
-          </button>
+          <div className="search-bar-anchor" style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <SearchExpand
+              placeholder={lang === "ar" ? "بحث الأندية واللاعبين..." : "Search clubs & athletes..."}
+              isModalOpen={searchOpen}
+              initialQuery={searchQuery}
+              onSearch={(term) => {
+                setSearchQuery(term)
+                setSearchOpen(true)
+              }}
+              onOpenModal={(term) => {
+                setSearchQuery(term || "")
+                setSearchOpen(true)
+              }}
+              onCloseModal={() => {
+                setSearchOpen(false)
+                setSearchQuery("")
+              }}
+            />
+            {searchOpen && (
+              <Search3DPopover
+                isOpen={searchOpen}
+                initialTerm={searchQuery}
+                onClose={() => {
+                  setSearchOpen(false)
+                  setSearchQuery("")
+                }}
+                profiles={directoryProfiles}
+                onSelectProfile={(p) => {
+                  setSearchOpen(false)
+                  setSearchQuery("")
+                  setViewingProfile(p)
+                }}
+                sports={sports}
+                lang={lang}
+              />
+            )}
+          </div>
 
-          <button
-            type="button"
-            className="outline-button desktop-only"
-            style={{
-              minHeight: 34,
-              padding: "0 12px",
-              gap: 6,
-              fontSize: 9,
-              borderColor: "var(--gold-line)",
-              color: "var(--gold-bright)",
-            }}
-            onClick={() => setVaultModalOpen(true)}
-            title={lang === "ar" ? "خزينة الكشاف لسجلات اللاعبين" : "Open Scout Vault player repository"}
-          >
-            <Icon name="shield" size={13} /> {lang === "ar" ? "خزينة الكشاف" : "SCOUT VAULT"}
-          </button>
+          <div className="scout-vault-anchor desktop-only" style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <button
+              type="button"
+              className="outline-button"
+              style={{
+                minHeight: 34,
+                padding: "0 12px",
+                gap: 6,
+                fontSize: 9,
+                borderColor: "var(--gold-line)",
+                color: "var(--gold-bright)",
+              }}
+              onClick={() => setVaultModalOpen((v) => !v)}
+              title={lang === "ar" ? "خزينة الكشاف لسجلات اللاعبين" : "Open Scout Vault player repository"}
+            >
+              <Icon name="shield" size={13} /> {lang === "ar" ? "خزينة الكشاف" : "SCOUT VAULT"}
+            </button>
+
+            {vaultModalOpen && (
+              <ScoutVaultModal
+                isOpen={vaultModalOpen}
+                onClose={() => setVaultModalOpen(false)}
+                onSelectReport={(_saved) => {
+                  setVaultModalOpen(false)
+                  setView("PerformanceReport")
+                }}
+              />
+            )}
+          </div>
 
           <button
             type="button"
@@ -9906,6 +10356,7 @@ function App() {
           currentUserName={userName}
           currentUserRole={role}
           followingList={followingList}
+          onToggleFollow={handleToggleFollow}
         />
       )}
 
@@ -9917,10 +10368,12 @@ function App() {
             onClick={() => setShowSportsMenu((prev) => !prev)}
             aria-expanded={showSportsMenu}
             title="Click to select sports for the dashboard"
+            data-testid="sport-strip-trigger"
           >
             <span className="sport-strip-title">Scot sports</span>
             <span className="sport-active-pill">
               <span className="sport-active-dot" />
+              <span style={{ marginRight: 4 }}>{SPORT_ICONS[sport] || "🏆"}</span>
               {sport}
             </span>
             <span className={`sport-chevron ${showSportsMenu ? "open" : ""}`}>
@@ -9929,21 +10382,41 @@ function App() {
           </button>
 
           {showSportsMenu && (
-            <div className="sport-strip-list" role="tablist">
-              {sports.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={sport === item ? "active" : ""}
-                  onClick={() => {
-                    setSport(item)
-                  }}
-                  role="tab"
-                  aria-selected={sport === item}
-                >
-                  {item}
-                </button>
-              ))}
+            <div
+              className={`sport-strip-list ${hoveredSport ? "has-hover" : ""}`}
+              role="tablist"
+              onMouseLeave={() => setHoveredSport(null)}
+              data-testid="sport-strip-list"
+            >
+              {sports.map((item) => {
+                const isHovered = hoveredSport === item
+                const isBlurred = Boolean(hoveredSport && hoveredSport !== item)
+                const isActive = sport === item
+                const sportIcon = SPORT_ICONS[item] || "🏆"
+
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    className={`sport-strip-item ${isActive ? "active" : ""} ${isHovered ? "hovered" : ""} ${isBlurred ? "blurred" : ""}`}
+                    onClick={() => {
+                      setSport(item)
+                    }}
+                    onMouseEnter={() => setHoveredSport(item)}
+                    onFocus={() => setHoveredSport(item)}
+                    onBlur={() => setHoveredSport(null)}
+                    role="tab"
+                    aria-selected={isActive}
+                    aria-label={item}
+                    title={item}
+                    data-testid={`sport-item-${item.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
+                  >
+                    <span className="sport-item-icon">{sportIcon}</span>
+                    <span className="sport-item-name">{item}</span>
+                    {isActive && <span className="sport-item-active-dot" />}
+                  </button>
+                )
+              })}
             </div>
           )}
         </section>
@@ -10329,7 +10802,7 @@ function App() {
                     frameCount,
                     filterMetrics,
                     localLeaderboardFirst,
-                    gemini_api_key: key || null,
+                    has_gemini_api_key: Boolean(key),
                   },
                   updated_at: new Date().toISOString(),
                 })
@@ -10379,9 +10852,16 @@ function App() {
         />
       )}
 
-      {/* Mobile Sticky Bottom Navigation Bar */}
+      {/* Mobile Sticky Bottom Navigation Bar — Liquid Glass & Focus Lens Blur */}
       {view !== "Admin" && (
-        <nav className="mobile-bottom-nav" aria-label="Mobile navigation bar">
+        <nav
+          className={`mobile-bottom-nav ${pointedBottomTab ? "has-pointed" : ""}`}
+          aria-label="Mobile navigation bar"
+          onPointerLeave={() => setPointedBottomTab(null)}
+        >
+          {/* Ambient glass reflection sweep */}
+          <span className="mobile-bottom-nav-glass-sheen" aria-hidden="true" />
+
           {[
             { id: "Dashboard", label: "Dashboard", icon: "chart" as const },
             { id: "Explore", label: "Explore", icon: "trend" as const },
@@ -10391,11 +10871,21 @@ function App() {
           ].map((tab) => {
             const isActive =
               view === tab.id || (tab.id === "Dashboard" && view === "FullDashboard")
+            const isPointed = pointedBottomTab === tab.id
+            const isDimmed = pointedBottomTab !== null && !isPointed
             return (
               <button
                 key={tab.id}
                 type="button"
-                className={`mobile-bottom-nav-item ${isActive ? "active" : ""}`}
+                className={`mobile-bottom-nav-item ${isActive ? "active" : ""} ${isPointed ? "pointed" : ""} ${isDimmed ? "dimmed-blur" : ""}`}
+                onPointerEnter={() => setPointedBottomTab(tab.id)}
+                onPointerLeave={() =>
+                  setPointedBottomTab((prev) => (prev === tab.id ? null : prev))
+                }
+                onFocus={() => setPointedBottomTab(tab.id)}
+                onBlur={() =>
+                  setPointedBottomTab((prev) => (prev === tab.id ? null : prev))
+                }
                 onClick={() => {
                   setView(tab.id)
                   setMenuOpen(false)
@@ -10405,6 +10895,8 @@ function App() {
                 aria-label={tab.label}
                 aria-current={isActive ? "page" : undefined}
               >
+                {/* Frosted glass capsule background */}
+                <span className="mobile-bottom-nav-glass-capsule" aria-hidden="true" />
                 {isActive && <span className="mobile-bottom-nav-indicator" />}
                 <span className="mobile-bottom-nav-icon-wrap">
                   <Icon name={tab.icon} size={18} />
@@ -10442,17 +10934,6 @@ function App() {
           onClose={() => setViewingProfile(null)}
           isFollowing={followingList.includes(viewingProfile.name)}
           onToggleFollow={handleToggleFollow}
-        />
-      )}
-      {searchOpen && (
-        <SearchModal
-          isOpen={searchOpen}
-          onClose={() => setSearchOpen(false)}
-          profiles={directoryProfiles}
-          onSelectProfile={(p) => {
-            setSearchOpen(false)
-            setViewingProfile(p)
-          }}
         />
       )}
 
@@ -10584,16 +11065,6 @@ function App() {
           </div>
         </div>
       )}
-
-      {/* Global Scout Vault Modal */}
-      <ScoutVaultModal
-        isOpen={vaultModalOpen}
-        onClose={() => setVaultModalOpen(false)}
-        onSelectReport={(_saved) => {
-          setVaultModalOpen(false)
-          setView("PerformanceReport")
-        }}
-      />
     </main>
   )
 }

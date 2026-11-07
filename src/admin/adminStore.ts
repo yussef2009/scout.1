@@ -392,8 +392,26 @@ export function addSpecialCode(entry: SpecialCodeEntry): void {
 
 export function revokeSpecialCode(code: string): void {
   try {
+    const clean = code.trim().toUpperCase()
     const all = getSpecialCodes()
-    const updated = all.map((c) => c.code.toUpperCase() === code.toUpperCase() ? { ...c, status: "revoked" as const } : c)
+    const existing = all.find((c) => c.code.toUpperCase() === clean)
+    let updated: SpecialCodeEntry[]
+    if (existing) {
+      updated = all.map((c) => (c.code.toUpperCase() === clean ? { ...c, status: "revoked" as const } : c))
+    } else {
+      // Record revocation for default base codes or new entries
+      const isBaseClub = BASE_CLUB_CODES.includes(clean)
+      updated = [
+        ...all,
+        {
+          code: clean,
+          role: isBaseClub ? "Club" : "Scout",
+          issuedTo: "Revoked System Credential",
+          issuedAt: "Just now",
+          status: "revoked" as const,
+        },
+      ]
+    }
     localStorage.setItem(STORAGE_KEY_CODES, JSON.stringify(updated))
   } catch {}
 }
@@ -401,29 +419,41 @@ export function revokeSpecialCode(code: string): void {
 export function isValidClubCode(code: string): boolean {
   const clean = code.trim().toUpperCase()
   if (!clean) return false
-  if (BASE_CLUB_CODES.includes(clean)) return true
-  const custom = getSpecialCodes()
-  return custom.some((c) => c.role === "Club" && c.status === "active" && c.code.toUpperCase() === clean)
+  const specialCodes = getSpecialCodes()
+  const matching = specialCodes.find((c) => c.code.toUpperCase() === clean)
+  if (matching) {
+    return matching.role === "Club" && matching.status === "active"
+  }
+  return BASE_CLUB_CODES.includes(clean)
 }
 
 export function isValidScoutCode(code: string): boolean {
   const clean = code.trim().toUpperCase()
   if (!clean) return false
-  if (BASE_SCOUT_CODES.includes(clean)) return true
-  const custom = getSpecialCodes()
-  return custom.some((c) => c.role === "Scout" && c.status === "active" && c.code.toUpperCase() === clean)
+  const specialCodes = getSpecialCodes()
+  const matching = specialCodes.find((c) => c.code.toUpperCase() === clean)
+  if (matching) {
+    return matching.role === "Scout" && matching.status === "active"
+  }
+  return BASE_SCOUT_CODES.includes(clean)
 }
 
 export function getAllClubCodes(): string[] {
-  const activeCustom = getSpecialCodes()
+  const specialCodes = getSpecialCodes()
+  const revoked = new Set(specialCodes.filter((c) => c.status === "revoked").map((c) => c.code.toUpperCase()))
+  const activeCustom = specialCodes
     .filter((c) => c.role === "Club" && c.status === "active")
     .map((c) => c.code.toUpperCase())
-  return Array.from(new Set([...BASE_CLUB_CODES, ...activeCustom]))
+  const validBase = BASE_CLUB_CODES.filter((c) => !revoked.has(c))
+  return Array.from(new Set([...validBase, ...activeCustom]))
 }
 
 export function getAllScoutCodes(): string[] {
-  const activeCustom = getSpecialCodes()
+  const specialCodes = getSpecialCodes()
+  const revoked = new Set(specialCodes.filter((c) => c.status === "revoked").map((c) => c.code.toUpperCase()))
+  const activeCustom = specialCodes
     .filter((c) => c.role === "Scout" && c.status === "active")
     .map((c) => c.code.toUpperCase())
-  return Array.from(new Set([...BASE_SCOUT_CODES, ...activeCustom]))
+  const validBase = BASE_SCOUT_CODES.filter((c) => !revoked.has(c))
+  return Array.from(new Set([...validBase, ...activeCustom]))
 }

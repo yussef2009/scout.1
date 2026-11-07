@@ -73,6 +73,12 @@
       "skillPath": "skills/roboflow-universe/SKILL.md",
       "computedHash": "14c65404baed876ee7791f5f6c539faa228c9620235094c83ac60b37483c1fb8"
     },
+    "security-audit": {
+      "source": "cloudflare/security-audit-skill",
+      "sourceType": "github",
+      "skillPath": "skills/security-audit/SKILL.md",
+      "computedHash": "e6b2e317de75da97e9de18d842982994803f3a67a4a6d8154a82323dc3de8528"
+    },
     "workflow-from-eval": {
       "source": "roboflow/computer-vision-skills",
       "sourceType": "github",

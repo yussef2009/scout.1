@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, useRef } from "react"
 import { Icon } from "../App"
 import type { VideoAnalysisReport } from "../video-analysis"
 
@@ -27,6 +27,9 @@ export const ScoutVaultModal: React.FC<ScoutVaultModalProps> = ({
   onCompareReport,
 }) => {
   const [reports, setReports] = useState<SavedScoutReport[]>([])
+  const [searchFilter, setSearchFilter] = useState("")
+  const inputRef = useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!isOpen) return
@@ -110,151 +113,175 @@ export const ScoutVaultModal: React.FC<ScoutVaultModalProps> = ({
     } catch {}
   }, [isOpen])
 
+  // Handle Escape key
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose()
+      }
+    }
+    if (isOpen) {
+      document.addEventListener("keydown", handleKeyDown)
+    }
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
+  const filteredReports = reports.filter((r) => {
+    if (!searchFilter.trim()) return true
+    const q = searchFilter.toLowerCase()
+    return (
+      r.athleteName.toLowerCase().includes(q) ||
+      r.sport.toLowerCase().includes(q) ||
+      r.position.toLowerCase().includes(q)
+    )
+  })
+
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        background: "rgba(3, 6, 15, 0.88)",
-        backdropFilter: "blur(16px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "20px",
-      }}
-      onClick={onClose}
-    >
+    <>
+      {/* Invisible backdrop to dismiss popover when clicking anywhere outside */}
       <div
+        className="vault-3d-backdrop"
+        onClick={onClose}
         style={{
-          background: "#0a0e1c",
-          border: "1px solid rgba(255, 255, 255, 0.12)",
-          borderRadius: "24px",
-          maxWidth: "680px",
-          width: "100%",
-          padding: "28px",
-          boxShadow: "0 20px 50px rgba(0,0,0,0.8)",
-          maxHeight: "85vh",
-          display: "flex",
-          flexDirection: "column",
+          position: "fixed",
+          inset: 0,
+          zIndex: 9990,
+          background: "transparent",
         }}
+        data-testid="vault-3d-backdrop"
+      />
+
+      {/* 3D Floating Small Screen under Scot Vault button */}
+      <div
+        ref={containerRef}
+        className="vault-3d-popover"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label="Scout Vault Repository Screen"
+        data-testid="vault-3d-popover"
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "20px",
-          }}
-        >
+        {/* 3D Pointer Diamond */}
+        <div className="vault-3d-pointer" />
+
+        {/* 3D Header */}
+        <div className="vault-3d-header">
           <div>
-            <span
-              style={{
-                fontSize: "10px",
-                fontWeight: 800,
-                color: "var(--gold-bright, #fbbf24)",
-                letterSpacing: "1px",
-              }}
-            >
-              ACCOUNT STORAGE &amp; HISTORY
-            </span>
-            <h2
-              style={{
-                fontSize: "22px",
-                fontWeight: 800,
-                color: "#ffffff",
-                margin: "2px 0 0",
-              }}
-            >
+            <div className="vault-3d-eyebrow">
+              <span className="vault-3d-pulse-dot" />
+              <span>ACCOUNT STORAGE &amp; HISTORY</span>
+              <span
+                style={{
+                  background: "rgba(251, 191, 36, 0.16)",
+                  padding: "1px 6px",
+                  borderRadius: "999px",
+                  fontSize: "9px",
+                  border: "1px solid rgba(251, 191, 36, 0.3)",
+                }}
+              >
+                {filteredReports.length} DOSSIERS
+              </span>
+            </div>
+            <h3 className="vault-3d-title">
               Scout Vault · Saved Player Reports
-            </h2>
+            </h3>
           </div>
+
           <button
+            type="button"
+            className="vault-3d-close-btn"
             onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#ffffff",
-              cursor: "pointer",
-              padding: "4px",
-            }}
+            aria-label="Close Scout Vault"
+            title="Close"
           >
-            <Icon name="close" size={20} />
+            <Icon name="close" size={14} />
           </button>
         </div>
 
-        <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px", paddingRight: "4px" }}>
-          {reports.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px", color: "rgba(255,255,255,0.5)" }}>
-              No scouting reports saved in your vault yet.
+        {/* Quick Filter Input */}
+        <div className="vault-3d-search-wrap">
+          <Icon name="search" size={14} />
+          <input
+            ref={inputRef}
+            type="text"
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            placeholder="Filter saved dossiers by name, sport..."
+            aria-label="Filter saved dossiers"
+          />
+          {searchFilter && (
+            <button
+              type="button"
+              className="vault-3d-clear-btn"
+              onClick={() => {
+                setSearchFilter("")
+                inputRef.current?.focus()
+              }}
+            >
+              CLEAR
+            </button>
+          )}
+        </div>
+
+        {/* 3D Saved Reports List */}
+        <div className="vault-3d-results-list">
+          {filteredReports.length === 0 ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "24px 12px",
+                color: "rgba(255, 255, 255, 0.45)",
+                fontSize: "12px",
+              }}
+            >
+              <div style={{ marginBottom: "6px" }}>🛡️</div>
+              <strong style={{ color: "rgba(255, 255, 255, 0.8)", display: "block" }}>
+                NO SAVED REPORTS FOUND
+              </strong>
+              <small>No scouting dossiers match your current filter query.</small>
             </div>
           ) : (
-            reports.map((r) => (
+            filteredReports.map((r) => (
               <div
                 key={r.id}
-                style={{
-                  background: "rgba(255, 255, 255, 0.04)",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "14px",
-                  padding: "16px 20px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: "12px",
+                className="vault-3d-row"
+                onClick={() => {
+                  onSelectReport(r)
+                  onClose()
                 }}
+                data-testid={`vault-row-${r.id}`}
               >
-                <div>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <strong style={{ fontSize: "16px", color: "#ffffff" }}>{r.athleteName}</strong>
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        padding: "2px 8px",
-                        borderRadius: "6px",
-                        background: "rgba(34, 211, 238, 0.15)",
-                        color: "#22d3ee",
-                      }}
-                    >
-                      {r.sport}
-                    </span>
-                    <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}>
-                      {r.position}
-                    </span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                    <strong className="vault-3d-athlete-name">{r.athleteName}</strong>
+                    <span className="vault-3d-sport-tag">{r.sport}</span>
+                    <span className="vault-3d-position-tag">{r.position}</span>
                   </div>
-                  <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", marginTop: "4px" }}>
+                  <div className="vault-3d-date-meta">
                     Session Date: {r.date}
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                  <div style={{ textAlign: "right", marginRight: "6px" }}>
-                    <div style={{ fontSize: "22px", fontWeight: 900, color: "#fbbf24" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "18px", fontWeight: 900, color: "#fbbf24", lineHeight: 1 }}>
                       {r.score}
                     </div>
-                    <small style={{ fontSize: "10px", color: "#10b981", fontWeight: 700 }}>
+                    <small style={{ fontSize: "9px", color: "#10b981", fontWeight: 800 }}>
                       GRADE {r.grade}
                     </small>
                   </div>
 
                   <button
-                    onClick={() => {
+                    type="button"
+                    className="vault-3d-open-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
                       onSelectReport(r)
                       onClose()
-                    }}
-                    style={{
-                      padding: "8px 14px",
-                      borderRadius: "8px",
-                      background: "rgba(255,255,255,0.08)",
-                      border: "1px solid rgba(255,255,255,0.2)",
-                      color: "#ffffff",
-                      fontSize: "12px",
-                      fontWeight: 700,
-                      cursor: "pointer",
                     }}
                   >
                     Open Report
@@ -262,19 +289,12 @@ export const ScoutVaultModal: React.FC<ScoutVaultModalProps> = ({
 
                   {onCompareReport && (
                     <button
-                      onClick={() => {
+                      type="button"
+                      className="vault-3d-compare-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
                         onCompareReport(r)
                         onClose()
-                      }}
-                      style={{
-                        padding: "8px 14px",
-                        borderRadius: "8px",
-                        background: "linear-gradient(135deg, #fbbf24, #d97706)",
-                        border: "none",
-                        color: "#000000",
-                        fontSize: "12px",
-                        fontWeight: 800,
-                        cursor: "pointer",
                       }}
                     >
                       Compare Dual
@@ -286,6 +306,8 @@ export const ScoutVaultModal: React.FC<ScoutVaultModalProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </>
   )
 }
+
+export default ScoutVaultModal

@@ -1,5 +1,6 @@
 import { createClient, type User } from "@supabase/supabase-js";
 import { projectId, publicAnonKey as legacyAnonKey } from "../utils/supabase/info";
+import { getActiveAdminSession } from "./admin/adminInfo";
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
@@ -179,8 +180,17 @@ export async function fetchAdminProfiles(): Promise<ProfileRow[]> {
   }
 }
 
+export function isAuthorizedAdminOperation(): boolean {
+  const activeSession = getActiveAdminSession();
+  return Boolean(activeSession && activeSession.role === "admin");
+}
+
 export async function updateAdminProfile(id: string, updates: Partial<ProfileRow>): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!isAuthorizedAdminOperation()) {
+      return { success: false, error: "Unauthorized: Administrator clearance required." };
+    }
+
     const payload = {
       ...updates,
       updated_at: new Date().toISOString(),
@@ -220,6 +230,10 @@ export async function updateAdminVerificationRequest(
   updates: Partial<VerificationRequestRow>
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!isAuthorizedAdminOperation()) {
+      return { success: false, error: "Unauthorized: Administrator clearance required." };
+    }
+
     const payload = {
       ...updates,
       updated_at: new Date().toISOString(),
@@ -258,6 +272,10 @@ export async function upsertAdminSportSchema(
   schema: Omit<SportSchemaRow, "created_at" | "updated_at">
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!isAuthorizedAdminOperation()) {
+      return { success: false, error: "Unauthorized: Administrator clearance required." };
+    }
+
     const payload = {
       ...schema,
       updated_at: new Date().toISOString(),

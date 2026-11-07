@@ -1,0 +1,31 @@
+# ── SCOT AI — Production Requirements ─────────────────────────────────────────
+# GitHub Student Developer Pack Stack: MongoDB Atlas + Appwrite + Sentry + Datadog + Azure
+
+# Core API & ASGI Framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.12
+pydantic>=2.9.0
+pydantic-settings>=2.6.0
+httpx>=0.27.0
+
+# Database: MongoDB Atlas Async Driver
+motor>=3.6.0
+pymongo>=4.9.0
+
+# Object Storage: Appwrite Cloud Storage SDK
+appwrite>=7.0.0
+
+# Observability: Sentry APM & Datadog DogStatsD / ddtrace
+sentry-sdk[fastapi]>=2.18.0
+ddtrace>=2.18.0
+datadog>=0.49.0
+
+# AI & Computer Vision Kinematics Stack
+ultralytics>=8.3.0
+roboflow>=1.1.48
+opencv-python-headless>=4.10.0.84
+supervision>=0.24.0
+numpy>=1.24.0,<2.1.0
+pyyaml>=6.0.2
+

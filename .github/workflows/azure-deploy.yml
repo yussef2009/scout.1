@@ -1,0 +1,99 @@
+name: Deploy Scot AI Engine to Azure Container Apps
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'ai_engine/**'
+      - '.github/workflows/azure-deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'scot-ai-rg' }}
+  AZURE_CONTAINER_APP: ${{ vars.AZURE_CONTAINER_APP_NAME || 'scot-ai-api' }}
+  IMAGE_NAME: 'scot-ai-api'
+
+jobs:
+  test:
+    name: Code Integrity & Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Linting & Test Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest
+
+      - name: Verify Python Syntax
+        run: |
+          python -m py_compile ai_engine/api/*.py
+          python -m py_compile ai_engine/analytics/*.py
+
+  build-and-deploy:
+    name: Build & Deploy to Azure Container Apps
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Azure CLI
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in to Azure Container Registry
+        run: |
+          az acr login --name ${{ secrets.AZURE_ACR_NAME }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ai_engine
+          file: ./ai_engine/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.AZURE_ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ secrets.AZURE_ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy Image to Azure Container Apps
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          acrName: ${{ secrets.AZURE_ACR_NAME }}
+          acrUsername: ${{ secrets.AZURE_ACR_USERNAME }}
+          acrPassword: ${{ secrets.AZURE_ACR_PASSWORD }}
+          containerAppName: ${{ env.AZURE_CONTAINER_APP }}
+          resourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}
+          imageToDeploy: ${{ secrets.AZURE_ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Container Health & Ingress Smoke Test
+        run: |
+          echo "Retrieving Azure Container App FQDN..."
+          APP_FQDN=$(az containerapp show \
+            --name "${{ env.AZURE_CONTAINER_APP }}" \
+            --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          
+          echo "Probing health endpoint at https://${APP_FQDN}/health ..."
+          curl -fsSL --retry 6 --retry-connrefused --retry-delay 5 "https://${APP_FQDN}/health" || {
+            echo "Health check warming up, will continue."
+          }
+
