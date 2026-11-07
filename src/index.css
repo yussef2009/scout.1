@@ -2549,30 +2549,43 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
     z-index: -1;
   }
 
-  /* When hovering / pointing on the tab bar: the others blur and soften */
-  .mobile-bottom-nav:hover .mobile-bottom-nav-item:not(:hover),
-  .mobile-bottom-nav.has-pointed .mobile-bottom-nav-item.dimmed-blur {
-    filter: blur(2.5px);
-    opacity: 0.36;
-    transform: scale(0.94);
+  /* 1. During page change/swipe ("except when it's change"): subtle motion blur on non-active tabs */
+  .mobile-bottom-nav.is-page-changing .mobile-bottom-nav-item:not(.active) {
+    filter: blur(2px);
+    opacity: 0.42;
+    transform: scale(0.95);
   }
 
-  /* The pointed/hovered tab: crisp, elevated, glass capsule highlight */
-  .mobile-bottom-nav-item:hover,
-  .mobile-bottom-nav-item.pointed {
-    filter: blur(0px) !important;
-    opacity: 1 !important;
-    transform: translateY(-2.5px) scale(1.08);
-    color: var(--white, #ffffff);
+  .mobile-bottom-nav.is-page-changing .mobile-bottom-nav-indicator {
+    transform: translateX(-50%) scaleX(1.45);
+    box-shadow: 0 0 16px rgba(245, 158, 11, 1), 0 0 32px rgba(251, 191, 36, 0.75);
   }
 
-  .mobile-bottom-nav-item:hover .mobile-bottom-nav-glass-capsule,
-  .mobile-bottom-nav-item.pointed .mobile-bottom-nav-glass-capsule {
-    background: radial-gradient(circle at 50% 30%, rgba(251, 191, 36, 0.18), rgba(255, 255, 255, 0.06) 65%, transparent 100%);
-    border-color: rgba(255, 255, 255, 0.18);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.24);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+  /* 2. ONLY when user uses a mouse/pointer device ("or the users use mouse"): depth-of-field lens focus blur */
+  @media (hover: hover) and (pointer: fine) {
+    .mobile-bottom-nav.is-mouse-user:hover .mobile-bottom-nav-item:not(:hover),
+    .mobile-bottom-nav.has-pointed.is-mouse-user .mobile-bottom-nav-item.dimmed-blur {
+      filter: blur(2.5px);
+      opacity: 0.36;
+      transform: scale(0.94);
+    }
+
+    .mobile-bottom-nav.is-mouse-user .mobile-bottom-nav-item:hover,
+    .mobile-bottom-nav-item.pointed.is-mouse-user {
+      filter: blur(0px) !important;
+      opacity: 1 !important;
+      transform: translateY(-2.5px) scale(1.08);
+      color: var(--white, #ffffff);
+    }
+
+    .mobile-bottom-nav.is-mouse-user .mobile-bottom-nav-item:hover .mobile-bottom-nav-glass-capsule,
+    .mobile-bottom-nav-item.pointed.is-mouse-user .mobile-bottom-nav-glass-capsule {
+      background: radial-gradient(circle at 50% 30%, rgba(251, 191, 36, 0.18), rgba(255, 255, 255, 0.06) 65%, transparent 100%);
+      border-color: rgba(255, 255, 255, 0.18);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.24);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
   }
 
   .mobile-bottom-nav-item:active {
@@ -2633,6 +2646,51 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
   .wearable-page-container,
   .settings-shell {
     padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* ==========================================================================
+   MOBILE SWIPE VIEWPORT & PAGE SLIDE TRANSITIONS
+   ========================================================================== */
+.mobile-swipe-view-wrapper {
+  position: relative;
+  width: 100%;
+  min-height: 100%;
+  touch-action: pan-y pinch-zoom;
+  will-change: transform, opacity, filter;
+}
+
+.mobile-swipe-view-wrapper.slide-from-right {
+  animation: pageSlideFromRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.mobile-swipe-view-wrapper.slide-from-left {
+  animation: pageSlideFromLeft 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pageSlideFromRight {
+  0% {
+    opacity: 0.75;
+    transform: translateX(28px);
+    filter: blur(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+    filter: blur(0px);
+  }
+}
+
+@keyframes pageSlideFromLeft {
+  0% {
+    opacity: 0.75;
+    transform: translateX(-28px);
+    filter: blur(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+    filter: blur(0px);
   }
 }
 

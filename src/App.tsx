@@ -8757,6 +8757,87 @@ function App() {
   const [apiKey, setApiKey] = useState("")
   const [view, setView] = useState("Dashboard")
   const [pointedBottomTab, setPointedBottomTab] = useState<string | null>(null)
+  const [isMouseUser, setIsMouseUser] = useState(false)
+  const [isPageChanging, setIsPageChanging] = useState(false)
+  const [pageSlideDirection, setPageSlideDirection] = useState<"left" | "right" | "none">("none")
+  const pageSlideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const touchStartXRef = useRef<number | null>(null)
+  const touchStartYRef = useRef<number | null>(null)
+  const touchStartTimeRef = useRef<number>(0)
+
+  const MOBILE_SWIPE_TABS = ["Dashboard", "Explore", "Wearable", "Profile", "Settings"] as const
+
+  const changeTabWithTransition = (newTab: string, direction: "left" | "right") => {
+    setPageSlideDirection(direction)
+    setIsPageChanging(true)
+    setView(newTab)
+    setPointedBottomTab(null)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+
+    if (pageSlideTimerRef.current) {
+      clearTimeout(pageSlideTimerRef.current)
+    }
+    pageSlideTimerRef.current = setTimeout(() => {
+      setIsPageChanging(false)
+      setPageSlideDirection("none")
+    }, 280)
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return
+    const target = e.target as HTMLElement | null
+    if (target) {
+      if (
+        target.closest(
+          "input, textarea, select, button, .video-scrubber, .reel-video-container, .feed-stream-tabs, [data-no-swipe]"
+        )
+      ) {
+        return
+      }
+    }
+    touchStartXRef.current = e.touches[0].clientX
+    touchStartYRef.current = e.touches[0].clientY
+    touchStartTimeRef.current = Date.now()
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return
+    const touch = e.changedTouches[0]
+    if (!touch) return
+
+    const deltaX = touch.clientX - touchStartXRef.current
+    const deltaY = touch.clientY - touchStartYRef.current
+    const duration = Date.now() - touchStartTimeRef.current
+
+    touchStartXRef.current = null
+    touchStartYRef.current = null
+
+    // Ensure distinct horizontal swipe gesture
+    if (Math.abs(deltaX) < 40 || Math.abs(deltaX) < Math.abs(deltaY) * 1.3) {
+      return
+    }
+    if (duration > 650 && Math.abs(deltaX) < 80) {
+      return
+    }
+
+    const normalizedView =
+      view === "FullDashboard" ? "Dashboard" : view === "Home" ? "Explore" : view
+    const currentIndex = MOBILE_SWIPE_TABS.indexOf(normalizedView as any)
+    if (currentIndex === -1) return
+
+    if (deltaX < 0) {
+      // Swiped left -> Next tab
+      if (currentIndex < MOBILE_SWIPE_TABS.length - 1) {
+        changeTabWithTransition(MOBILE_SWIPE_TABS[currentIndex + 1], "left")
+      }
+    } else {
+      // Swiped right -> Previous tab
+      if (currentIndex > 0) {
+        changeTabWithTransition(MOBILE_SWIPE_TABS[currentIndex - 1], "right")
+      }
+    }
+  }
+
   const [lang, setLang] = useState<"en" | "ar">(() => {
     return (localStorage.getItem("scot_app_lang") as "en" | "ar") || "en"
   })
@@ -9669,7 +9750,12 @@ function App() {
                   : ""
               }
               onClick={() => {
-                setView(item.id)
+                const normalizedView =
+                  view === "FullDashboard" ? "Dashboard" : view === "Home" ? "Explore" : view
+                const currentIndex = MOBILE_SWIPE_TABS.indexOf(normalizedView as any)
+                const targetIndex = MOBILE_SWIPE_TABS.indexOf(item.id as any)
+                const dir = targetIndex >= currentIndex ? "left" : "right"
+                changeTabWithTransition(item.id, dir)
               }}
             >
               {item.label}
@@ -10348,7 +10434,19 @@ function App() {
         </div>
       )}
 
-      {/* EXPLORE / POSTS FEED VIEW */}
+      {/* Mobile Swipe-Enabled Dynamic Viewport with Synchronized Transitions */}
+      <div
+        className={`mobile-swipe-view-wrapper ${
+          pageSlideDirection === "left"
+            ? "slide-from-right"
+            : pageSlideDirection === "right"
+              ? "slide-from-left"
+              : ""
+        } ${isPageChanging ? "is-page-changing" : ""}`}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* EXPLORE / POSTS FEED VIEW */}
       {(view === "Explore" || view === "Home") && (
         <FeedView
           sport={sport}
@@ -10833,6 +10931,7 @@ function App() {
           onResetOnboardingChoice={handleResetOnboardingChoice}
         />
       )}
+      </div>
 
       {view === "Admin" && isAdminLoggedIn && (
         <AdminPortalPage
@@ -10852,12 +10951,22 @@ function App() {
         />
       )}
 
-      {/* Mobile Sticky Bottom Navigation Bar — Liquid Glass & Focus Lens Blur */}
+      {/* Mobile Sticky Bottom Navigation Bar — Liquid Glass & Synced Page Transitions */}
       {view !== "Admin" && (
         <nav
-          className={`mobile-bottom-nav ${pointedBottomTab ? "has-pointed" : ""}`}
+          className={`mobile-bottom-nav ${pointedBottomTab ? "has-pointed" : ""} ${isMouseUser ? "is-mouse-user" : ""} ${isPageChanging ? "is-page-changing" : ""}`}
           aria-label="Mobile navigation bar"
-          onPointerLeave={() => setPointedBottomTab(null)}
+          onPointerDown={(e) => setIsMouseUser(e.pointerType === "mouse")}
+          onPointerMove={(e) => {
+            if (e.pointerType === "mouse" && !isMouseUser) {
+              setIsMouseUser(true)
+            }
+          }}
+          onPointerLeave={() => {
+            setPointedBottomTab(null)
+          }}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
         >
           {/* Ambient glass reflection sweep */}
           <span className="mobile-bottom-nav-glass-sheen" aria-hidden="true" />
@@ -10877,20 +10986,33 @@ function App() {
               <button
                 key={tab.id}
                 type="button"
-                className={`mobile-bottom-nav-item ${isActive ? "active" : ""} ${isPointed ? "pointed" : ""} ${isDimmed ? "dimmed-blur" : ""}`}
-                onPointerEnter={() => setPointedBottomTab(tab.id)}
-                onPointerLeave={() =>
+                className={`mobile-bottom-nav-item ${isActive ? "active" : ""} ${isPointed && isMouseUser ? "pointed" : ""} ${isDimmed && isMouseUser ? "dimmed-blur" : ""}`}
+                onPointerEnter={(e) => {
+                  if (e.pointerType === "mouse") {
+                    setIsMouseUser(true)
+                    setPointedBottomTab(tab.id)
+                  }
+                }}
+                onPointerLeave={() => {
                   setPointedBottomTab((prev) => (prev === tab.id ? null : prev))
-                }
-                onFocus={() => setPointedBottomTab(tab.id)}
-                onBlur={() =>
+                }}
+                onFocus={() => {
+                  if (isMouseUser) {
+                    setPointedBottomTab(tab.id)
+                  }
+                }}
+                onBlur={() => {
                   setPointedBottomTab((prev) => (prev === tab.id ? null : prev))
-                }
+                }}
                 onClick={() => {
-                  setView(tab.id)
+                  const normalizedView =
+                    view === "FullDashboard" ? "Dashboard" : view === "Home" ? "Explore" : view
+                  const currentIndex = MOBILE_SWIPE_TABS.indexOf(normalizedView as any)
+                  const targetIndex = MOBILE_SWIPE_TABS.indexOf(tab.id as any)
+                  const dir = targetIndex >= currentIndex ? "left" : "right"
+                  changeTabWithTransition(tab.id, dir)
                   setMenuOpen(false)
                   setAccountMenuOpen(false)
-                  window.scrollTo({ top: 0, behavior: "smooth" })
                 }}
                 aria-label={tab.label}
                 aria-current={isActive ? "page" : undefined}
