@@ -53,6 +53,8 @@ export interface ReelCard9x16Props {
   currentUserRole?: string
   onSaveToVault?: (postId: string) => void
   isSaved?: boolean
+  onOpenReport?: (post: FeedPost) => void
+  onOpenStream?: (postId: string) => void
 }
 
 export function ReelCard9x16({
@@ -72,6 +74,8 @@ export function ReelCard9x16({
   currentUserRole = "Scout",
   onSaveToVault,
   isSaved = false,
+  onOpenReport,
+  onOpenStream,
 }: ReelCard9x16Props) {
   const [isPlaying, setIsPlaying] = useState(true)
   const [isMuted, setIsMuted] = useState(post.isAudioMuted ?? true)
@@ -355,38 +359,72 @@ export function ReelCard9x16({
           <span>60 FPS · YOLOv11 VISION</span>
         </div>
 
-        {/* Top-Right: Grade Stamp */}
-        <div
-          className="hud-badge top-right reel-grade-stamp"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "5px",
-            padding: "5px 11px",
-            background: "rgba(9, 14, 26, 0.8)",
-            border: "1px solid rgba(251, 191, 36, 0.45)",
-            borderRadius: "999px",
-            fontSize: "9.5px",
-            fontWeight: 800,
-            letterSpacing: "0.08em",
-            color: "#fbbf24",
-            backdropFilter: "blur(8px)",
-            boxShadow: "0 2px 10px rgba(0, 0, 0, 0.4)",
-          }}
-        >
-          <svg
-            width="11"
-            height="11"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
+        {/* Top-Right: Grade Stamp & Stream Button */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          {onOpenStream && (
+            <button
+              type="button"
+              className="reel-stream-open-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                onOpenStream(post.id)
+              }}
+              title="Open Fullscreen Reels Stream (Scroll like Instagram)"
+              aria-label="Open Fullscreen Reels Stream"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+                padding: "5px 11px",
+                background: "rgba(0, 0, 0, 0.75)",
+                border: "1px solid rgba(251, 191, 36, 0.5)",
+                borderRadius: "999px",
+                fontSize: "9.5px",
+                fontWeight: 800,
+                letterSpacing: "0.06em",
+                color: "#ffffff",
+                backdropFilter: "blur(8px)",
+                cursor: "pointer",
+                boxShadow: "0 2px 10px rgba(0, 0, 0, 0.4)",
+              }}
+            >
+              <span>📹</span>
+              <span>REELS STREAM</span>
+            </button>
+          )}
+
+          <div
+            className="hud-badge top-right reel-grade-stamp"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "5px",
+              padding: "5px 11px",
+              background: "rgba(9, 14, 26, 0.8)",
+              border: "1px solid rgba(251, 191, 36, 0.45)",
+              borderRadius: "999px",
+              fontSize: "9.5px",
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              color: "#fbbf24",
+              backdropFilter: "blur(8px)",
+              boxShadow: "0 2px 10px rgba(0, 0, 0, 0.4)",
+            }}
           >
-            <path d="M12 3 5 6v5c0 4.7 3 8.2 7 10 4-1.8 7-5.3 7-10V6l-7-3Z" />
-            <path d="m9 12 2 2 4-4" />
-          </svg>
-          <span>{displayGrade}</span>
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            >
+              <path d="M12 3 5 6v5c0 4.7 3 8.2 7 10 4-1.8 7-5.3 7-10V6l-7-3Z" />
+              <path d="m9 12 2 2 4-4" />
+            </svg>
+            <span>{displayGrade}</span>
+          </div>
         </div>
       </div>
 
@@ -702,6 +740,38 @@ export function ReelCard9x16({
             </span>
           </button>
         )}
+
+        {/* Attached Scout Report Action Button */}
+        {((post as any).hasReport || !!(post as any).reportData) && (
+          <button
+            type="button"
+            className="reel-action-btn report-btn"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenReport?.(post)
+            }}
+            title="View Attached Scout Dossier"
+            aria-label="View Attached Scout Dossier"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 44,
+              height: 44,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, rgba(251, 191, 36, 0.4), rgba(217, 119, 6, 0.4))",
+              border: "1.5px solid #fbbf24",
+              color: "#fbbf24",
+              cursor: "pointer",
+              backdropFilter: "blur(8px)",
+              transition: "all 0.18s ease",
+            }}
+          >
+            <span style={{ fontSize: "16px" }}>📑</span>
+            <span style={{ fontSize: "7px", fontWeight: 800, marginTop: 1 }}>REPORT</span>
+          </button>
+        )}
       </div>
 
       {/* Bottom Area: Athlete Profile, Caption, Telemetry */}
@@ -927,6 +997,38 @@ export function ReelCard9x16({
               </div>
             ))}
           </div>
+        )}
+
+        {/* Attached Scout Report Pill */}
+        {((post as any).hasReport || !!(post as any).reportData) && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenReport?.(post)
+            }}
+            className="reel-report-pill"
+            style={{
+              alignSelf: "flex-start",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "4px 10px",
+              borderRadius: "8px",
+              background: "rgba(251, 191, 36, 0.18)",
+              border: "1px solid rgba(251, 191, 36, 0.5)",
+              color: "#fbbf24",
+              fontSize: "11px",
+              fontWeight: 700,
+              cursor: "pointer",
+              backdropFilter: "blur(6px)",
+              marginTop: "4px",
+            }}
+          >
+            <span>📑</span>
+            <span>Scout Report Attached ({post.ratingGrade || "A"} · {post.rating || 94}/100)</span>
+            <span>→</span>
+          </button>
         )}
       </div>
 

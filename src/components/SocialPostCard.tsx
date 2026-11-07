@@ -51,6 +51,7 @@ export interface SocialPostCardProps {
   currentUserName?: string
   currentUserRole?: string
   isSaved?: boolean
+  onOpenReport?: (post: FeedPost) => void
 }
 
 export function calculateGrade(rating: number): string {
@@ -81,6 +82,7 @@ export function SocialPostCard({
   currentUserName = "Observer",
   currentUserRole = "Scout",
   isSaved = false,
+  onOpenReport,
 }: SocialPostCardProps) {
   const [internalCommentsOpen, setInternalCommentsOpen] = useState(false)
   const [internalCommentDraft, setInternalCommentDraft] = useState("")
@@ -315,6 +317,19 @@ export function SocialPostCard({
           </div>
           <div className="hud-scanlines-overlay pointer-events-none" />
         </div>
+      )}
+
+      {/* Attached Scout Report Pill */}
+      {((post as any).hasReport || !!(post as any).reportData) && (
+        <button
+          type="button"
+          onClick={() => onOpenReport?.(post)}
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-mono font-bold transition-all my-2 cursor-pointer shadow-sm shadow-amber-500/10"
+        >
+          <span>📑</span>
+          <span>Scout Report Attached ({post.ratingGrade || "A"} · {post.rating || 94}/100)</span>
+          <span className="text-amber-200">View Dossier →</span>
+        </button>
       )}
 
       {/* Post Footer Actions */}

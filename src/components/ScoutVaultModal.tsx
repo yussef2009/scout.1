@@ -142,16 +142,10 @@ export const ScoutVaultModal: React.FC<ScoutVaultModalProps> = ({
 
   return (
     <>
-      {/* Invisible backdrop to dismiss popover when clicking anywhere outside */}
+      {/* Backdrop to dismiss popover when clicking outside */}
       <div
         className="vault-3d-backdrop"
         onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 9990,
-          background: "transparent",
-        }}
         data-testid="vault-3d-backdrop"
       />
 

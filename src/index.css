@@ -16646,6 +16646,13 @@ html[dir="rtl"] .mobile-tab-link-icon {
    3D Scout Vault Popover Screen — Under the Scot Vault Button
    ============================================================ */
 
+.vault-3d-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  background: transparent;
+}
+
 .vault-3d-popover {
   position: absolute;
   top: calc(100% + 12px);
@@ -16912,15 +16919,300 @@ html[dir="rtl"] .mobile-tab-link-icon {
   box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
 }
 
-@media (max-width: 520px) {
+@media (max-width: 768px) {
   .vault-3d-popover {
-    right: -10px;
-    width: calc(100vw - 20px);
-    max-width: calc(100vw - 20px);
-    padding: 14px;
-    border-radius: 14px;
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%) !important;
+    width: calc(100vw - 28px) !important;
+    max-width: 440px !important;
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+    padding: 18px 16px !important;
+    border-radius: 20px !important;
+    z-index: 10001 !important;
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.95), 0 0 35px rgba(251, 191, 36, 0.25) !important;
   }
   .vault-3d-pointer {
-    right: 48px;
+    display: none !important;
   }
+  .vault-3d-backdrop {
+    background: rgba(0, 0, 0, 0.75) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    z-index: 10000 !important;
+  }
+}
+
+/* ==========================================================================
+   LAPTOP & DESKTOP GLASS ANIMATIONS & SMOOTH TRANSITIONS
+   (Matches Mobile Liquid Glass Sheen & Depth-of-Field Precision)
+   ========================================================================== */
+@media (min-width: 961px) {
+  .topbar {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(10, 12, 18, 0.85) 100%) !important;
+    backdrop-filter: blur(28px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.14) !important;
+    box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.2), 0 10px 32px rgba(0, 0, 0, 0.5) !important;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Liquid Glass Sheen Sweep Across Desktop Topbar */
+  .topbar::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.06) 40%,
+      rgba(251, 191, 36, 0.15) 50%,
+      rgba(255, 255, 255, 0.06) 60%,
+      transparent 100%
+    );
+    pointer-events: none;
+    animation: glass-sheen-sweep 8s infinite ease-in-out;
+    z-index: 1;
+  }
+
+  .desktop-nav {
+    position: relative;
+    z-index: 2;
+  }
+
+  .desktop-nav button {
+    position: relative;
+    border-radius: 8px;
+    padding: 6px 14px;
+    transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+
+  .desktop-nav button:hover {
+    color: var(--white, #ffffff) !important;
+    background: radial-gradient(circle at 50% 30%, rgba(251, 191, 36, 0.18), rgba(255, 255, 255, 0.06) 65%, transparent 100%) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.22) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    transform: translateY(-2px) scale(1.04) !important;
+  }
+
+  .desktop-nav button.active {
+    color: var(--gold-bright, #fbbf24) !important;
+    background: radial-gradient(circle at 50% 20%, rgba(245, 158, 11, 0.16), transparent 75%) !important;
+  }
+
+  .desktop-nav button.active::after {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    left: 15%;
+    right: 15%;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b) !important;
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.85), 0 0 20px rgba(251, 191, 36, 0.45) !important;
+    animation: indicator-glow 3s infinite ease-in-out !important;
+  }
+
+  /* Desktop Nav Hover Blur (Depth of Field Focus) */
+  .desktop-nav:hover button:not(:hover) {
+    filter: blur(1.8px) !important;
+    opacity: 0.4 !important;
+    transform: scale(0.96) !important;
+  }
+}
+
+/* ==========================================================================
+   MOBILE PHONE SIZING & RESPONSIVE POLISH (360px - 480px Viewports)
+   ========================================================================== */
+@media (max-width: 480px) {
+  html, body, #root, .app-shell, .page-shell, .feed-shell {
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+
+  .explore-header-card {
+    padding: 16px 14px !important;
+    border-radius: 12px !important;
+  }
+
+  .explore-header-card h2 {
+    font-size: 18px !important;
+    line-height: 1.3 !important;
+  }
+
+  .explore-tagline {
+    font-size: 11px !important;
+    line-height: 1.4 !important;
+  }
+
+  .explore-stats-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .explore-stat-badge {
+    padding: 10px 8px !important;
+  }
+
+  .explore-stat-badge strong {
+    font-size: 16px !important;
+  }
+
+  .explore-spotlights-container {
+    gap: 10px !important;
+  }
+
+  .explore-spotlight-card {
+    min-width: 220px !important;
+    padding: 12px !important;
+  }
+
+  .feed-controls-bar {
+    gap: 10px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .explore-separated-action-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .explore-separated-action-row button {
+    justify-content: center !important;
+  }
+
+  .feed-filter-btn {
+    min-height: 40px !important;
+    padding: 6px 12px !important;
+    font-size: 10px !important;
+  }
+
+  .feed-filter-btn.feed-new-dispatch-btn {
+    width: 100% !important;
+    min-height: 44px !important;
+    border-radius: 10px !important;
+  }
+
+  .post-card, .reel-card-9x16 {
+    border-radius: 12px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .post-header {
+    padding: 12px !important;
+    gap: 8px !important;
+  }
+
+  .post-footer-actions {
+    padding: 8px 12px 12px !important;
+    gap: 6px !important;
+  }
+
+  .post-action-btn {
+    min-height: 38px !important;
+    padding: 0 10px !important;
+  }
+}
+
+/* ==========================================================================
+   EXPLORE SEARCH BAR AS COMPACT ICON CAPSULE (MATCHING MAIN TABS)
+   ========================================================================== */
+.feed-search-wrap.explore-icon-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: rgba(16, 17, 23, 0.9);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 999px;
+  padding: 0 12px;
+  height: 42px;
+  min-height: 42px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.feed-search-wrap.explore-icon-search-wrap:focus-within,
+.feed-search-wrap.explore-icon-search-wrap.has-query {
+  border-color: #fbbf24;
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.35);
+  background: rgba(10, 12, 18, 0.98);
+}
+
+.feed-search-icon-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fbbf24;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.explore-separated-action-row {
+  margin: 4px 0;
+}
+
+/* ==========================================================================
+   INSTAGRAM-INSPIRED REELS & POSTS STYLING
+   ========================================================================== */
+@keyframes heart-burst-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  45% {
+    transform: scale(1.35);
+    opacity: 1;
+  }
+  75% {
+    transform: scale(1.05);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(1.1);
+    opacity: 0;
+  }
+}
+
+.instagram-heart-burst {
+  animation: heart-burst-pop 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: none;
+}
+
+.instagram-story-ring {
+  background: linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #10b981 100%);
+  padding: 2px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reel-report-pill {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reel-report-pill:hover {
+  background: rgba(251, 191, 36, 0.28) !important;
+  border-color: #fbbf24 !important;
+  transform: translateY(-1px);
+}
+
+.explore-live-match-banner {
+  background: linear-gradient(135deg, rgba(30, 8, 8, 0.85) 0%, rgba(10, 12, 18, 0.95) 50%, rgba(30, 18, 5, 0.8) 100%);
+  transition: all 0.25s ease;
+}
+
+.explore-live-match-banner:hover {
+  border-color: rgba(239, 68, 68, 0.6) !important;
+  box-shadow: 0 0 24px rgba(239, 68, 68, 0.25) !important;
 }
