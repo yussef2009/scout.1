@@ -8760,6 +8760,7 @@ function App() {
   const [isMouseUser, setIsMouseUser] = useState(false)
   const [isPageChanging, setIsPageChanging] = useState(false)
   const [pageSlideDirection, setPageSlideDirection] = useState<"left" | "right" | "none">("none")
+  const [swipeOffset, setSwipeOffset] = useState<number>(0)
   const pageSlideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const touchStartXRef = useRef<number | null>(null)
   const touchStartYRef = useRef<number | null>(null)
@@ -8770,6 +8771,7 @@ function App() {
   const changeTabWithTransition = (newTab: string, direction: "left" | "right") => {
     setPageSlideDirection(direction)
     setIsPageChanging(true)
+    setSwipeOffset(0)
     setView(newTab)
     setPointedBottomTab(null)
     window.scrollTo({ top: 0, behavior: "smooth" })
@@ -8780,7 +8782,7 @@ function App() {
     pageSlideTimerRef.current = setTimeout(() => {
       setIsPageChanging(false)
       setPageSlideDirection("none")
-    }, 280)
+    }, 300)
   }
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -8798,12 +8800,34 @@ function App() {
     touchStartXRef.current = e.touches[0].clientX
     touchStartYRef.current = e.touches[0].clientY
     touchStartTimeRef.current = Date.now()
+    setSwipeOffset(0)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return
+    const touch = e.touches[0]
+    if (!touch) return
+
+    const deltaX = touch.clientX - touchStartXRef.current
+    const deltaY = touch.clientY - touchStartYRef.current
+
+    // If movement is predominantly horizontal, track subtle real-time swipe offset with dampening
+    if (Math.abs(deltaX) > Math.abs(deltaY) * 1.3 && Math.abs(deltaX) > 8) {
+      const offset = Math.sign(deltaX) * Math.min(36, Math.abs(deltaX) * 0.28)
+      setSwipeOffset(offset)
+    }
   }
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartXRef.current === null || touchStartYRef.current === null) return
+    if (touchStartXRef.current === null || touchStartYRef.current === null) {
+      setSwipeOffset(0)
+      return
+    }
     const touch = e.changedTouches[0]
-    if (!touch) return
+    if (!touch) {
+      setSwipeOffset(0)
+      return
+    }
 
     const deltaX = touch.clientX - touchStartXRef.current
     const deltaY = touch.clientY - touchStartYRef.current
@@ -8814,28 +8838,37 @@ function App() {
 
     // Ensure distinct horizontal swipe gesture
     if (Math.abs(deltaX) < 40 || Math.abs(deltaX) < Math.abs(deltaY) * 1.3) {
+      setSwipeOffset(0)
       return
     }
     if (duration > 650 && Math.abs(deltaX) < 80) {
+      setSwipeOffset(0)
       return
     }
 
     const normalizedView =
       view === "FullDashboard" ? "Dashboard" : view === "Home" ? "Explore" : view
     const currentIndex = MOBILE_SWIPE_TABS.indexOf(normalizedView as any)
-    if (currentIndex === -1) return
+    if (currentIndex === -1) {
+      setSwipeOffset(0)
+      return
+    }
 
     if (deltaX < 0) {
       // Swiped left -> Next tab
       if (currentIndex < MOBILE_SWIPE_TABS.length - 1) {
         changeTabWithTransition(MOBILE_SWIPE_TABS[currentIndex + 1], "left")
+        return
       }
     } else {
       // Swiped right -> Previous tab
       if (currentIndex > 0) {
         changeTabWithTransition(MOBILE_SWIPE_TABS[currentIndex - 1], "right")
+        return
       }
     }
+
+    setSwipeOffset(0)
   }
 
   const [lang, setLang] = useState<"en" | "ar">(() => {
@@ -10443,7 +10476,20 @@ function App() {
               ? "slide-from-left"
               : ""
         } ${isPageChanging ? "is-page-changing" : ""}`}
+        style={
+          swipeOffset !== 0
+            ? {
+                transform: `translate3d(${swipeOffset}px, 0, 0)`,
+                transition: "none",
+              }
+            : isPageChanging
+              ? undefined
+              : {
+                  transition: "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)",
+                }
+        }
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
         {/* EXPLORE / POSTS FEED VIEW */}
@@ -10970,6 +11016,27 @@ function App() {
         >
           {/* Ambient glass reflection sweep */}
           <span className="mobile-bottom-nav-glass-sheen" aria-hidden="true" />
+
+          {/* Continuous horizontal gliding gold indicator */}
+          <span
+            className="mobile-bottom-nav-sliding-indicator"
+            style={{
+              left: `calc(${
+                Math.max(
+                  0,
+                  MOBILE_SWIPE_TABS.indexOf(
+                    (view === "FullDashboard" ? "Dashboard" : view === "Home" ? "Explore" : view) as any
+                  )
+                ) * 20 + 10
+              }% ${
+                swipeOffset !== 0
+                  ? `- ${(swipeOffset / (typeof window !== "undefined" && window.innerWidth > 0 ? window.innerWidth : 390)) * 20}%`
+                  : ""
+              })`,
+              transition: swipeOffset !== 0 ? "none" : undefined,
+            }}
+            aria-hidden="true"
+          />
 
           {[
             { id: "Dashboard", label: "Dashboard", icon: "chart" as const },

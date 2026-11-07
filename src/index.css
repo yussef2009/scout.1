@@ -2657,40 +2657,79 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
   width: 100%;
   min-height: 100%;
   touch-action: pan-y pinch-zoom;
-  will-change: transform, opacity, filter;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .mobile-swipe-view-wrapper.slide-from-right {
-  animation: pageSlideFromRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: pageSlideFromRight 0.30s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .mobile-swipe-view-wrapper.slide-from-left {
-  animation: pageSlideFromLeft 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: pageSlideFromLeft 0.30s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 @keyframes pageSlideFromRight {
   0% {
-    opacity: 0.75;
-    transform: translateX(28px);
-    filter: blur(3px);
+    opacity: 0.25;
+    transform: translate3d(36px, 0, 0) scale(0.99);
   }
   100% {
     opacity: 1;
-    transform: translateX(0);
-    filter: blur(0px);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 @keyframes pageSlideFromLeft {
   0% {
-    opacity: 0.75;
-    transform: translateX(-28px);
-    filter: blur(3px);
+    opacity: 0.25;
+    transform: translate3d(-36px, 0, 0) scale(0.99);
   }
   100% {
     opacity: 1;
-    transform: translateX(0);
-    filter: blur(0px);
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* Continuous horizontal gliding gold indicator on the glass dock */
+.mobile-bottom-nav-sliding-indicator {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  width: 26px;
+  height: 3px;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b);
+  border-radius: 99px;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.9), 0 0 20px rgba(251, 191, 36, 0.5);
+  transition: left 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+              width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.3s ease;
+  will-change: left, width;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.mobile-bottom-nav.is-page-changing .mobile-bottom-nav-sliding-indicator {
+  width: 38px;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 1), 0 0 32px rgba(251, 191, 36, 0.85);
+}
+
+/* Hide redundant per-item static indicator when continuous sliding indicator is active */
+.mobile-bottom-nav .mobile-bottom-nav-item .mobile-bottom-nav-indicator {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-swipe-view-wrapper.slide-from-right,
+  .mobile-swipe-view-wrapper.slide-from-left {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+  .mobile-bottom-nav-sliding-indicator {
+    transition: none !important;
   }
 }
 
@@ -2722,7 +2761,8 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
 .theme-light .mobile-bottom-nav-item.active .mobile-bottom-nav-label {
   color: #b45309;
 }
-.theme-light .mobile-bottom-nav-indicator {
+.theme-light .mobile-bottom-nav-indicator,
+.theme-light .mobile-bottom-nav-sliding-indicator {
   background: linear-gradient(90deg, #d97706, #b45309, #d97706);
   box-shadow: 0 0 10px rgba(180, 83, 9, 0.55);
 }
@@ -2741,7 +2781,8 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
 .theme-midnight .mobile-bottom-nav-item.active .mobile-bottom-nav-label {
   color: #38bdf8;
 }
-.theme-midnight .mobile-bottom-nav-indicator {
+.theme-midnight .mobile-bottom-nav-indicator,
+.theme-midnight .mobile-bottom-nav-sliding-indicator {
   background: linear-gradient(90deg, #0284c7, #38bdf8, #0284c7);
   box-shadow: 0 0 12px #38bdf8;
 }
@@ -2764,7 +2805,8 @@ footer > span { font-size: 11px; letter-spacing: .12em; }footer > small { margin
 .theme-cyber .mobile-bottom-nav-item.active .mobile-bottom-nav-label {
   color: #10b981;
 }
-.theme-cyber .mobile-bottom-nav-indicator {
+.theme-cyber .mobile-bottom-nav-indicator,
+.theme-cyber .mobile-bottom-nav-sliding-indicator {
   background: linear-gradient(90deg, #059669, #10b981, #059669);
   box-shadow: 0 0 12px #10b981;
 }
