@@ -79,6 +79,18 @@
       "skillPath": "skills/security-audit/SKILL.md",
       "computedHash": "e6b2e317de75da97e9de18d842982994803f3a67a4a6d8154a82323dc3de8528"
     },
+    "teamwork": {
+      "source": "antigravity/teamwork",
+      "sourceType": "builtin",
+      "skillPath": "skills/teamwork/SKILL.md",
+      "computedHash": "259a3d5cbd3afb3718219d432330a57b2a3c62234edfe761591de4da38813878"
+    },
+    "ui-ux-pro-max": {
+      "source": "local/ui-ux-pro-max",
+      "sourceType": "project",
+      "skillPath": "skills/ui-ux-pro-max/SKILL.md",
+      "computedHash": "5905a2b470ca86077daf03f3c13361b949a702ae9f98399515abc55882cb9aa3"
+    },
     "workflow-from-eval": {
       "source": "roboflow/computer-vision-skills",
       "sourceType": "github",
