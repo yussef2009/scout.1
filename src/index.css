@@ -16629,16 +16629,34 @@ html[dir="rtl"] .mobile-tab-link-icon {
   transform: translateX(1px);
 }
 
-@media (max-width: 520px) {
+.search-3d-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+@media (max-width: 768px) {
   .search-3d-popover {
-    right: -50px;
-    width: calc(100vw - 24px);
-    max-width: calc(100vw - 24px);
-    padding: 14px;
-    border-radius: 14px;
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%) !important;
+    width: calc(100vw - 28px) !important;
+    max-width: 440px !important;
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+    padding: 16px !important;
+    border-radius: 20px !important;
+    z-index: 10001 !important;
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.95), 0 0 40px rgba(251, 191, 36, 0.25) !important;
   }
   .search-3d-pointer {
-    right: 64px;
+    display: none !important;
   }
 }
 
@@ -16958,8 +16976,10 @@ html[dir="rtl"] .mobile-tab-link-icon {
     -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.14) !important;
     box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.2), 0 10px 32px rgba(0, 0, 0, 0.5) !important;
-    position: relative;
-    overflow: hidden;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1000 !important;
+    overflow: visible !important;
   }
 
   /* Liquid Glass Sheen Sweep Across Desktop Topbar */
@@ -16970,6 +16990,7 @@ html[dir="rtl"] .mobile-tab-link-icon {
     left: 0;
     width: 40%;
     height: 100%;
+    clip-path: inset(0 0 0 0);
     background: linear-gradient(
       90deg,
       transparent 0%,

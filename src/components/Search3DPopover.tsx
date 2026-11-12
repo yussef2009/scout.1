@@ -178,16 +178,10 @@ export function Search3DPopover({
 
   return (
     <>
-      {/* Invisible backdrop to close popover when clicking anywhere outside */}
+      {/* Backdrop to close popover when clicking anywhere outside */}
       <div
         className="search-3d-backdrop"
         onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 9990,
-          background: "transparent",
-        }}
         data-testid="search-3d-backdrop"
       />
 
@@ -435,7 +429,7 @@ export function Search3DPopover({
                       <div
                         key={p.id}
                         className="search-3d-row"
-                        onClick={() => onSelectProfile(p)}
+                        onClick={() => { onClose(); onSelectProfile(p); }}
                         data-testid={`search-result-${p.id}`}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
@@ -457,6 +451,7 @@ export function Search3DPopover({
                             className="search-3d-view-btn"
                             onClick={(e) => {
                               e.stopPropagation()
+                              onClose()
                               onSelectProfile(p)
                             }}
                           >
