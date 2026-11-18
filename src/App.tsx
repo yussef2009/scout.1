@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 import {
   analyzeVideoPlayer,
   captureVideoElementFrame,
@@ -11657,6 +11658,7 @@ function App() {
           </div>
         </div>
       )}
+      <SpeedInsights />
     </main>
   )
 }
